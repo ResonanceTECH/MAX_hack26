@@ -1,0 +1,534 @@
+{
+  "info": {
+    "name": "B2B Match API",
+    "description": "Демо-сценарий бэкенда B2B Match (MAX). Запустите сервер и выполняйте папки по порядку. Запросы «Auth» автоматически кладут токен в переменную коллекции.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000" },
+    { "key": "token", "value": "" },
+    { "key": "opportunity_id", "value": "" },
+    { "key": "proposal_id", "value": "" },
+    { "key": "match_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0. Проверка сервера",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Вход админа и демо-данные",
+      "item": [
+        {
+          "name": "Auth (админ 7777001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) { pm.collectionVariables.set('token', json.access_token); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dev_max_user_id\": 7777001,\n  \"dev_first_name\": \"Anna\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/max", "host": ["{{base_url}}"], "path": ["auth", "max"] }
+          }
+        },
+        {
+          "name": "Seed демо-данных",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "" },
+            "url": { "raw": "{{base_url}}/api/admin/seed", "host": ["{{base_url}}"], "path": ["api", "admin", "seed"] }
+          }
+        },
+        {
+          "name": "Статистика платформы",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/admin/stats", "host": ["{{base_url}}"], "path": ["api", "admin", "stats"] }
+          }
+        },
+        {
+          "name": "Справочники",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/dictionaries", "host": ["{{base_url}}"], "path": ["dictionaries"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Исполнитель: персональная лента",
+      "item": [
+        {
+          "name": "Auth (исполнитель DigitalLab 7777002)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) { pm.collectionVariables.set('token', json.access_token); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dev_max_user_id\": 7777002,\n  \"dev_first_name\": \"Dmitry\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/max", "host": ["{{base_url}}"], "path": ["auth", "max"] }
+          }
+        },
+        {
+          "name": "Персональные рекомендации (лента заказов)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (Array.isArray(json) && json[0] && json[0].match_id) {",
+                  "  pm.collectionVariables.set('match_id', json[0].match_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/me/recommendations", "host": ["{{base_url}}"], "path": ["me", "recommendations"] }
+          }
+        },
+        {
+          "name": "Feedback по рекомендации (релевантна?)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"positive\": true\n}" },
+            "url": {
+              "raw": "{{base_url}}/matches/{{match_id}}/feedback",
+              "host": ["{{base_url}}"],
+              "path": ["matches", "{{match_id}}", "feedback"]
+            }
+          }
+        },
+        {
+          "name": "Inbox уведомлений",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/notifications", "host": ["{{base_url}}"], "path": ["notifications"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Заказчик: запрос, матчи, отклики",
+      "item": [
+        {
+          "name": "Auth (заказчик МебельПро 7777001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) { pm.collectionVariables.set('token', json.access_token); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dev_max_user_id\": 7777001,\n  \"dev_first_name\": \"Anna\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/max", "host": ["{{base_url}}"], "path": ["auth", "max"] }
+          }
+        },
+        {
+          "name": "AI-структуризация (parse-opportunity)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Нужна разработка интернет-магазина. React, 1С, бюджет 400-600 тысяч, срок два месяца, Москва\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/ai/parse-opportunity",
+              "host": ["{{base_url}}"],
+              "path": ["ai", "parse-opportunity"]
+            }
+          }
+        },
+        {
+          "name": "Создать и опубликовать потребность (с матчингом)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) { pm.collectionVariables.set('opportunity_id', json.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Нужна разработка интернет-магазина. React, 1С, бюджет 400-600 тысяч, срок два месяца, Москва\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/opportunities", "host": ["{{base_url}}"], "path": ["opportunities"] }
+          }
+        },
+        {
+          "name": "Матчи по потребности",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/opportunities/{{opportunity_id}}/matches",
+              "host": ["{{base_url}}"],
+              "path": ["opportunities", "{{opportunity_id}}", "matches"]
+            }
+          }
+        },
+        {
+          "name": "Comparison Board",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/opportunities/{{opportunity_id}}/comparison",
+              "host": ["{{base_url}}"],
+              "path": ["opportunities", "{{opportunity_id}}", "comparison"]
+            }
+          }
+        },
+        {
+          "name": "Deal Room",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/opportunities/{{opportunity_id}}/dealroom",
+              "host": ["{{base_url}}"],
+              "path": ["opportunities", "{{opportunity_id}}", "dealroom"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Исполнитель: отклик",
+      "item": [
+        {
+          "name": "Auth (DigitalLab 7777002)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) { pm.collectionVariables.set('token', json.access_token); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dev_max_user_id\": 7777002,\n  \"dev_first_name\": \"Dmitry\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/max", "host": ["{{base_url}}"], "path": ["auth", "max"] }
+          }
+        },
+        {
+          "name": "Отправить предложение",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) { pm.collectionVariables.set('proposal_id', json.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 480000,\n  \"term_days\": 45,\n  \"solution_text\": \"React + 1С, поэтапная сдача\",\n  \"comment\": \"Готовы стартовать через неделю\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/opportunities/{{opportunity_id}}/proposals",
+              "host": ["{{base_url}}"],
+              "path": ["opportunities", "{{opportunity_id}}", "proposals"]
+            }
+          }
+        },
+        {
+          "name": "Мои отклики",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/proposals/mine", "host": ["{{base_url}}"], "path": ["proposals", "mine"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Заказчик: shortlist, deal",
+      "item": [
+        {
+          "name": "Auth (заказчик 7777001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) { pm.collectionVariables.set('token', json.access_token); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dev_max_user_id\": 7777001,\n  \"dev_first_name\": \"Anna\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/max", "host": ["{{base_url}}"], "path": ["auth", "max"] }
+          }
+        },
+        {
+          "name": "Shortlist (по предложению)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"proposal_id\": {{proposal_id}}\n}" },
+            "url": {
+              "raw": "{{base_url}}/opportunities/{{opportunity_id}}/shortlist",
+              "host": ["{{base_url}}"],
+              "path": ["opportunities", "{{opportunity_id}}", "shortlist"]
+            }
+          }
+        },
+        {
+          "name": "Открыть Deal (переговоры)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) { pm.collectionVariables.set('deal_id', json.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"opportunity_id\": {{opportunity_id}},\n  \"proposal_id\": {{proposal_id}}\n}"
+            },
+            "url": { "raw": "{{base_url}}/deals", "host": ["{{base_url}}"], "path": ["deals"] }
+          }
+        },
+        {
+          "name": "Deal Room (итог)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/opportunities/{{opportunity_id}}/dealroom",
+              "host": ["{{base_url}}"],
+              "path": ["opportunities", "{{opportunity_id}}", "dealroom"]
+            }
+          }
+        },
+        {
+          "name": "Inbox уведомлений заказчика",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/notifications", "host": ["{{base_url}}"], "path": ["notifications"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Шеринг и файлы сделки",
+      "item": [
+        {
+          "name": "Auth (заказчик 7777001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) { pm.collectionVariables.set('token', json.access_token); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dev_max_user_id\": 7777001,\n  \"dev_first_name\": \"Anna\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/max", "host": ["{{base_url}}"], "path": ["auth", "max"] }
+          }
+        },
+        {
+          "name": "Ссылка «Отправить в MAX» (компания)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/share/company/2/link",
+              "host": ["{{base_url}}"],
+              "path": ["share", "company", "2", "link"]
+            }
+          }
+        },
+        {
+          "name": "Карточка компании через бота (mid для shareMaxContent)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": { "mode": "raw", "raw": "" },
+            "url": {
+              "raw": "{{base_url}}/share/company/2",
+              "host": ["{{base_url}}"],
+              "path": ["share", "company", "2"]
+            }
+          }
+        },
+        {
+          "name": "Ссылка «Отправить в MAX» (потребность)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/share/opportunity/{{opportunity_id}}/link",
+              "host": ["{{base_url}}"],
+              "path": ["share", "opportunity", "{{opportunity_id}}", "link"]
+            }
+          }
+        },
+        {
+          "name": "Загрузить файл в сделку (multipart: file + deal_id)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": [] },
+                { "key": "deal_id", "value": "{{deal_id}}", "type": "text" }
+              ]
+            },
+            "url": { "raw": "{{base_url}}/files", "host": ["{{base_url}}"], "path": ["files"] }
+          }
+        },
+        {
+          "name": "Сделка с файлами",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/deals/{{deal_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["deals", "{{deal_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Deal Room с файлами",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/opportunities/{{opportunity_id}}/dealroom",
+              "host": ["{{base_url}}"],
+              "path": ["opportunities", "{{opportunity_id}}", "dealroom"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

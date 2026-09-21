@@ -1,0 +1,79 @@
+# Caddy: HTTPS-вход для B2B Match
+# - отдаёт фронтенд мини-приложения из ./frontend
+# - проксирует API на backend:8000
+#
+# ЛОКАЛЬНО: DOMAIN=localhost -> самоподписанный сертификат (tls internal).
+# ПРОДАКШЕН: DOMAIN=ваш-домен.ru, уберите строку "tls internal" —
+# Caddy автоматически выпустит сертификат Let's Encrypt.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN:localhost} {
+	tls internal
+	encode zstd gzip
+
+	# --- API бэкенда ---
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	handle /auth/* {
+		reverse_proxy backend:8000
+	}
+	handle /me {
+		reverse_proxy backend:8000
+	}
+	handle /me/* {
+		reverse_proxy backend:8000
+	}
+	handle /companies* {
+		reverse_proxy backend:8000
+	}
+	handle /opportunities* {
+		reverse_proxy backend:8000
+	}
+	handle /proposals* {
+		reverse_proxy backend:8000
+	}
+	handle /deals* {
+		reverse_proxy backend:8000
+	}
+	handle /matches/* {
+		reverse_proxy backend:8000
+	}
+	handle /notifications* {
+		reverse_proxy backend:8000
+	}
+	handle /files* {
+		reverse_proxy backend:8000
+	}
+	handle /dictionaries* {
+		reverse_proxy backend:8000
+	}
+	handle /ai/* {
+		reverse_proxy backend:8000
+	}
+	handle /feed {
+		reverse_proxy backend:8000
+	}
+	handle /health {
+		reverse_proxy backend:8000
+	}
+	handle /docs* {
+		reverse_proxy backend:8000
+	}
+	handle /openapi.json {
+		reverse_proxy backend:8000
+	}
+	handle /redoc {
+		reverse_proxy backend:8000
+	}
+
+	# --- фронтенд мини-приложения (SPA), всё что не API ---
+	handle {
+		root * /srv/frontend
+		try_files {path} /index.html
+		file_server
+	}
+}

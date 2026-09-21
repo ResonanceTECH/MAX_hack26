@@ -14,7 +14,15 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
-log = logging.getLogger("echo-bot")
+# log = logging.getLogger("echo-bot")
+
+log = logging.getLogger("b2b-match-bot")
+
+
+def _app_deep_link(username: str, payload: str = "") -> str:
+    """Ссылка на мини-приложение: https://max.ru/<botName>?startapp=<payload>."""
+    suffix = f"={payload}" if payload else ""
+    return f"https://max.ru/{username}?startapp{suffix}"
 
 
 def _chat_id_from_message(message: dict[str, Any]) -> int | None:
@@ -29,13 +37,29 @@ def _user_id_from_message(message: dict[str, Any]) -> int | None:
     return int(user_id) if user_id is not None else None
 
 
-def handle_update(api: MaxAPI, update: dict[str, Any]) -> None:
+WELCOME = (
+    "Добро пожаловать в B2B Match 🤝\n\n"
+    "Здесь компании находят подрядчиков, поставщиков и партнёров, "
+    "а исполнители — релевантные заказы.\n\n"
+    "Откройте приложение по ссылке ниже или кнопкой в меню:\n"
+    "{link}\n\n"
+    "Статусы и события будут приходить сюда в чат."
+)
+
+HELP_TEXT = (
+    "Я — точка входа в B2B Match. Откройте мини-приложение:\n"
+    "{link}\n\n"
+    "Подбор исполнителей и заказов происходит внутри приложения."
+)
+
+
+def handle_update(api: MaxAPI, update: dict[str, Any], username: str) -> None:
     update_type = update.get("update_type")
 
     if update_type == "bot_started":
         chat_id = update.get("chat_id")
         user_id = (update.get("user") or {}).get("user_id")
-        text = "Эхо-бот. Напиши что угодно — верну то же самое."
+        text = WELCOME.format(link=_app_deep_link(username))
         if chat_id is not None:
             api.send_message(text, chat_id=int(chat_id))
         elif user_id is not None:
@@ -57,11 +81,19 @@ def handle_update(api: MaxAPI, update: dict[str, Any]) -> None:
     chat_id = _chat_id_from_message(message)
     user_id = _user_id_from_message(message)
 
-    log.info("echo <- %r", text)
+    lowered = text.strip().lower()
+    if lowered in {"start", "/start", "начать", "старт", "меню"}:
+        reply = WELCOME.format(link=_app_deep_link(username))
+    elif lowered in {"заказы", "подбор", "мои отклики", "лента"}:
+        reply = "Откройте персональную ленту в приложении:\n" + _app_deep_link(username, "feed")
+    else:
+        reply = HELP_TEXT.format(link=_app_deep_link(username))
+
+    log.info("bot <- %r", text)
     if chat_id is not None:
-        api.send_message(text, chat_id=chat_id)
+        api.send_message(reply, chat_id=chat_id)
     elif user_id is not None:
-        api.send_message(text, user_id=user_id)
+        api.send_message(reply, user_id=user_id)
 
 
 def start_bot() -> None:
@@ -70,6 +102,7 @@ def start_bot() -> None:
     name = me.get("first_name") or me.get("name") or "?"
     username = me.get("username") or "?"
     log.info("started as %s (@%s), user_id=%s", name, username, me.get("user_id"))
+    log.info("mini-app link: %s", _app_deep_link(username))
 
     marker: int | None = None
     while True:
@@ -82,7 +115,7 @@ def start_bot() -> None:
             marker = payload.get("marker", marker)
             for update in payload.get("updates") or []:
                 try:
-                    handle_update(api, update)
+                    handle_update(api, update, username)
                 except Exception:
                     log.exception("failed to handle update: %s", update)
         except KeyboardInterrupt:
