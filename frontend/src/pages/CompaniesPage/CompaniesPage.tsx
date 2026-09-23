@@ -1,0 +1,199 @@
+import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { AppIcon } from '@/shared/ui'
+import { FilterHorizontalIcon } from '@/shared/ui/icons'
+import Box from '@mui/material/Box'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Stack from '@mui/material/Stack'
+import Switch from '@mui/material/Switch'
+import Typography from '@mui/material/Typography'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
+import { useCompanies } from '@/entities/company/api/queries'
+import { useCompanySearchStore } from '@/features/company-search/model/searchStore'
+import { INDUSTRIES, REGIONS } from '@/shared/constants/labels'
+import { useUiStore } from '@/shared/hooks/useUiStore'
+import {
+  AppButton,
+  AppInput,
+  AppSelect,
+  EmptyState,
+  ErrorState,
+  FilterDrawer,
+  LoadingState,
+  PageHeader,
+  SearchInput,
+} from '@/shared/ui'
+import { CompanyCard } from '@/widgets/CompanyCard/CompanyCard'
+
+function CompanyFiltersForm() {
+  const filters = useCompanySearchStore((s) => s.filters)
+  const patch = useCompanySearchStore((s) => s.patchFilters)
+
+  return (
+    <Stack spacing={2}>
+      <AppSelect
+        label="Отрасль"
+        value={filters.industries?.[0] ?? ''}
+        options={[{ value: '', label: 'Все' }, ...INDUSTRIES.map((i) => ({ value: i, label: i }))]}
+        onChange={(v) => patch({ industries: v ? [v] : undefined })}
+      />
+      <AppInput
+        label="Услуги"
+        value={filters.services?.join(', ') ?? ''}
+        onChange={(e) => {
+          const services = e.target.value
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+          patch({ services: services.length ? services : undefined })
+        }}
+      />
+      <AppInput
+        label="Технологии"
+        value={filters.technologies?.join(', ') ?? ''}
+        onChange={(e) => {
+          const technologies = e.target.value
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+          patch({ technologies: technologies.length ? technologies : undefined })
+        }}
+      />
+      <AppSelect
+        label="Регион"
+        value={filters.region ?? ''}
+        options={[{ value: '', label: 'Все' }, ...REGIONS.map((r) => ({ value: r, label: r }))]}
+        onChange={(v) => patch({ region: v || undefined })}
+      />
+      <AppInput
+        label="Стоимость от"
+        type="number"
+        value={filters.priceFrom ?? ''}
+        onChange={(e) => patch({ priceFrom: e.target.value ? Number(e.target.value) : undefined })}
+      />
+      <AppInput
+        label="Рейтинг от"
+        type="number"
+        value={filters.minRating ?? ''}
+        inputProps={{ min: 0, max: 5, step: 0.1 }}
+        onChange={(e) => patch({ minRating: e.target.value ? Number(e.target.value) : undefined })}
+      />
+      <FormControlLabel
+        control={
+          <Switch
+            checked={Boolean(filters.verified)}
+            onChange={(e) => patch({ verified: e.target.checked || undefined })}
+          />
+        }
+        label="Только verified"
+      />
+      <FormControlLabel
+        control={
+          <Switch
+            checked={Boolean(filters.hasCases)}
+            onChange={(e) => patch({ hasCases: e.target.checked || undefined })}
+          />
+        }
+        label="Есть кейсы"
+      />
+    </Stack>
+  )
+}
+
+export function CompaniesPage() {
+  const theme = useTheme()
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'))
+  const [searchParams] = useSearchParams()
+  const filters = useCompanySearchStore((s) => s.filters)
+  const reset = useCompanySearchStore((s) => s.reset)
+  const drawerOpen = useUiStore((s) => s.filterDrawerOpen)
+  const setDrawerOpen = useUiStore((s) => s.setFilterDrawerOpen)
+  const [query, setQuery] = useState(filters.query ?? '')
+
+  const focusSupply = searchParams.get('focus') === 'supply'
+  const effectiveFilters = useMemo(
+    () => ({
+      ...filters,
+      query: query || filters.query,
+      services: focusSupply ? ['Поставка', ...(filters.services ?? [])] : filters.services,
+    }),
+    [filters, query, focusSupply],
+  )
+
+  const { data, isLoading, isError, refetch } = useCompanies(effectiveFilters)
+
+  return (
+    <Box>
+      <PageHeader
+        title="Компании"
+        subtitle="Найдите исполнителя или поставщика."
+        actions={
+          !isDesktop ? (
+            <AppButton
+              variant="outlined"
+              startIcon={<AppIcon icon={FilterHorizontalIcon} size={18} />}
+              onClick={() => setDrawerOpen(true)}
+            >
+              Фильтры
+            </AppButton>
+          ) : null
+        }
+      />
+
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+        {isDesktop ? (
+          <Box
+            sx={{
+              width: 280,
+              flexShrink: 0,
+              p: 2,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+            }}
+          >
+            <Typography variant="h3" sx={{ mb: 2 }}>
+              Фильтры
+            </Typography>
+            <CompanyFiltersForm />
+            <AppButton fullWidth variant="text" sx={{ mt: 2 }} onClick={reset}>
+              Сбросить
+            </AppButton>
+          </Box>
+        ) : null}
+
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <SearchInput
+            value={query}
+            onChange={setQuery}
+            label="Поиск компаний"
+            placeholder="Digital Lab, React, Healthcare..."
+          />
+          <Box sx={{ mt: 3 }}>
+            {isLoading ? <LoadingState rows={4} /> : null}
+            {isError ? <ErrorState onRetry={() => void refetch()} /> : null}
+            {!isLoading && !isError && (data?.length ?? 0) === 0 ? (
+              <EmptyState
+                title="Компании не найдены"
+                description="Попробуйте изменить фильтры."
+                actionLabel="Сбросить"
+                onAction={reset}
+              />
+            ) : null}
+            <Stack spacing={2}>
+              {(data ?? []).map((company) => (
+                <CompanyCard key={company.id} company={company} />
+              ))}
+            </Stack>
+          </Box>
+        </Box>
+      </Stack>
+
+      <FilterDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onReset={reset}>
+        <CompanyFiltersForm />
+      </FilterDrawer>
+    </Box>
+  )
+}

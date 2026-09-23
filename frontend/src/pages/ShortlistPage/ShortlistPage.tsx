@@ -1,0 +1,165 @@
+import { useMemo, useState } from 'react'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
+import Box from '@mui/material/Box'
+import Card from '@mui/material/Card'
+import CardActions from '@mui/material/CardActions'
+import CardContent from '@mui/material/CardContent'
+import Stack from '@mui/material/Stack'
+import TextField from '@mui/material/TextField'
+import Typography from '@mui/material/Typography'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { dealApi } from '@/shared/api/dealApi'
+import { dealKeys } from '@/entities/deal/api/queries'
+import { getCompanyById, getOpportunityById, mockShortlist, type ShortlistItem } from '@/shared/mocks'
+import { companyDetailsPath, dealDetailsPath, ROUTES } from '@/shared/constants/routes'
+import { AppButton, EmptyState, MatchScore, MoneyValue, PageHeader, VerifiedBadge } from '@/shared/ui'
+
+export interface ShortlistPageProps {
+  embedded?: boolean
+}
+
+export function ShortlistPage({ embedded }: ShortlistPageProps) {
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [items, setItems] = useState<ShortlistItem[]>(mockShortlist)
+  const [notes, setNotes] = useState<Record<string, string>>(
+    Object.fromEntries(mockShortlist.map((i) => [i.id, i.note])),
+  )
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, ShortlistItem[]>()
+    for (const item of items) {
+      const list = map.get(item.opportunityId) ?? []
+      list.push(item)
+      map.set(item.opportunityId, list)
+    }
+    return [...map.entries()]
+  }, [items])
+
+  const startDeal = useMutation({
+    mutationFn: dealApi.startFromShortlist,
+    onSuccess: (deal) => {
+      void qc.invalidateQueries({ queryKey: dealKeys.all })
+      void navigate(dealDetailsPath(deal.id))
+    },
+  })
+
+  const content = (
+    <>
+      {grouped.length === 0 ? (
+        <EmptyState
+          title="Shortlist пуст"
+          description="Добавляйте компании из предложений."
+          actionLabel="К возможностям"
+          onAction={() => {
+            window.location.href = ROUTES.OPPORTUNITIES
+          }}
+        />
+      ) : (
+        <Stack spacing={4}>
+          {grouped.map(([opportunityId, group]) => {
+            const opp = getOpportunityById(opportunityId)
+            return (
+              <Box key={opportunityId}>
+                <Typography variant="h2" sx={{ mb: 0.5 }}>
+                  {opp?.title ?? opportunityId}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Финалисты: {group.length}
+                </Typography>
+                <Stack spacing={2}>
+                  {group.map((item) => {
+                    const company = getCompanyById(item.companyId)
+                    if (!company) return null
+                    return (
+                      <Card key={item.id}>
+                        <CardContent>
+                          <Stack spacing={1.25}>
+                            <Stack
+                              direction="row"
+                              justifyContent="space-between"
+                              alignItems="flex-start"
+                            >
+                              <Stack direction="row" spacing={0.75} alignItems="center">
+                                <Typography variant="h3">{company.shortName}</Typography>
+                                <VerifiedBadge verified={company.verified} compact />
+                              </Stack>
+                              <MatchScore score={item.matchScore} companyName={company.shortName} />
+                            </Stack>
+                            <Stack direction="row" spacing={2} alignItems="baseline">
+                              <MoneyValue amount={item.price} currency={item.currency} />
+                              {item.durationDays != null ? (
+                                <Typography variant="body2" color="text.secondary">
+                                  {item.durationDays} дн.
+                                </Typography>
+                              ) : null}
+                            </Stack>
+                            <TextField
+                              label="Заметка"
+                              fullWidth
+                              size="small"
+                              value={notes[item.id] ?? ''}
+                              onChange={(e) =>
+                                setNotes((n) => ({ ...n, [item.id]: e.target.value }))
+                              }
+                            />
+                          </Stack>
+                        </CardContent>
+                        <CardActions sx={{ px: 2, pb: 2, gap: 1, flexWrap: 'wrap' }}>
+                          <AppButton
+                            variant="contained"
+                            size="small"
+                            loading={startDeal.isPending}
+                            onClick={() =>
+                              startDeal.mutate({
+                                opportunityId: item.opportunityId,
+                                opportunityTitle: opp?.title ?? 'Запрос',
+                                companyId: item.companyId,
+                                companyName: company.shortName,
+                                proposalId: item.proposalId,
+                                price: item.price,
+                                currency: item.currency,
+                                durationDays: item.durationDays,
+                              })
+                            }
+                          >
+                            Начать переговоры
+                          </AppButton>
+                          <AppButton
+                            component={RouterLink}
+                            to={companyDetailsPath(company.id)}
+                            variant="outlined"
+                            size="small"
+                          >
+                            Открыть компанию
+                          </AppButton>
+                          <AppButton
+                            variant="text"
+                            color="error"
+                            size="small"
+                            onClick={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
+                          >
+                            Удалить
+                          </AppButton>
+                        </CardActions>
+                      </Card>
+                    )
+                  })}
+                </Stack>
+              </Box>
+            )
+          })}
+        </Stack>
+      )}
+    </>
+  )
+
+  if (embedded) return content
+
+  return (
+    <Box>
+      <PageHeader title="Shortlist" subtitle="Финалисты по выбранным запросам" />
+      {content}
+    </Box>
+  )
+}
