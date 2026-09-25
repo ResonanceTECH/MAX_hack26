@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { cardWithAction, gap } from './helpers'
+import { cardWithAction } from './helpers'
 
 function finalist(page: import('@playwright/test').Page, name: string) {
   return cardWithAction(page, name, 'Начать переговоры')
@@ -15,12 +15,9 @@ test('[SHORT-01] grouped by request', async ({ page }) => {
 test('[SHORT-02] a shortlisted proposal appears here', async ({ page }) => {
   await page.goto('/opportunities/opp-dl-ecommerce/proposals')
   await page.getByRole('button', { name: 'В shortlist' }).click()
-  await expect(page.getByText('В shortlist')).toBeVisible()
+  await expect(page.getByText('Добавлено в shortlist')).toBeVisible()
   await page.goto('/my/shortlist')
-  await expect(
-    page.getByRole('heading', { name: 'TechFlow' }),
-    gap('FAIL', 'proposalApi.shortlist меняет статус, но не добавляет запись в shortlist'),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'TechFlow' })).toBeVisible()
 })
 
 test('[SHORT-03] remove stays removed', async ({ page }) => {
@@ -29,21 +26,19 @@ test('[SHORT-03] remove stays removed', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'PackPro' })).toHaveCount(0)
   await page.goto('/my')
   await page.goto('/my/shortlist')
-  await expect(
-    page.getByRole('heading', { name: 'PackPro' }),
-    gap('FAIL', 'удаление живёт в useState и возвращается после ухода со страницы'),
-  ).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'PackPro' })).toHaveCount(0)
 })
 
 test('[SHORT-04] [SHORT-05] a note is saved', async ({ page }) => {
   await page.goto('/my/shortlist')
-  await finalist(page, 'PackPro').getByRole('textbox', { name: 'Заметка' }).fill('Заметка аудита должна сохраниться')
+  const note = finalist(page, 'PackPro').getByRole('textbox', { name: 'Заметка' })
+  await note.fill('Заметка аудита должна сохраниться')
+  await expect(note).toHaveValue('Заметка аудита должна сохраниться')
   await page.goto('/companies')
   await page.goto('/my/shortlist')
-  await expect(
-    finalist(page, 'PackPro').getByRole('textbox', { name: 'Заметка' }),
-    gap('FAIL', 'заметка не записывается и сбрасывается при новом монтировании'),
-  ).toHaveValue('Заметка аудита должна сохраниться')
+  await expect(finalist(page, 'PackPro').getByRole('textbox', { name: 'Заметка' })).toHaveValue(
+    'Заметка аудита должна сохраниться',
+  )
 })
 
 test('[SHORT-06] open company', async ({ page }) => {
@@ -69,5 +64,5 @@ test('[SHORT-09] starting negotiations twice does not duplicate the deal', async
   await page.goto('/my/shortlist')
   await finalist(page, 'PackPro').getByRole('button', { name: 'Начать переговоры' }).click()
   await expect(page).toHaveURL(/\/deals\/deal-/)
-  expect(page.url(), gap('FAIL', 'каждый клик создаёт новый deal через Date.now()')).toBe(first)
+  expect(page.url()).toBe(first)
 })

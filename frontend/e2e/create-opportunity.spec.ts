@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { gap, reachOpportunityForm } from './helpers'
+import { reachOpportunityForm } from './helpers'
 
 const TITLE = 'CRM для сети клиник — аудит публикации'
 
@@ -79,12 +79,9 @@ test('[CR-14] [CR-15] save draft lands in drafts', async ({ page }) => {
   await page.getByLabel('Название').fill('Черновик CRM для аудита')
   await page.getByRole('button', { name: 'К предпросмотру' }).click()
   await page.getByRole('button', { name: 'Сохранить черновик' }).click()
-  await page.goto('/my/requests')
+  await expect(page).toHaveURL(/\/my\/requests/)
   await page.getByRole('tab', { name: /Черновики/ }).click()
-  await expect(
-    page.getByText('Черновик CRM для аудита'),
-    gap('NOT_IMPLEMENTED', '«Сохранить черновик» вызывает publish(), статус становится published'),
-  ).toBeVisible()
+  await expect(page.getByText('Черновик CRM для аудита')).toBeVisible()
 })
 
 test('[CR-20] publishing produces matching results', async ({ page }) => {
@@ -94,8 +91,6 @@ test('[CR-20] publishing produces matching results', async ({ page }) => {
   await page.getByRole('button', { name: 'К предпросмотру' }).click()
   await page.getByRole('button', { name: 'Опубликовать' }).click()
   await expect(page.getByRole('heading', { name: 'Запрос опубликован' })).toBeVisible()
-  await expect(
-    page.getByText(/Почему подходит/),
-    gap('NOT_IMPLEMENTED', 'после публикации показывается захардкоженное «Найдено 8», без компаний и объяснения'),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Почему подходит' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /TechFlow|DataCraft|МедСнаб/ }).first()).toBeVisible()
 })

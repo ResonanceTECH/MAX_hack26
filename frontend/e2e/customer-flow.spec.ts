@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { gap, reachOpportunityForm } from './helpers'
+import { reachOpportunityForm } from './helpers'
 
 test('customer flow: the same business user publishes a request and reaches a deal', async ({
   page,
@@ -18,11 +18,5 @@ test('customer flow: the same business user publishes a request and reaches a de
   await expect(page.getByText('CRM для 12 клиник — поток заказчика')).toBeVisible()
   await page.getByRole('button', { name: 'Опубликовать' }).click()
   await expect(page.getByRole('heading', { name: 'Запрос опубликован' })).toBeVisible()
-  await expect(
-    page.getByRole('heading', { name: /TechFlow|DataCraft|МедСнаб/ }),
-    gap(
-      'FAIL',
-      'тот же Business User публикует запрос, но не получает рекомендации компаний. Сравнение, shortlist и Deal Room из нового запроса недоступны: предложений нет, shortlist не связан с кнопкой «В shortlist».',
-    ),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: /TechFlow|DataCraft|МедСнаб/ }).first()).toBeVisible()
 })
