@@ -26,7 +26,7 @@ export function useOpportunities(filters?: OpportunityFilters, sort?: Opportunit
 export function useRecommendedOpportunities(companyId?: string) {
   return useQuery({
     queryKey: [...opportunityKeys.all, 'recommended', companyId] as const,
-    queryFn: () => opportunityApi.getAll(undefined, 'match'),
+    queryFn: () => opportunityApi.getRecommended(),
     enabled: Boolean(companyId),
   })
 }

@@ -18,7 +18,11 @@ MAX Mini App для поиска B2B-контрагентов и сопоста�
 - показывает Match Score и объяснение «Почему подходит»;
 - ведёт процесс от отклика до shortlist, переговоров и Deal Room.
 
-Пока backend не подключён: данные живут в in-memory mock API (`src/shared/api` + `src/shared/mocks`). HTTP-запросы к FastAPI ещё не используются.
+По умолчанию (`VITE_USE_MOCK_API=true`) данные живут в mock API.  
+При `VITE_USE_MOCK_API=false` core-домены (auth, companies, opportunities, proposals, matching, deals, notifications, shortlist) ходят в FastAPI `backend_max` через Axios + DTO mappers.  
+Admin / moderation / favorites / team и т.п. остаются на mock — см. `docs/INTEGRATION_AUDIT_REPORT.md`.
+
+**Важно:** backend **без** prefix `/api/v1`. Vite proxy проксирует `/companies`, `/auth`, … на `localhost:8000`.
 
 ---
 
@@ -88,11 +92,11 @@ cp .env.example .env
 
 | Переменная          | По умолчанию | Назначение                                              |
 | ------------------- | ------------ | ------------------------------------------------------- |
-| `VITE_API_BASE_URL` | `/api/v1`    | Базовый URL FastAPI                                     |
-| `VITE_USE_MOCK_API` | `true`       | `true` — in-memory mocks; `false` — когда backend готов |
+| `VITE_API_BASE_URL` | `` (empty)   | Base URL FastAPI; empty = Vite proxy → `localhost:8000` |
+| `VITE_USE_MOCK_API` | `true`       | `true` — mocks; `false` — real FastAPI (core domains)   |
 
 
-Сейчас `VITE_USE_MOCK_API=true`. Переключение на живой API ещё впереди.
+При `VITE_USE_MOCK_API=false` сначала поднимите backend (`docker compose up db backend`) и сделайте seed.
 
 ### Dev-сервер
 

@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
+const backend = process.env.VITE_PROXY_TARGET || 'http://localhost:8000'
 
 export default defineConfig({
   plugins: [react()],
@@ -15,5 +16,25 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    proxy: {
+      '/auth': backend,
+      '/me': backend,
+      '/companies': backend,
+      '/opportunities': backend,
+      '/proposals': backend,
+      '/deals': backend,
+      '/matches': backend,
+      '/notifications': backend,
+      '/files': backend,
+      '/dictionaries': backend,
+      '/ai': backend,
+      '/feed': backend,
+      '/share': backend,
+      '/health': backend,
+      '/api': backend,
+      '/docs': backend,
+      '/openapi.json': backend,
+      '/redoc': backend,
+    },
   },
 })
