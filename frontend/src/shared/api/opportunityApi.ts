@@ -1,6 +1,8 @@
 import type { Opportunity } from '@/entities/opportunity'
 import { delay } from '@/shared/lib/delay'
+import { persistOpportunities } from '@/shared/mocks/hydrateMocks'
 import { getCompanyById, getOpportunityById, mockOpportunities } from '@/shared/mocks'
+import { mockMatches } from '@/shared/mocks/matches'
 import { CURRENT_COMPANY_ID } from '@/shared/mocks/user'
 
 export interface OpportunityFilters {
@@ -36,12 +38,30 @@ export interface CreateOpportunityPayload {
   executionDeadline: string | null
 }
 
+function scoreFor(opportunityId: string): number {
+  return (
+    mockMatches.find(
+      (m) => m.opportunityId === opportunityId && m.companyId === CURRENT_COMPANY_ID,
+    )?.score ?? 0
+  )
+}
+
 function applyFilters(items: Opportunity[], filters?: OpportunityFilters): Opportunity[] {
   if (!filters) return items
   return items.filter((o) => {
     if (filters.query) {
       const q = filters.query.toLowerCase()
-      const hay = `${o.title} ${o.description} ${o.company.shortName}`.toLowerCase()
+      const hay = [
+        o.title,
+        o.description,
+        o.company.shortName,
+        o.category,
+        ...o.skills,
+        ...o.technologies,
+        ...o.industries,
+      ]
+        .join(' ')
+        .toLowerCase()
       if (!hay.includes(q)) return false
     }
     if (filters.category && o.category !== filters.category) return false
@@ -63,6 +83,7 @@ function applyFilters(items: Opportunity[], filters?: OpportunityFilters): Oppor
     }
     if (filters.remoteAllowed != null && o.remoteAllowed !== filters.remoteAllowed) return false
     if (filters.status && o.status !== filters.status) return false
+    if (filters.minMatchScore != null && scoreFor(o.id) < filters.minMatchScore) return false
     return true
   })
 }
@@ -79,6 +100,7 @@ function applySort(items: Opportunity[], sort?: OpportunitySort): Opportunity[] 
     case 'deadline':
       return sorted.sort((a, b) => +new Date(a.proposalDeadline) - +new Date(b.proposalDeadline))
     case 'match':
+      return sorted.sort((a, b) => scoreFor(b.id) - scoreFor(a.id))
     default:
       return sorted
   }
@@ -127,6 +149,7 @@ export const opportunityApi = {
       newProposalsCount: 0,
     }
     mockOpportunities.unshift(created)
+    persistOpportunities()
     return created
   },
 
@@ -135,6 +158,7 @@ export const opportunityApi = {
     const item = getOpportunityById(id)
     if (!item) throw new Error('Возможность не найдена')
     Object.assign(item, payload)
+    persistOpportunities()
     return item
   },
 
@@ -143,7 +167,12 @@ export const opportunityApi = {
     const item = getOpportunityById(id)
     if (!item) throw new Error('Возможность не найдена')
     item.status = 'published'
+    persistOpportunities()
     return item
+  },
+
+  async saveDraft(payload: CreateOpportunityPayload): Promise<Opportunity> {
+    return opportunityApi.create(payload)
   },
 
   async getMine(companyId: string): Promise<Opportunity[]> {

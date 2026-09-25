@@ -22,6 +22,8 @@ export const mockCompanies: Company[] = [
     reviewsCount: 36,
     verified: true,
     casesCount: 24,
+    verificationStatus: 'verified',
+    status: 'active',
   },
   {
     id: 'company-techflow',
@@ -44,6 +46,8 @@ export const mockCompanies: Company[] = [
     reviewsCount: 22,
     verified: true,
     casesCount: 18,
+    verificationStatus: 'verified',
+    status: 'active',
   },
   {
     id: 'company-packpro',
@@ -66,6 +70,8 @@ export const mockCompanies: Company[] = [
     reviewsCount: 51,
     verified: true,
     casesCount: 40,
+    verificationStatus: 'verified',
+    status: 'active',
   },
   {
     id: 'company-logistics-one',
@@ -88,6 +94,8 @@ export const mockCompanies: Company[] = [
     reviewsCount: 67,
     verified: true,
     casesCount: 55,
+    verificationStatus: 'verified',
+    status: 'active',
   },
   {
     id: 'company-datacraft',
@@ -110,6 +118,8 @@ export const mockCompanies: Company[] = [
     reviewsCount: 19,
     verified: true,
     casesCount: 15,
+    verificationStatus: 'verified',
+    status: 'active',
   },
   {
     id: 'company-medsupply',
@@ -132,6 +142,8 @@ export const mockCompanies: Company[] = [
     reviewsCount: 28,
     verified: false,
     casesCount: 12,
+    verificationStatus: 'pending',
+    status: 'draft',
   },
   {
     id: 'company-brandpulse',
@@ -154,6 +166,8 @@ export const mockCompanies: Company[] = [
     reviewsCount: 41,
     verified: true,
     casesCount: 33,
+    verificationStatus: 'verified',
+    status: 'active',
   },
   {
     id: 'company-steelworks',
@@ -176,6 +190,8 @@ export const mockCompanies: Company[] = [
     reviewsCount: 14,
     verified: true,
     casesCount: 9,
+    verificationStatus: 'verified',
+    status: 'active',
   },
   {
     id: 'company-cloudnest',
@@ -197,6 +213,8 @@ export const mockCompanies: Company[] = [
     reviewsCount: 17,
     verified: true,
     casesCount: 14,
+    verificationStatus: 'verified',
+    status: 'active',
   },
   {
     id: 'company-retailsoft',
@@ -218,6 +236,8 @@ export const mockCompanies: Company[] = [
     reviewsCount: 25,
     verified: false,
     casesCount: 20,
+    verificationStatus: 'pending',
+    status: 'draft',
   },
 ]
 

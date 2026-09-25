@@ -1,16 +1,9 @@
-export interface ShortlistItem {
-  id: string
-  opportunityId: string
-  companyId: string
-  proposalId: string | null
-  price: number | null
-  currency: string
-  durationDays: number | null
-  matchScore: number
-  note: string
-}
+import type { ShortlistItem } from '@/entities/shortlist'
+import { loadMockState } from '@/shared/lib/mockPersist'
 
-export const mockShortlist: ShortlistItem[] = [
+export type { ShortlistItem }
+
+const SEED: ShortlistItem[] = [
   {
     id: 'sl-1',
     opportunityId: 'opp-crm-clinics',
@@ -56,3 +49,6 @@ export const mockShortlist: ShortlistItem[] = [
     note: 'Основной кандидат по логистике',
   },
 ]
+
+/** Mutated in-place by shortlistApi; hydrated from localStorage on boot. */
+export const mockShortlist: ShortlistItem[] = loadMockState('shortlist', SEED)

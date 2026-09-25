@@ -29,6 +29,7 @@ export {
   InformationCircleIcon,
   AlertCircleIcon,
   UserCircleIcon,
+  UserGroupIcon,
   Clock01Icon,
   Delete02Icon,
   Edit02Icon,
@@ -47,4 +48,10 @@ export {
   Analytics01Icon,
   Link01Icon,
   Globe02Icon,
+  Activity01Icon,
+  Settings01Icon,
+  Shield01Icon,
+  Key01Icon,
+  MoreHorizontalIcon,
+  MoreVerticalCircle01Icon,
 } from '@hugeicons/core-free-icons'

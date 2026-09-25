@@ -1,3 +1,5 @@
+import { saveMockState } from '@/shared/lib/mockPersist'
+
 export interface FavoriteItem {
   id: string
   type: 'company' | 'opportunity'
@@ -5,7 +7,7 @@ export interface FavoriteItem {
   createdAt: string
 }
 
-export let mockFavorites: FavoriteItem[] = [
+export const mockFavorites: FavoriteItem[] = [
   {
     id: 'fav-1',
     type: 'opportunity',
@@ -26,24 +28,27 @@ export let mockFavorites: FavoriteItem[] = [
   },
 ]
 
+function persist() {
+  saveMockState('favorites', mockFavorites)
+}
+
 export function isFavorite(type: FavoriteItem['type'], targetId: string): boolean {
   return mockFavorites.some((f) => f.type === type && f.targetId === targetId)
 }
 
 export function toggleFavorite(type: FavoriteItem['type'], targetId: string): boolean {
-  const existing = mockFavorites.find((f) => f.type === type && f.targetId === targetId)
-  if (existing) {
-    mockFavorites = mockFavorites.filter((f) => f.id !== existing.id)
+  const index = mockFavorites.findIndex((f) => f.type === type && f.targetId === targetId)
+  if (index >= 0) {
+    mockFavorites.splice(index, 1)
+    persist()
     return false
   }
-  mockFavorites = [
-    {
-      id: `fav-${Date.now()}`,
-      type,
-      targetId,
-      createdAt: new Date().toISOString(),
-    },
-    ...mockFavorites,
-  ]
+  mockFavorites.unshift({
+    id: `fav-${Date.now()}`,
+    type,
+    targetId,
+    createdAt: new Date().toISOString(),
+  })
+  persist()
   return true
 }

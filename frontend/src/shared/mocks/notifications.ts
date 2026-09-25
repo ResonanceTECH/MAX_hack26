@@ -59,7 +59,7 @@ export const mockNotifications: AppNotification[] = [
   },
   {
     id: 'notif-7',
-    type: NOTIFICATION_TYPES.NEW_PROPOSAL,
+    type: NOTIFICATION_TYPES.NEGOTIATION,
     title: 'Начались переговоры',
     message: 'По запросу CRM начаты переговоры с Digital Lab',
     createdAt: '2026-09-25T14:05:00.000Z',

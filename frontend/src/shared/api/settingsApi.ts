@@ -1,0 +1,55 @@
+import type { CompanySettings } from '@/entities/company-settings'
+import { COMPANY_ACTIVITY_TYPE } from '@/entities/company-activity'
+import { delay } from '@/shared/lib/delay'
+import { mockCompanySettings } from '@/shared/mocks'
+import { persistCompanySettings } from '@/shared/mocks/hydrateMocks'
+import { CURRENT_COMPANY_ID } from '@/shared/mocks/user'
+import { activityApi } from './activityApi'
+
+export type CompanySettingsPatch = Partial<{
+  notifications: Partial<CompanySettings['notifications']>
+  visibility: Partial<CompanySettings['visibility']>
+  matching: Partial<CompanySettings['matching']>
+  archived: boolean
+}>
+
+const DEFAULT_ACTOR = 'Анна Смирнова'
+
+export const settingsApi = {
+  async get(companyId = CURRENT_COMPANY_ID): Promise<CompanySettings> {
+    await delay()
+    if (mockCompanySettings.companyId !== companyId) {
+      return {
+        ...structuredClone(mockCompanySettings),
+        companyId,
+      }
+    }
+    return structuredClone(mockCompanySettings)
+  },
+
+  async update(patch: CompanySettingsPatch, companyId = CURRENT_COMPANY_ID): Promise<CompanySettings> {
+    await delay()
+    if (patch.notifications) {
+      Object.assign(mockCompanySettings.notifications, patch.notifications)
+    }
+    if (patch.visibility) {
+      Object.assign(mockCompanySettings.visibility, patch.visibility)
+    }
+    if (patch.matching) {
+      Object.assign(mockCompanySettings.matching, patch.matching)
+    }
+    if (patch.archived !== undefined) {
+      mockCompanySettings.archived = patch.archived
+    }
+    mockCompanySettings.companyId = companyId
+    persistCompanySettings()
+    activityApi.appendSync({
+      companyId,
+      type: COMPANY_ACTIVITY_TYPE.SETTINGS_UPDATED,
+      actorName: DEFAULT_ACTOR,
+      action: 'обновила настройки компании',
+      entityLabel: 'Настройки',
+    })
+    return structuredClone(mockCompanySettings)
+  },
+}

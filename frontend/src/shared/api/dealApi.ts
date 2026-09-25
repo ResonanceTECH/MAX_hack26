@@ -1,5 +1,6 @@
 import type { Deal } from '@/entities/deal'
 import { delay } from '@/shared/lib/delay'
+import { persistDeals } from '@/shared/mocks/hydrateMocks'
 import { getDealById, mockDeals } from '@/shared/mocks'
 
 export const dealApi = {
@@ -12,7 +13,10 @@ export const dealApi = {
     await delay()
     const deal = getDealById(id)
     if (!deal) throw new Error('Сделка не найдена')
-    return deal
+    return {
+      ...deal,
+      events: [...deal.events].sort((a, b) => +new Date(a.date) - +new Date(b.date)),
+    }
   },
 
   async startFromShortlist(params: {
@@ -26,6 +30,20 @@ export const dealApi = {
     durationDays: number | null
   }): Promise<Deal> {
     await delay()
+    const existing = mockDeals.find(
+      (d) =>
+        d.opportunityId === params.opportunityId &&
+        d.companyId === params.companyId &&
+        (params.proposalId == null || d.proposalId === params.proposalId) &&
+        d.status === 'negotiation',
+    )
+    if (existing) {
+      return {
+        ...existing,
+        events: [...existing.events].sort((a, b) => +new Date(a.date) - +new Date(b.date)),
+      }
+    }
+
     const deal: Deal = {
       id: `deal-${Date.now()}`,
       ...params,
@@ -45,6 +63,7 @@ export const dealApi = {
       ],
     }
     mockDeals.unshift(deal)
+    persistDeals()
     return deal
   },
 }
