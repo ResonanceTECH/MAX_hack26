@@ -167,11 +167,13 @@ export function DealRoomPage() {
 
       {tab === 3 ? (
         <Stack spacing={0}>
-          {deal.events.map((event, index) => (
+          {[...deal.events]
+            .sort((a, b) => +new Date(a.date) - +new Date(b.date))
+            .map((event, index, list) => (
             <Stack key={event.id} direction="row" spacing={2} sx={{ pb: 3 }}>
               <Stack alignItems="center" sx={{ width: 32 }}>
                 <AppIcon icon={eventIcon(event.type)} size={22} color="secondary.main" aria-hidden />
-                {index < deal.events.length - 1 ? (
+                {index < list.length - 1 ? (
                   <Box
                     sx={{
                       flex: 1,

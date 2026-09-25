@@ -3,8 +3,9 @@ import Box from '@mui/material/Box'
 import Stack from '@mui/material/Stack'
 import Tab from '@mui/material/Tab'
 import Tabs from '@mui/material/Tabs'
+import { useCompanies } from '@/entities/company/api/queries'
+import { useOpportunities } from '@/entities/opportunity/api/queries'
 import { useFavorites } from '@/features/favorites/api/queries'
-import { getCompanyById, getOpportunityById } from '@/shared/mocks'
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '@/shared/ui'
 import { CompanyCard } from '@/widgets/CompanyCard/CompanyCard'
 import { OpportunityCard } from '@/widgets/OpportunityCard/OpportunityCard'
@@ -14,20 +15,22 @@ const TABS = ['Компании', 'Возможности'] as const
 export function FavoritesPage() {
   const [tab, setTab] = useState(0)
   const { data, isLoading, isError, refetch } = useFavorites()
+  const companiesQuery = useCompanies()
+  const opportunitiesQuery = useOpportunities()
 
   const companies = useMemo(() => {
     const items = (data ?? []).filter((f) => f.type === 'company')
     return items
-      .map((f) => getCompanyById(f.targetId))
+      .map((f) => companiesQuery.data?.find((c) => c.id === f.targetId))
       .filter((c): c is NonNullable<typeof c> => c != null)
-  }, [data])
+  }, [data, companiesQuery.data])
 
   const opportunities = useMemo(() => {
     const items = (data ?? []).filter((f) => f.type === 'opportunity')
     return items
-      .map((f) => getOpportunityById(f.targetId))
+      .map((f) => opportunitiesQuery.data?.find((o) => o.id === f.targetId))
       .filter((o): o is NonNullable<typeof o> => o != null)
-  }, [data])
+  }, [data, opportunitiesQuery.data])
 
   return (
     <Box>
