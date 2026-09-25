@@ -14,6 +14,7 @@ export const USER_ROLES = SYSTEM_ROLES
 
 export const USER_STATUS = {
   ACTIVE: 'active',
+  SUSPENDED: 'suspended',
   BLOCKED: 'blocked',
   INVITED: 'invited',
 } as const
