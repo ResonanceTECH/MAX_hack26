@@ -4,7 +4,6 @@ import { Outlet } from 'react-router-dom'
 import { DevRoleSwitcher } from '@/features/auth/ui/DevRoleSwitcher'
 import { AppSnackbar } from '@/features/ui/ui/AppSnackbar'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
-import { getNavConfig } from '@/shared/config/navigation'
 import { AppHeader } from '@/widgets/AppHeader/AppHeader'
 import { AppBottomNavigation } from '@/widgets/BottomNavigation/BottomNavigation'
 import { Sidebar } from '@/widgets/Sidebar/Sidebar'
@@ -13,7 +12,6 @@ import { LoadingState } from '@/shared/ui'
 export function AppLayout() {
   const isInitialized = useSessionStore((s) => s.isInitialized)
   const isLoading = useSessionStore((s) => s.isLoading)
-  const role = useSessionStore((s) => s.role)
   const showBottomNav = true
 
   if (!isInitialized || isLoading) {
