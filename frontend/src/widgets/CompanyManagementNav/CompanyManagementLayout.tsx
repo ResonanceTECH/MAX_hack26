@@ -108,7 +108,7 @@ export const COMPANY_ADMIN_NAV: CompanyNavItem[] = [
   },
 ]
 
-const MOBILE_PRIMARY = [
+const MOBILE_PRIMARY: string[] = [
   ROUTES.PROFILE_COMPANY,
   ROUTES.PROFILE_COMPANY_EDIT,
   ROUTES.PROFILE_COMPANY_TEAM,
@@ -318,16 +318,16 @@ export function CompanyManagementLayout({ children }: { children?: ReactNode }) 
         </Breadcrumbs>
       ) : null}
 
-      <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
-        <Box sx={{ display: { xs: 'none', md: 'block' } }}>
-          <CompanyNavigation />
-        </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Box sx={{ display: { xs: 'block', md: 'none' } }}>
-            <CompanyNavigation />
-          </Box>
-          {children}
-        </Box>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          gap: { xs: 0, md: 3 },
+          alignItems: 'flex-start',
+        }}
+      >
+        <CompanyNavigation />
+        <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>{children}</Box>
       </Box>
     </Box>
   )

@@ -138,7 +138,7 @@ export function CompanyTeamPage() {
       member.status !== COMPANY_MEMBER_STATUS.SUSPENDED &&
       member.status !== COMPANY_MEMBER_STATUS.DEACTIVATED &&
       summary.admins <= 1
-    const items = [
+    const items: import('@/features/company-management').BaseUiMenuItem[] = [
       {
         key: 'open',
         label: 'Открыть',

@@ -6,9 +6,9 @@ import {
   type CompanyMemberStatus,
 } from '@/entities/company-member'
 
-const ROLE_COLOR: Record<CompanyMemberRole, 'primary' | 'secondary' | 'default'> = {
+const ROLE_COLOR: Record<CompanyMemberRole, 'primary' | 'info' | 'default'> = {
   COMPANY_ADMIN: 'primary',
-  MANAGER: 'secondary',
+  MANAGER: 'info',
   VIEWER: 'default',
 }
 

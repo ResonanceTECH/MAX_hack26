@@ -36,28 +36,36 @@ export const inviteMemberSchema = z.object({
 
 export type InviteMemberFormValues = z.infer<typeof inviteMemberSchema>
 
-export const serviceSchema = z.object({
-  title: z.string().min(3, 'Укажите название'),
-  description: z.string().min(10, 'Описание слишком короткое'),
-  category: z.string().min(2, 'Укажите категорию'),
-  shortDescription: z.string().max(200).optional(),
-  priceMin: z.number().optional(),
-  priceMax: z.number().optional(),
-  currency: z.string().optional(),
-  regions: z.array(z.string()).optional(),
-  remote: z.boolean().optional(),
-  technologies: z.array(z.string()).optional(),
-  capabilities: z.array(z.string()).optional(),
-  targetIndustries: z.array(z.string()).optional(),
-  status: z
-    .enum([
-      COMPANY_SERVICE_STATUS.DRAFT,
-      COMPANY_SERVICE_STATUS.ACTIVE,
-      COMPANY_SERVICE_STATUS.HIDDEN,
-      COMPANY_SERVICE_STATUS.ARCHIVED,
-    ])
-    .optional(),
-})
+export const serviceSchema = z
+  .object({
+    title: z.string().min(3, 'Укажите название'),
+    description: z.string().min(10, 'Описание слишком короткое'),
+    category: z.string().min(2, 'Укажите категорию'),
+    shortDescription: z.string().max(200).optional(),
+    priceMin: z.number().min(0, 'Цена не может быть отрицательной').optional(),
+    priceMax: z.number().min(0, 'Цена не может быть отрицательной').optional(),
+    currency: z.string().optional(),
+    regions: z.array(z.string()).optional(),
+    remote: z.boolean().optional(),
+    technologies: z.array(z.string()).optional(),
+    capabilities: z.array(z.string()).optional(),
+    targetIndustries: z.array(z.string()).optional(),
+    status: z
+      .enum([
+        COMPANY_SERVICE_STATUS.DRAFT,
+        COMPANY_SERVICE_STATUS.ACTIVE,
+        COMPANY_SERVICE_STATUS.HIDDEN,
+        COMPANY_SERVICE_STATUS.ARCHIVED,
+      ])
+      .optional(),
+  })
+  .refine(
+    (v) =>
+      v.priceMin == null ||
+      v.priceMax == null ||
+      v.priceMin <= v.priceMax,
+    { message: 'Цена «от» не может быть больше цены «до»', path: ['priceMax'] },
+  )
 
 export type ServiceFormValues = z.infer<typeof serviceSchema>
 
