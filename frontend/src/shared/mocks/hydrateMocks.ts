@@ -18,7 +18,15 @@ import { mockModerationHistory, mockOwnerNotifications } from '@/shared/mocks/mo
 import { mockReports } from '@/shared/mocks/reports'
 import { mockEscalations } from '@/shared/mocks/escalations'
 import { mockModeratorNotifications } from '@/shared/mocks/moderatorNotifications'
+import { mockAdminUsers } from '@/shared/mocks/adminUsers'
+import { mockAuditEvents } from '@/shared/mocks/audit'
+import { mockDictionaries } from '@/shared/mocks/dictionaries'
+import { mockPlatformSettings } from '@/shared/mocks/platformSettings'
+import { mockFeatureFlags } from '@/shared/mocks/featureFlags'
+import { mockAdminNotifications } from '@/shared/mocks/adminNotifications'
+import { hydrateAdminCompanyState } from '@/shared/api/adminCompaniesApi'
 import type { CompanySettings } from '@/entities/company-settings'
+import type { PlatformSettings } from '@/shared/mocks/platformSettings'
 
 function replaceArray<T>(target: T[], next: T[]) {
   target.splice(0, target.length, ...next)
@@ -55,6 +63,12 @@ export function hydrateMocks() {
   hydrateArray('escalations', mockEscalations)
   hydrateArray('moderatorNotifications', mockModeratorNotifications)
   hydrateArray('ownerNotifications', mockOwnerNotifications)
+  hydrateArray('adminUsers', mockAdminUsers)
+  hydrateArray('auditEvents', mockAuditEvents)
+  hydrateArray('dictionaries', mockDictionaries)
+  hydrateArray('featureFlags', mockFeatureFlags)
+  hydrateArray('adminNotifications', mockAdminNotifications)
+  hydrateAdminCompanyState()
 
   if (typeof localStorage !== 'undefined') {
     try {
@@ -72,6 +86,16 @@ export function hydrateMocks() {
       if (raw) {
         const parsed = JSON.parse(raw) as CompanySettings
         Object.assign(mockCompanySettings, parsed)
+      }
+    } catch {
+      /* ignore */
+    }
+
+    try {
+      const raw = localStorage.getItem('b2b_match_mock_v1_platformSettings')
+      if (raw) {
+        const parsed = JSON.parse(raw) as PlatformSettings
+        Object.assign(mockPlatformSettings, parsed)
       }
     } catch {
       /* ignore */
@@ -157,6 +181,30 @@ export function persistModeratorNotifications() {
 
 export function persistOwnerNotifications() {
   saveMockState('ownerNotifications', mockOwnerNotifications)
+}
+
+export function persistAdminUsers() {
+  saveMockState('adminUsers', mockAdminUsers)
+}
+
+export function persistAuditEvents() {
+  saveMockState('auditEvents', mockAuditEvents)
+}
+
+export function persistDictionaries() {
+  saveMockState('dictionaries', mockDictionaries)
+}
+
+export function persistFeatureFlags() {
+  saveMockState('featureFlags', mockFeatureFlags)
+}
+
+export function persistAdminNotifications() {
+  saveMockState('adminNotifications', mockAdminNotifications)
+}
+
+export function persistPlatformSettings() {
+  saveMockState('platformSettings', mockPlatformSettings)
 }
 
 export { loadMockState, saveMockState }
