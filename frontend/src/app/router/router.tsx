@@ -202,9 +202,15 @@ function withSuspense(element: ReactNode) {
   return <Suspense fallback={<LoadingState variant="page" />}>{element}</Suspense>
 }
 
-function guarded(permission: Permission | Permission[], element: ReactNode) {
+function guarded(
+  permission: Permission | Permission[],
+  element: ReactNode,
+  denyReason?: string,
+) {
   return withSuspense(
-    <PermissionGuard permission={permission}>{element}</PermissionGuard>,
+    <PermissionGuard permission={permission} denyReason={denyReason}>
+      {element}
+    </PermissionGuard>,
   )
 }
 
@@ -261,7 +267,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'profile/company/team',
-        element: guarded(Permission.MANAGE_COMPANY_MEMBERS, <CompanyTeamPage />),
+        element: guarded(
+          Permission.MANAGE_COMPANY_MEMBERS,
+          <CompanyTeamPage />,
+          'company_members',
+        ),
       },
       {
         path: 'profile/company/services',
@@ -281,11 +291,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'profile/company/settings',
-        element: guarded(Permission.EDIT_COMPANY, <CompanySettingsPage />),
+        element: guarded(
+          Permission.MANAGE_COMPANY_SETTINGS,
+          <CompanySettingsPage />,
+          'company_settings',
+        ),
       },
       {
         path: 'profile/company/verification',
-        element: guarded(Permission.EDIT_COMPANY, <CompanyVerificationPage />),
+        element: guarded(Permission.VIEW_COMPANY_VERIFICATION, <CompanyVerificationPage />),
       },
 
       {
