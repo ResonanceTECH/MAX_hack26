@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link as RouterLink, useParams, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import Box from '@mui/material/Box'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
@@ -17,6 +18,10 @@ import { useCompany } from '@/entities/company/api/queries'
 import { useMatch } from '@/entities/match/api/queries'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import { useMyOpportunities } from '@/entities/opportunity/api/queries'
+import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
+import { casesApi } from '@/shared/api/casesApi'
+import { documentsApi } from '@/shared/api/documentsApi'
+import { inviteApi } from '@/shared/api/inviteApi'
 import { formatCurrency } from '@/shared/lib/format'
 import {
   AppButton,
@@ -40,27 +45,54 @@ export function CompanyDetailsPage() {
   const fromOpportunity = searchParams.get('fromOpportunity') ?? ''
   const [tab, setTab] = useState(0)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null)
   const companyId = useSessionStore((s) => s.company?.id)
   const myRequests = useMyOpportunities(companyId)
+  const showSuccess = useSnackbarStore((s) => s.showSuccess)
   const { data, isLoading, isError, refetch } = useCompany(id)
   const matchQuery = useMatch(fromOpportunity, id)
+  const casesQuery = useQuery({
+    queryKey: ['company-cases', id],
+    queryFn: () => casesApi.list(id),
+    enabled: Boolean(id),
+  })
+  const docsQuery = useQuery({
+    queryKey: ['company-documents', id],
+    queryFn: () => documentsApi.list(id),
+    enabled: Boolean(id),
+  })
 
   if (isLoading) return <LoadingState variant="page" />
   if (isError || !data) return <ErrorState onRetry={() => void refetch()} />
 
   const match = matchQuery.data
-  const requests = myRequests.data ?? []
+  const requests = (myRequests.data ?? []).filter((r) =>
+    ['published', 'collecting_proposals', 'shortlisting', 'draft'].includes(r.status),
+  )
+
+  const inviteTo = async (opportunityId: string, title: string) => {
+    await inviteApi.invite({
+      opportunityId,
+      opportunityTitle: title,
+      companyId: data.id,
+      companyName: data.shortName,
+    })
+    const message = `${data.shortName} приглашена в «${title}»`
+    setInviteMessage(message)
+    showSuccess(message)
+    setInviteOpen(false)
+  }
 
   const handleInvite = () => {
-    if (requests.length > 1) {
-      setInviteOpen(true)
+    if (requests.length === 0) {
+      setInviteMessage('Создайте запрос, чтобы пригласить компанию')
       return
     }
-    window.alert(
-      requests[0]
-        ? `Mock: ${data.shortName} приглашена в «${requests[0].title}»`
-        : 'Mock: создайте запрос, чтобы пригласить компанию',
-    )
+    if (requests.length === 1 && requests[0]) {
+      void inviteTo(requests[0].id, requests[0].title)
+      return
+    }
+    setInviteOpen(true)
   }
 
   return (
@@ -112,6 +144,12 @@ export function CompanyDetailsPage() {
         </Box>
       ) : null}
 
+      {inviteMessage ? (
+        <Typography variant="body1" color="secondary" sx={{ mb: 2 }} role="status">
+          {inviteMessage}
+        </Typography>
+      ) : null}
+
       <Tabs
         value={tab}
         onChange={(_, v: number) => setTab(v)}
@@ -149,9 +187,41 @@ export function CompanyDetailsPage() {
         </Stack>
       ) : null}
       {tab === 2 ? (
-        <Typography variant="body1" color="text.secondary">
-          В портфолио {data.casesCount} кейсов. Детальные кейсы появятся после подключения API.
-        </Typography>
+        <Stack spacing={2}>
+          {(casesQuery.data ?? []).length === 0 ? (
+            <Typography variant="body1" color="text.secondary">
+              В портфолио {data.casesCount} кейсов. Подробные описания появятся позже.
+            </Typography>
+          ) : (
+            (casesQuery.data ?? []).map((item) => (
+              <Box
+                key={item.id}
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Typography variant="h3">{item.title}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  {item.industry}
+                </Typography>
+                <Typography variant="body1" sx={{ mb: 1 }}>
+                  {item.description}
+                </Typography>
+                <Typography variant="body2" fontWeight={600}>
+                  Результат: {item.result}
+                </Typography>
+                <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                  {item.technologies.map((t) => (
+                    <Tag key={t} label={t} color="secondary" />
+                  ))}
+                </Stack>
+              </Box>
+            ))
+          )}
+        </Stack>
       ) : null}
       {tab === 3 ? (
         <Stack spacing={2}>
@@ -178,9 +248,26 @@ export function CompanyDetailsPage() {
         </Stack>
       ) : null}
       {tab === 4 ? (
-        <Typography variant="body1" color="text.secondary">
-          ИНН {data.inn} · ОГРН {data.ogrn}. Документы — после интеграции с backend.
-        </Typography>
+        <Stack spacing={1.5}>
+          {(docsQuery.data ?? []).map((doc) => (
+            <Box
+              key={doc.id}
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Typography variant="body1" fontWeight={600}>
+                {doc.name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {doc.type} · {doc.fileName} · {doc.status}
+              </Typography>
+            </Box>
+          ))}
+        </Stack>
       ) : null}
 
       <Box
@@ -221,8 +308,7 @@ export function CompanyDetailsPage() {
               <ListItemButton
                 key={r.id}
                 onClick={() => {
-                  setInviteOpen(false)
-                  window.alert(`Mock: ${data.shortName} приглашена в «${r.title}»`)
+                  void inviteTo(r.id, r.title)
                 }}
               >
                 <ListItemText primary={r.title} secondary={r.status} />
