@@ -85,8 +85,8 @@ export const mockUsers: User[] = [
   {
     id: 'user-moderator',
     maxUserId: 'max-20001',
-    firstName: 'Ольга',
-    lastName: 'Модераторова',
+    firstName: 'Елена',
+    lastName: 'Морозова',
     avatarUrl: null,
     companyId: null,
     role: SYSTEM_ROLES.MODERATOR,
@@ -96,8 +96,8 @@ export const mockUsers: User[] = [
   {
     id: 'user-platform-admin',
     maxUserId: 'max-30001',
-    firstName: 'Алексей',
-    lastName: 'Админов',
+    firstName: 'Александр',
+    lastName: 'Иванов',
     avatarUrl: null,
     companyId: null,
     role: SYSTEM_ROLES.PLATFORM_ADMIN,

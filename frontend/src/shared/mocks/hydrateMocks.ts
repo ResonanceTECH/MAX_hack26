@@ -13,6 +13,11 @@ import { mockOpportunities } from '@/shared/mocks/opportunities'
 import { mockProposals } from '@/shared/mocks/proposals'
 import { mockShortlist } from '@/shared/mocks/shortlist'
 import { mockNotifications } from '@/shared/mocks/notifications'
+import { mockModerationItems } from '@/shared/mocks/moderation'
+import { mockModerationHistory, mockOwnerNotifications } from '@/shared/mocks/moderationHistory'
+import { mockReports } from '@/shared/mocks/reports'
+import { mockEscalations } from '@/shared/mocks/escalations'
+import { mockModeratorNotifications } from '@/shared/mocks/moderatorNotifications'
 import type { CompanySettings } from '@/entities/company-settings'
 
 function replaceArray<T>(target: T[], next: T[]) {
@@ -44,6 +49,12 @@ export function hydrateMocks() {
   hydrateArray('companyDocuments', mockCompanyDocuments)
   hydrateArray('companies', mockCompanies)
   hydrateArray('companyActivity', mockCompanyActivity)
+  hydrateArray('moderationItems', mockModerationItems)
+  hydrateArray('moderationHistory', mockModerationHistory)
+  hydrateArray('reports', mockReports)
+  hydrateArray('escalations', mockEscalations)
+  hydrateArray('moderatorNotifications', mockModeratorNotifications)
+  hydrateArray('ownerNotifications', mockOwnerNotifications)
 
   if (typeof localStorage !== 'undefined') {
     try {
@@ -122,6 +133,30 @@ export function persistCompanyActivity() {
 
 export function persistCompanySettings() {
   saveMockState('companySettings', mockCompanySettings)
+}
+
+export function persistModerationItems() {
+  saveMockState('moderationItems', mockModerationItems)
+}
+
+export function persistModerationHistory() {
+  saveMockState('moderationHistory', mockModerationHistory)
+}
+
+export function persistReports() {
+  saveMockState('reports', mockReports)
+}
+
+export function persistEscalations() {
+  saveMockState('escalations', mockEscalations)
+}
+
+export function persistModeratorNotifications() {
+  saveMockState('moderatorNotifications', mockModeratorNotifications)
+}
+
+export function persistOwnerNotifications() {
+  saveMockState('ownerNotifications', mockOwnerNotifications)
 }
 
 export { loadMockState, saveMockState }
