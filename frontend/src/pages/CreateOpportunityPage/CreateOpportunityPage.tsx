@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
 import Box from '@mui/material/Box'
@@ -8,7 +8,11 @@ import FormControlLabel from '@mui/material/FormControlLabel'
 import Stack from '@mui/material/Stack'
 import Switch from '@mui/material/Switch'
 import Typography from '@mui/material/Typography'
-import { opportunityApi } from '@/shared/api/opportunityApi'
+import {
+  usePublishOpportunity,
+  useSaveOpportunityDraft,
+} from '@/entities/opportunity/api/queries'
+import type { Match } from '@/entities/match'
 import {
   draftToFormValues,
   opportunityFormSchema,
@@ -16,23 +20,48 @@ import {
   type OpportunityFormValues,
   type ParsedOpportunityDraft,
 } from '@/features/opportunity-create/lib/parseOpportunityText'
+import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { OPPORTUNITY_CATEGORIES, REGIONS } from '@/shared/constants/labels'
 import { OPPORTUNITY_TYPE_LABELS } from '@/shared/constants/labels'
-import { opportunityDetailsPath } from '@/shared/constants/routes'
+import { companyDetailsPath, opportunityDetailsPath, ROUTES } from '@/shared/constants/routes'
 import { formatBudgetRange } from '@/shared/lib/format'
 import { AppButton, AppInput, AppSelect, AppTextarea, PageHeader } from '@/shared/ui'
+import { MatchCard } from '@/widgets/MatchCard/MatchCard'
 
-type Step = 'describe' | 'structured' | 'form' | 'preview' | 'success'
+type Step = 'describe' | 'structured' | 'form' | 'preview' | 'success' | 'draft-saved'
+
+function toPayload(values: OpportunityFormValues) {
+  return {
+    title: values.title,
+    description: values.description,
+    type: values.type,
+    category: values.category,
+    subcategory: values.subcategory,
+    industries: values.industries,
+    skills: values.skills,
+    technologies: values.technologies,
+    budgetMin: values.budgetMin,
+    budgetMax: values.budgetMax,
+    currency: values.currency,
+    region: values.region,
+    remoteAllowed: values.remoteAllowed,
+    proposalDeadline: values.proposalDeadline,
+    executionDeadline: values.executionDeadline,
+  }
+}
 
 export function CreateOpportunityPage() {
   const navigate = useNavigate()
+  const showSuccess = useSnackbarStore((s) => s.showSuccess)
   const [step, setStep] = useState<Step>('describe')
   const [rawText, setRawText] = useState('')
   const [draft, setDraft] = useState<ParsedOpportunityDraft | null>(null)
   const [parsing, setParsing] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
   const [createdId, setCreatedId] = useState<string | null>(null)
-  const [matchCount, setMatchCount] = useState(8)
+  const [matches, setMatches] = useState<Match[]>([])
+
+  const publishMutation = usePublishOpportunity()
+  const draftMutation = useSaveOpportunityDraft()
 
   const form = useForm<OpportunityFormValues>({
     resolver: zodResolver(opportunityFormSchema),
@@ -70,39 +99,27 @@ export function CreateOpportunityPage() {
 
   const onSubmit = form.handleSubmit(async (values: OpportunityFormValues) => {
     setStep('preview')
-    // keep values in form for preview; publish happens on confirm
     void values
   })
 
   const publish = async () => {
     const values = form.getValues()
-    setSubmitting(true)
-    try {
-      const created = await opportunityApi.create({
-        title: values.title,
-        description: values.description,
-        type: values.type,
-        category: values.category,
-        subcategory: values.subcategory,
-        industries: values.industries,
-        skills: values.skills,
-        technologies: values.technologies,
-        budgetMin: values.budgetMin,
-        budgetMax: values.budgetMax,
-        currency: values.currency,
-        region: values.region,
-        remoteAllowed: values.remoteAllowed,
-        proposalDeadline: values.proposalDeadline,
-        executionDeadline: values.executionDeadline,
-      })
-      await opportunityApi.publish(created.id)
-      setCreatedId(created.id)
-      setMatchCount(8)
-      setStep('success')
-    } finally {
-      setSubmitting(false)
-    }
+    const result = await publishMutation.mutateAsync(toPayload(values))
+    setCreatedId(result.opportunity.id)
+    setMatches(result.matches)
+    setStep('success')
+    showSuccess('Запрос опубликован')
   }
+
+  const saveDraft = async () => {
+    const values = form.getValues()
+    const created = await draftMutation.mutateAsync(toPayload(values))
+    setCreatedId(created.id)
+    showSuccess('Запрос сохранён')
+    void navigate(ROUTES.MY_REQUESTS)
+  }
+
+  const submitting = publishMutation.isPending || draftMutation.isPending
 
   return (
     <Box>
@@ -322,16 +339,39 @@ export function CreateOpportunityPage() {
               ))}
             </Stack>
           </Box>
-          <Stack direction="row" spacing={1.5}>
+          <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
             <AppButton variant="outlined" onClick={() => setStep('form')}>
               Назад
             </AppButton>
-            <AppButton variant="outlined" onClick={() => void publish()} loading={submitting}>
+            <AppButton variant="outlined" onClick={() => saveDraft()} loading={submitting}>
               Сохранить черновик
             </AppButton>
-            <AppButton variant="contained" onClick={() => void publish()} loading={submitting}>
+            <AppButton variant="contained" onClick={() => publish()} loading={submitting}>
               Опубликовать
             </AppButton>
+          </Stack>
+        </Stack>
+      ) : null}
+
+      {step === 'draft-saved' ? (
+        <Stack spacing={2} alignItems="flex-start">
+          <Typography variant="h2">Черновик сохранён</Typography>
+          <Typography variant="body1" color="text.secondary">
+            Запрос доступен во вкладке «Черновики» в разделе «Мои запросы».
+          </Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+            <AppButton component={RouterLink} to={ROUTES.MY_REQUESTS} variant="contained">
+              Мои запросы
+            </AppButton>
+            {createdId ? (
+              <AppButton
+                component={RouterLink}
+                to={opportunityDetailsPath(createdId)}
+                variant="outlined"
+              >
+                Открыть черновик
+              </AppButton>
+            ) : null}
           </Stack>
         </Stack>
       ) : null}
@@ -343,13 +383,28 @@ export function CreateOpportunityPage() {
             Ищем подходящие компании...
           </Typography>
           <Typography variant="h3" color="secondary">
-            Найдено {matchCount} подходящих компаний
+            Найдено {matches.length} подходящих компаний
           </Typography>
+          <Typography variant="h4" sx={{ mt: 1 }}>
+            Почему подходит
+          </Typography>
+          <Stack spacing={1.5} sx={{ width: '100%' }}>
+            {matches.slice(0, 5).map((match) => (
+              <Box
+                key={match.id}
+                component={RouterLink}
+                to={`${companyDetailsPath(match.companyId)}?fromOpportunity=${createdId}`}
+                sx={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+              >
+                <MatchCard match={match} />
+              </Box>
+            ))}
+          </Stack>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
             <AppButton
               variant="contained"
               onClick={() => {
-                if (createdId) void navigate(`${opportunityDetailsPath(createdId)}`)
+                if (createdId) void navigate(opportunityDetailsPath(createdId))
               }}
             >
               Посмотреть рекомендации
