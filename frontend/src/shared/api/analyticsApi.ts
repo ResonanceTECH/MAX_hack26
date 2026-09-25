@@ -2,7 +2,6 @@ import { delay } from '@/shared/lib/delay'
 import {
   getAnalyticsByPeriod,
   mockAnalyticsTable,
-  mockFunnel,
   type AnalyticsMetricRow,
   type AnalyticsOverview,
   type AnalyticsPeriod,

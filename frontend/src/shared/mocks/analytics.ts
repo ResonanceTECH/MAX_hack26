@@ -84,7 +84,7 @@ export interface AnalyticsOverview {
   publishedOpportunities: number
   createdProposals: number
   shortlists: number
-  negotiations: number
+  negotiationsCount: number
   isModelData: true
 }
 
@@ -157,7 +157,7 @@ const PERIOD_DATA: Record<AnalyticsPeriod, AnalyticsOverview> = {
     publishedOpportunities: 180,
     createdProposals: 640,
     shortlists: 210,
-    negotiations: 95,
+    negotiationsCount: 95,
     isModelData: true,
   },
   '30d': {
@@ -222,7 +222,7 @@ const PERIOD_DATA: Record<AnalyticsPeriod, AnalyticsOverview> = {
     publishedOpportunities: 700,
     createdProposals: 2410,
     shortlists: 820,
-    negotiations: 380,
+    negotiationsCount: 380,
     isModelData: true,
   },
   '90d': {
@@ -287,7 +287,7 @@ const PERIOD_DATA: Record<AnalyticsPeriod, AnalyticsOverview> = {
     publishedOpportunities: 2100,
     createdProposals: 7200,
     shortlists: 2400,
-    negotiations: 1100,
+    negotiationsCount: 1100,
     isModelData: true,
   },
 }

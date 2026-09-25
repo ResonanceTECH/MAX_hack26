@@ -16,7 +16,6 @@ import {
   Task01Icon,
   UserCircleIcon,
   UserGroupIcon,
-  WorkflowSquare01Icon,
   Clock01Icon,
   AlertCircleIcon,
   Share08Icon,

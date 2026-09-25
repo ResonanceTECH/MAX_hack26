@@ -260,7 +260,7 @@ export const mockCompanies: Company[] = [
     reviewsCount: 11,
     verified: false,
     casesCount: 8,
-    verificationStatus: 'unverified',
+    verificationStatus: 'pending',
     status: 'active',
   },
   {
