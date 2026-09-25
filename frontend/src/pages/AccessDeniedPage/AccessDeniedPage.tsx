@@ -26,9 +26,9 @@ const REASON_COPY: Record<string, { title: string; description: string; cta: str
     },
     platform_admin: {
       title: 'Нет доступа',
-      description: 'У вас нет прав администратора платформы.',
-      cta: 'Вернуться к модерации',
-      href: ROUTES.MODERATION,
+      description: 'Этот раздел доступен только Platform Admin.',
+      cta: 'Вернуться',
+      href: ROUTES.HOME,
     },
     moderation: {
       title: 'Нет доступа',
