@@ -2,29 +2,27 @@ import { NavLink, useLocation } from 'react-router-dom'
 import BottomNavigation from '@mui/material/BottomNavigation'
 import BottomNavigationAction from '@mui/material/BottomNavigationAction'
 import Paper from '@mui/material/Paper'
-import { ROUTES } from '@/shared/constants/routes'
+import { useSessionStore } from '@/features/auth/model/sessionStore'
+import { getNavConfig } from '@/shared/config/navigation'
 import { AppIcon } from '@/shared/ui'
-import {
-  AddCircleIcon,
-  Briefcase02Icon,
-  Building02Icon,
-  Home01Icon,
-  Task01Icon,
-} from '@/shared/ui/icons'
 
-function resolveValue(pathname: string): string {
-  if (pathname.startsWith('/opportunities/create')) return ROUTES.OPPORTUNITY_CREATE
-  if (pathname.startsWith('/opportunities')) return ROUTES.OPPORTUNITIES
-  if (pathname.startsWith('/my')) return ROUTES.MY
-  if (pathname.startsWith('/profile') || pathname.startsWith('/companies')) {
-    return ROUTES.PROFILE_COMPANY
+function resolveValue(pathname: string, items: { to: string; matchPrefix?: string }[]): string {
+  for (const item of items) {
+    if (item.matchPrefix && pathname.startsWith(item.matchPrefix)) return item.to
+    if (item.to !== '/' && pathname.startsWith(item.to)) return item.to
   }
-  return ROUTES.HOME
+  if (pathname === '/') return items[0]?.to ?? '/'
+  return items.find((i) => i.to === pathname)?.to ?? items[0]?.to ?? '/'
 }
 
 export function AppBottomNavigation() {
   const location = useLocation()
-  const value = resolveValue(location.pathname)
+  const role = useSessionStore((s) => s.role)
+  const config = getNavConfig(role)
+
+  if (config.mobileAsDrawer) return null
+
+  const value = resolveValue(location.pathname, config.mobile)
 
   return (
     <Paper
@@ -42,47 +40,32 @@ export function AppBottomNavigation() {
       }}
     >
       <BottomNavigation value={value} showLabels>
-        <BottomNavigationAction
-          label="Главная"
-          value={ROUTES.HOME}
-          icon={<AppIcon icon={Home01Icon} size={22} />}
-          component={NavLink}
-          to={ROUTES.HOME}
-        />
-        <BottomNavigationAction
-          label="Возможности"
-          value={ROUTES.OPPORTUNITIES}
-          icon={<AppIcon icon={Briefcase02Icon} size={22} />}
-          component={NavLink}
-          to={ROUTES.OPPORTUNITIES}
-        />
-        <BottomNavigationAction
-          label="Создать"
-          value={ROUTES.OPPORTUNITY_CREATE}
-          icon={<AppIcon icon={AddCircleIcon} size={28} color="#1F6F8B" />}
-          component={NavLink}
-          to={ROUTES.OPPORTUNITY_CREATE}
-          sx={{
-            '& .MuiBottomNavigationAction-label': {
-              fontWeight: 700,
-              color: 'secondary.main',
-            },
-          }}
-        />
-        <BottomNavigationAction
-          label="Мои"
-          value={ROUTES.MY}
-          icon={<AppIcon icon={Task01Icon} size={22} />}
-          component={NavLink}
-          to={ROUTES.MY}
-        />
-        <BottomNavigationAction
-          label="Компания"
-          value={ROUTES.PROFILE_COMPANY}
-          icon={<AppIcon icon={Building02Icon} size={22} />}
-          component={NavLink}
-          to={ROUTES.PROFILE_COMPANY}
-        />
+        {config.mobile.map((item) => (
+          <BottomNavigationAction
+            key={item.to}
+            label={item.label}
+            value={item.to}
+            icon={
+              <AppIcon
+                icon={item.icon}
+                size={item.emphasize ? 28 : 22}
+                color={item.emphasize ? '#1F6F8B' : undefined}
+              />
+            }
+            component={NavLink}
+            to={item.to}
+            sx={
+              item.emphasize
+                ? {
+                    '& .MuiBottomNavigationAction-label': {
+                      fontWeight: 700,
+                      color: 'secondary.main',
+                    },
+                  }
+                : undefined
+            }
+          />
+        ))}
       </BottomNavigation>
     </Paper>
   )

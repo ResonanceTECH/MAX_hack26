@@ -3,7 +3,7 @@ import CardContent from '@mui/material/CardContent'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import type { Match } from '@/entities/match'
-import { getCompanyById } from '@/shared/mocks'
+import { useCompany } from '@/entities/company/api/queries'
 import { MatchScore } from '@/shared/ui'
 
 export interface MatchCardProps {
@@ -11,7 +11,8 @@ export interface MatchCardProps {
 }
 
 export function MatchCard({ match }: MatchCardProps) {
-  const company = getCompanyById(match.companyId)
+  const companyQuery = useCompany(match.companyId)
+  const company = companyQuery.data
 
   return (
     <Card>
@@ -35,6 +36,11 @@ export function MatchCard({ match }: MatchCardProps) {
                   ✓ {r.label}
                 </Typography>
               ))}
+            {match.missingRequirements.slice(0, 1).map((item) => (
+              <Typography key={item} variant="body2" color="text.secondary">
+                △ {item}
+              </Typography>
+            ))}
           </Stack>
         </Stack>
       </CardContent>

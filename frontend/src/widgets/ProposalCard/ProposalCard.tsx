@@ -20,8 +20,8 @@ import {
 export interface ProposalCardProps {
   proposal: Proposal
   match?: Match | null
-  onShortlist?: (id: string) => void
-  onReject?: (id: string) => void
+  onShortlist?: (id: string) => void | Promise<void>
+  onReject?: (id: string) => void | Promise<void>
   compact?: boolean
 }
 
@@ -91,7 +91,11 @@ export function ProposalCard({
           Подробнее
         </AppButton>
         {onShortlist ? (
-          <AppButton variant="contained" size="small" onClick={() => onShortlist(proposal.id)}>
+          <AppButton
+            variant="contained"
+            size="small"
+            onClick={() => onShortlist(proposal.id)}
+          >
             В shortlist
           </AppButton>
         ) : null}
