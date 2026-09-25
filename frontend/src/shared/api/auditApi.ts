@@ -1,16 +1,26 @@
 import { delay } from '@/shared/lib/delay'
-import { mockAuditEvents, type AuditEvent, type AuditFilters } from '@/shared/mocks/audit'
+import {
+  getAuditEventById,
+  mockAuditEvents,
+  type AuditEvent,
+  type AuditFilters,
+} from '@/shared/mocks/audit'
 
 export const auditApi = {
+  async getAll(filters?: AuditFilters): Promise<AuditEvent[]> {
+    return this.list(filters)
+  },
+
   async list(filters?: AuditFilters): Promise<AuditEvent[]> {
-    await delay()
+    await delay(200 + Math.floor(Math.random() * 400))
     let items = [...mockAuditEvents]
-    if (filters?.actorId) {
-      items = items.filter((e) => e.actorId === filters.actorId)
-    }
+    if (filters?.actorId) items = items.filter((e) => e.actorId === filters.actorId)
     if (filters?.actor) {
       const q = filters.actor.toLowerCase()
       items = items.filter((e) => e.actorName.toLowerCase().includes(q))
+    }
+    if (filters?.role) {
+      items = items.filter((e) => e.actorRole === filters.role || e.role === filters.role)
     }
     if (filters?.action) {
       items = items.filter((e) => e.action.toLowerCase().includes(filters.action!.toLowerCase()))
@@ -22,7 +32,7 @@ export const auditApi = {
     if (filters?.query) {
       const q = filters.query.toLowerCase()
       items = items.filter((e) =>
-        `${e.actorName} ${e.action} ${e.targetName ?? ''} ${e.entityLabel} ${e.details ?? ''}`
+        `${e.actorName} ${e.action} ${e.targetName ?? ''} ${e.entityName} ${e.entityLabel} ${e.reason ?? ''} ${e.details ?? ''}`
           .toLowerCase()
           .includes(q),
       )
@@ -37,6 +47,13 @@ export const auditApi = {
     }
     return items.sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp))
   },
+
+  async getById(id: string): Promise<AuditEvent> {
+    await delay(200 + Math.floor(Math.random() * 200))
+    const event = getAuditEventById(id)
+    if (!event) throw new Error('Событие не найдено')
+    return { ...event }
+  },
 }
 
-export type { AuditFilters }
+export type { AuditFilters, AuditEvent }
