@@ -24,6 +24,18 @@ const REASON_COPY: Record<string, { title: string; description: string; cta: str
       cta: 'Вернуться к компании',
       href: ROUTES.PROFILE_COMPANY,
     },
+    platform_admin: {
+      title: 'Нет доступа',
+      description: 'У вас нет прав администратора платформы.',
+      cta: 'Вернуться к модерации',
+      href: ROUTES.MODERATION,
+    },
+    moderation: {
+      title: 'Нет доступа',
+      description: 'У вас недостаточно прав для этого раздела.',
+      cta: 'Вернуться к модерации',
+      href: ROUTES.MODERATION,
+    },
   }
 
 export function AccessDeniedPage() {
