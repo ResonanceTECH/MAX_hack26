@@ -84,10 +84,10 @@ export function canBlockCompany(status: PlatformCompanyStatus): {
   allowed: boolean
   reason?: string
 } {
-  if (status === 'BLOCKED' || status === 'blocked') {
+  if (status === 'BLOCKED') {
     return { allowed: false, reason: 'Компания уже заблокирована.' }
   }
-  if (status === 'ARCHIVED' || status === 'archived') {
+  if (status === 'ARCHIVED') {
     return { allowed: false, reason: 'Архивированную компанию нельзя заблокировать.' }
   }
   return { allowed: true }
@@ -101,9 +101,8 @@ export function canChangeVerification(
     return { allowed: false, reason: 'Статус не изменился.', requiresReason: false }
   }
   const sensitive =
-    (from === 'PENDING' || from === 'pending') && (to === 'VERIFIED' || to === 'verified') ||
-    (from === 'VERIFIED' || from === 'verified') &&
-      (to === 'REQUIRES_UPDATE' || to === 'requires_update' || to === 'NOT_VERIFIED')
+    (from === 'PENDING' && to === 'VERIFIED') ||
+    (from === 'VERIFIED' && (to === 'REQUIRES_UPDATE' || to === 'NOT_VERIFIED'))
   return { allowed: true, requiresReason: true, ...(sensitive ? {} : {}) }
 }
 
