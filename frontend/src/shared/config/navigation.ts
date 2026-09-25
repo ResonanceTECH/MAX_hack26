@@ -15,11 +15,16 @@ import {
   AddCircleIcon,
   Task01Icon,
   UserCircleIcon,
+  UserGroupIcon,
   WorkflowSquare01Icon,
   Clock01Icon,
   AlertCircleIcon,
   Share08Icon,
   Shield01Icon,
+  Settings01Icon,
+  Activity01Icon,
+  CheckmarkBadge01Icon,
+  MoreHorizontalIcon,
 } from '@/shared/ui/icons'
 
 export interface NavItem {
@@ -28,12 +33,23 @@ export interface NavItem {
   icon: IconSvgElement
   emphasize?: boolean
   matchPrefix?: string
-  badgeKey?: 'pendingQueue' | 'openReports'
+  badgeKey?: 'pendingQueue' | 'openReports' | 'adminNotifications'
+  /** Special mobile "More" entry — opens menu/drawer instead of navigating */
+  isMore?: boolean
+}
+
+export interface NavGroup {
+  id: string
+  label?: string
+  items: NavItem[]
 }
 
 export interface NavConfig {
   mobile: NavItem[]
   desktop: NavItem[]
+  desktopGroups?: NavGroup[]
+  /** Extra items revealed by mobile "More" */
+  mobileMore?: NavItem[]
   /** Platform admin: use drawer on mobile instead of bottom nav */
   mobileAsDrawer?: boolean
   homePath: string
@@ -72,7 +88,6 @@ const BUSINESS_DESKTOP: NavItem[] = [
   { to: ROUTES.PROFILE_COMPANY, label: 'Профиль компании', icon: Building02Icon },
 ]
 
-/** Same as BUSINESS_DESKTOP, but profile entry labelled «Компания» */
 const COMPANY_ADMIN_DESKTOP: NavItem[] = [
   ...BUSINESS_DESKTOP.slice(0, -1),
   { to: ROUTES.PROFILE_COMPANY, label: 'Компания', icon: Building02Icon },
@@ -127,16 +142,82 @@ const MODERATOR_DESKTOP: NavItem[] = [
   { to: ROUTES.MODERATION_PROFILE, label: 'Профиль', icon: UserCircleIcon },
 ]
 
-const PLATFORM_ADMIN_NAV_RU: NavItem[] = [
-  { to: ROUTES.ADMIN, label: 'Dashboard', icon: DashboardSquare01Icon },
-  { to: ROUTES.ADMIN_USERS, label: 'Пользователи', icon: UserCircleIcon },
-  { to: ROUTES.ADMIN_COMPANIES, label: 'Компании', icon: Building02Icon },
-  { to: ROUTES.ADMIN_MODERATION, label: 'Модерация', icon: DocumentValidationIcon },
-  { to: ROUTES.ADMIN_DICTIONARIES, label: 'Справочники', icon: File02Icon },
-  { to: ROUTES.ADMIN_ANALYTICS, label: 'Аналитика', icon: Analytics01Icon },
-  { to: ROUTES.ADMIN_AUDIT, label: 'Аудит', icon: WorkflowSquare01Icon },
-  { to: ROUTES.ADMIN_SETTINGS, label: 'Настройки', icon: Layers01Icon },
+const PLATFORM_ADMIN_MOBILE: NavItem[] = [
+  { to: ROUTES.ADMIN, label: 'Обзор', icon: DashboardSquare01Icon },
+  { to: ROUTES.ADMIN_USERS, label: 'Пользователи', icon: UserGroupIcon, matchPrefix: '/admin/users' },
+  {
+    to: ROUTES.ADMIN_COMPANIES,
+    label: 'Компании',
+    icon: Building02Icon,
+    matchPrefix: '/admin/companies',
+  },
+  { to: '#more', label: 'Ещё', icon: MoreHorizontalIcon, isMore: true },
 ]
+
+const PLATFORM_ADMIN_MOBILE_MORE: NavItem[] = [
+  { to: ROUTES.ADMIN_MODERATION, label: 'Модерация', icon: Shield01Icon },
+  { to: ROUTES.ADMIN_DICTIONARIES, label: 'Справочники', icon: Layers01Icon },
+  { to: ROUTES.ADMIN_ANALYTICS, label: 'Аналитика', icon: Analytics01Icon },
+  { to: ROUTES.ADMIN_AUDIT, label: 'Audit Log', icon: Activity01Icon },
+  { to: ROUTES.ADMIN_SETTINGS, label: 'Настройки', icon: Settings01Icon },
+  { to: ROUTES.ADMIN_FEATURE_FLAGS, label: 'Feature Flags', icon: CheckmarkBadge01Icon },
+  { to: ROUTES.ADMIN_PROFILE, label: 'Профиль администратора', icon: UserCircleIcon },
+]
+
+const PLATFORM_ADMIN_DESKTOP_GROUPS: NavGroup[] = [
+  {
+    id: 'platform',
+    label: 'Платформа',
+    items: [{ to: ROUTES.ADMIN, label: 'Обзор', icon: DashboardSquare01Icon }],
+  },
+  {
+    id: 'management',
+    label: 'Управление',
+    items: [
+      { to: ROUTES.ADMIN_USERS, label: 'Пользователи', icon: UserGroupIcon, matchPrefix: '/admin/users' },
+      {
+        to: ROUTES.ADMIN_COMPANIES,
+        label: 'Компании',
+        icon: Building02Icon,
+        matchPrefix: '/admin/companies',
+      },
+      { to: ROUTES.ADMIN_MODERATION, label: 'Модерация', icon: Shield01Icon },
+    ],
+  },
+  {
+    id: 'data',
+    label: 'Данные',
+    items: [
+      {
+        to: ROUTES.ADMIN_DICTIONARIES,
+        label: 'Справочники',
+        icon: Layers01Icon,
+        matchPrefix: '/admin/dictionaries',
+      },
+      { to: ROUTES.ADMIN_DICTIONARIES_CATEGORIES, label: 'Категории', icon: DocumentValidationIcon },
+      { to: ROUTES.ADMIN_DICTIONARIES_INDUSTRIES, label: 'Отрасли', icon: Briefcase02Icon },
+      { to: ROUTES.ADMIN_DICTIONARIES_REGIONS, label: 'Регионы', icon: File02Icon },
+    ],
+  },
+  {
+    id: 'control',
+    label: 'Контроль',
+    items: [
+      { to: ROUTES.ADMIN_ANALYTICS, label: 'Аналитика', icon: Analytics01Icon },
+      { to: ROUTES.ADMIN_AUDIT, label: 'Audit Log', icon: Activity01Icon },
+    ],
+  },
+  {
+    id: 'system',
+    label: 'Система',
+    items: [
+      { to: ROUTES.ADMIN_FEATURE_FLAGS, label: 'Feature Flags', icon: CheckmarkBadge01Icon },
+      { to: ROUTES.ADMIN_SETTINGS, label: 'Настройки', icon: Settings01Icon },
+    ],
+  },
+]
+
+const PLATFORM_ADMIN_DESKTOP: NavItem[] = PLATFORM_ADMIN_DESKTOP_GROUPS.flatMap((g) => g.items)
 
 export function getNavConfig(role: SystemRole | null): NavConfig {
   switch (role) {
@@ -154,9 +235,10 @@ export function getNavConfig(role: SystemRole | null): NavConfig {
       }
     case SYSTEM_ROLES.PLATFORM_ADMIN:
       return {
-        mobile: PLATFORM_ADMIN_NAV_RU.slice(0, 4),
-        desktop: PLATFORM_ADMIN_NAV_RU,
-        mobileAsDrawer: true,
+        mobile: PLATFORM_ADMIN_MOBILE,
+        desktop: PLATFORM_ADMIN_DESKTOP,
+        desktopGroups: PLATFORM_ADMIN_DESKTOP_GROUPS,
+        mobileMore: PLATFORM_ADMIN_MOBILE_MORE,
         homePath: ROUTES.ADMIN,
       }
     case SYSTEM_ROLES.BUSINESS_USER:
