@@ -1,26 +1,41 @@
 import { delay } from '@/shared/lib/delay'
 import {
-  mockAnalyticsOverview,
+  getAnalyticsByPeriod,
   mockAnalyticsTable,
   mockFunnel,
   type AnalyticsMetricRow,
   type AnalyticsOverview,
+  type AnalyticsPeriod,
   type FunnelStep,
+  type GrowthMetrics,
+  type ModerationAnalytics,
 } from '@/shared/mocks/analytics'
 
 export const analyticsApi = {
-  async getOverview(): Promise<AnalyticsOverview> {
-    await delay()
-    return { ...mockAnalyticsOverview }
+  async getOverview(period: AnalyticsPeriod = '30d'): Promise<AnalyticsOverview> {
+    await delay(200 + Math.floor(Math.random() * 400))
+    return getAnalyticsByPeriod(period)
   },
 
-  async getFunnel(): Promise<FunnelStep[]> {
-    await delay()
-    return mockFunnel.map((s) => ({ ...s }))
+  async getFunnel(period: AnalyticsPeriod = '30d'): Promise<FunnelStep[]> {
+    await delay(200 + Math.floor(Math.random() * 300))
+    return getAnalyticsByPeriod(period).funnel.map((s) => ({ ...s }))
+  },
+
+  async getGrowth(period: AnalyticsPeriod = '30d'): Promise<GrowthMetrics> {
+    await delay(200 + Math.floor(Math.random() * 300))
+    return structuredClone(getAnalyticsByPeriod(period).growth)
+  },
+
+  async getModerationStats(period: AnalyticsPeriod = '30d'): Promise<ModerationAnalytics> {
+    await delay(200 + Math.floor(Math.random() * 300))
+    return structuredClone(getAnalyticsByPeriod(period).moderation)
   },
 
   async getMetricsTable(): Promise<AnalyticsMetricRow[]> {
-    await delay()
+    await delay(200 + Math.floor(Math.random() * 200))
     return mockAnalyticsTable.map((r) => ({ ...r }))
   },
 }
+
+export type { AnalyticsPeriod, FunnelStep }
