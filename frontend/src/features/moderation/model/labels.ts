@@ -144,17 +144,32 @@ export const USER_STATUS_LABELS: Record<string, string> = {
   active: 'Активен',
   blocked: 'Заблокирован',
   invited: 'Приглашён',
+  suspended: 'Приостановлен',
 }
 
 export const PLATFORM_COMPANY_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: 'Активна',
+  SUSPENDED: 'Приостановлена',
+  BLOCKED: 'Заблокирована',
+  ARCHIVED: 'В архиве',
+  /** @deprecated legacy lowercase */
   active: 'Активна',
   pending_moderation: 'На модерации',
   blocked: 'Заблокирована',
   suspended: 'Приостановлена',
+  archived: 'В архиве',
 }
 
 export const VERIFICATION_STATUS_LABELS: Record<string, string> = {
+  NOT_VERIFIED: 'Не верифицирована',
+  PENDING: 'На проверке',
+  VERIFIED: 'Верифицирована',
+  REJECTED: 'Отклонена',
+  REQUIRES_UPDATE: 'Требует обновления',
+  /** @deprecated legacy lowercase */
   verified: 'Верифицирована',
   unverified: 'Не верифицирована',
   pending: 'На проверке',
+  rejected: 'Отклонена',
+  requires_update: 'Требует обновления',
 }
