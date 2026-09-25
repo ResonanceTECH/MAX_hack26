@@ -30,7 +30,7 @@ export function AdminDashboardPage() {
     { label: 'Открытые запросы', value: overview.data?.opportunitiesOpen ?? '—' },
     { label: 'Активные сделки', value: overview.data?.dealsActive ?? '—' },
     { label: 'Матчи за месяц', value: overview.data?.matchesThisMonth ?? '—' },
-    { label: 'На модерации', value: moderation.data?.pending ?? overview.data?.moderationPending ?? '—' },
+    { label: 'На модерации', value: moderation.data?.pendingTotal ?? overview.data?.moderationPending ?? '—' },
   ]
 
   return (
