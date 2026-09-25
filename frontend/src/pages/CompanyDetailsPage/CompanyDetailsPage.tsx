@@ -191,12 +191,36 @@ export function CompanyDetailsPage() {
         </Stack>
       ) : null}
       {tab === 1 ? (
-        <Stack spacing={1}>
-          {data.services.map((s) => (
-            <Typography key={s} variant="body1">
-              · {s}
-            </Typography>
-          ))}
+        <Stack spacing={1.5}>
+          {(servicesQuery.data ?? []).length === 0 ? (
+            <Stack spacing={1}>
+              {data.services.map((s) => (
+                <Typography key={s} variant="body1">
+                  · {s}
+                </Typography>
+              ))}
+            </Stack>
+          ) : (
+            (servicesQuery.data ?? []).map((service) => (
+              <Box
+                key={service.id}
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Typography variant="h3">{service.title}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  {service.category}
+                </Typography>
+                <Typography variant="body1">
+                  {service.shortDescription || service.description}
+                </Typography>
+              </Box>
+            ))
+          )}
         </Stack>
       ) : null}
       {tab === 2 ? (
