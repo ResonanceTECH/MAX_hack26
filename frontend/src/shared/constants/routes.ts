@@ -70,8 +70,19 @@ export const ROUTES = {
 
   MODERATION: '/moderation',
   MODERATION_QUEUE: '/moderation/queue',
+  MODERATION_QUEUE_COMPANIES: '/moderation/queue/companies',
+  MODERATION_QUEUE_OPPORTUNITIES: '/moderation/queue/opportunities',
+  MODERATION_QUEUE_CASES: '/moderation/queue/cases',
+  MODERATION_QUEUE_DOCUMENTS: '/moderation/queue/documents',
+  MODERATION_COMPANY: '/moderation/company/:id',
+  MODERATION_OPPORTUNITY: '/moderation/opportunity/:id',
+  MODERATION_CASE: '/moderation/case/:id',
+  MODERATION_DOCUMENT: '/moderation/document/:id',
   MODERATION_REPORTS: '/moderation/reports',
+  MODERATION_REPORT: '/moderation/reports/:id',
+  MODERATION_ESCALATIONS: '/moderation/escalations',
   MODERATION_HISTORY: '/moderation/history',
+  MODERATION_PROFILE: '/moderation/profile',
   MODERATION_DETAIL: '/moderation/:type/:id',
   MODERATION_ITEM: '/moderation/:type/:id',
 
@@ -83,10 +94,20 @@ export const ROUTES = {
   ADMIN_COMPANY: '/admin/companies/:id',
   ADMIN_COMPANY_DETAIL: '/admin/companies/:id',
   ADMIN_MODERATION: '/admin/moderation',
+  ADMIN_MODERATION_ITEM: '/admin/moderation/:type/:id',
   ADMIN_DICTIONARIES: '/admin/dictionaries',
+  ADMIN_DICTIONARIES_CATEGORIES: '/admin/dictionaries/categories',
+  ADMIN_DICTIONARIES_INDUSTRIES: '/admin/dictionaries/industries',
+  ADMIN_DICTIONARIES_SKILLS: '/admin/dictionaries/skills',
+  ADMIN_DICTIONARIES_TECHNOLOGIES: '/admin/dictionaries/technologies',
+  ADMIN_DICTIONARIES_REGIONS: '/admin/dictionaries/regions',
+  ADMIN_DICTIONARIES_DOCUMENT_TYPES: '/admin/dictionaries/document-types',
   ADMIN_ANALYTICS: '/admin/analytics',
   ADMIN_AUDIT: '/admin/audit',
   ADMIN_SETTINGS: '/admin/settings',
+  ADMIN_FEATURE_FLAGS: '/admin/feature-flags',
+  ADMIN_NOTIFICATIONS: '/admin/notifications',
+  ADMIN_PROFILE: '/admin/profile',
 } as const
 
 export function opportunityDetailsPath(id: string): string {
@@ -131,12 +152,29 @@ export function moderationItemPath(idOrType: string, id?: string): string {
   return `/moderation/item/${idOrType}`
 }
 
+export function moderationReportPath(id: string): string {
+  return `/moderation/reports/${id}`
+}
+
+export function queueTypePath(type: string): string {
+  if (type === 'all') return '/moderation/queue'
+  return `/moderation/queue/${type === 'opportunity' ? 'opportunities' : type === 'company' ? 'companies' : type === 'case' ? 'cases' : 'documents'}`
+}
+
 export function adminUserPath(id: string): string {
   return `/admin/users/${id}`
 }
 
 export function adminCompanyPath(id: string): string {
   return `/admin/companies/${id}`
+}
+
+export function adminModerationItemPath(type: string, id: string): string {
+  return `/admin/moderation/${type}/${id}`
+}
+
+export function adminDictionaryPath(type: string): string {
+  return `/admin/dictionaries/${type}`
 }
 
 export function companyTeamMemberPath(memberId: string): string {
