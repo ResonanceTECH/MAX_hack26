@@ -50,6 +50,11 @@ const ComparisonPage = lazy(() =>
 const ShortlistPage = lazy(() =>
   import('@/pages/ShortlistPage/ShortlistPage').then((m) => ({ default: m.ShortlistPage })),
 )
+const CompanyManagementLayoutRoute = lazy(() =>
+  import('@/widgets/CompanyManagementNav/CompanyManagementLayoutRoute').then((m) => ({
+    default: m.CompanyManagementLayoutRoute,
+  })),
+)
 const CompanyProfileRoute = lazy(() =>
   import('@/pages/CompanyProfileRoute').then((m) => ({ default: m.CompanyProfileRoute })),
 )
@@ -59,9 +64,34 @@ const CompanyEditPage = lazy(() =>
 const CompanyTeamPage = lazy(() =>
   import('@/pages/CompanyTeamPage/CompanyTeamPage').then((m) => ({ default: m.CompanyTeamPage })),
 )
+const CompanyInviteMemberPage = lazy(() =>
+  import('@/pages/CompanyInviteMemberPage/CompanyInviteMemberPage').then((m) => ({
+    default: m.CompanyInviteMemberPage,
+  })),
+)
+const CompanyMemberDetailPage = lazy(() =>
+  import('@/pages/CompanyMemberDetailPage/CompanyMemberDetailPage').then((m) => ({
+    default: m.CompanyMemberDetailPage,
+  })),
+)
 const CompanyServicesPage = lazy(() =>
   import('@/pages/CompanyServicesPage/CompanyServicesPage').then((m) => ({
     default: m.CompanyServicesPage,
+  })),
+)
+const CompanyServiceCreatePage = lazy(() =>
+  import('@/pages/CompanyServicesPage/CompanyServiceCreatePage').then((m) => ({
+    default: m.CompanyServiceCreatePage,
+  })),
+)
+const CompanyServiceDetailPage = lazy(() =>
+  import('@/pages/CompanyServicesPage/CompanyServiceDetailPage').then((m) => ({
+    default: m.CompanyServiceDetailPage,
+  })),
+)
+const CompanyServiceEditPage = lazy(() =>
+  import('@/pages/CompanyServicesPage/CompanyServiceEditPage').then((m) => ({
+    default: m.CompanyServiceEditPage,
   })),
 )
 const CompanyCasesPage = lazy(() =>
@@ -69,9 +99,34 @@ const CompanyCasesPage = lazy(() =>
     default: m.CompanyCasesPage,
   })),
 )
+const CompanyCaseCreatePage = lazy(() =>
+  import('@/pages/CompanyCasesPage/CompanyCaseCreatePage').then((m) => ({
+    default: m.CompanyCaseCreatePage,
+  })),
+)
+const CompanyCaseDetailPage = lazy(() =>
+  import('@/pages/CompanyCasesPage/CompanyCaseDetailPage').then((m) => ({
+    default: m.CompanyCaseDetailPage,
+  })),
+)
+const CompanyCaseEditPage = lazy(() =>
+  import('@/pages/CompanyCasesPage/CompanyCaseEditPage').then((m) => ({
+    default: m.CompanyCaseEditPage,
+  })),
+)
 const CompanyDocumentsPage = lazy(() =>
   import('@/pages/CompanyDocumentsPage/CompanyDocumentsPage').then((m) => ({
     default: m.CompanyDocumentsPage,
+  })),
+)
+const CompanyDocumentUploadPage = lazy(() =>
+  import('@/pages/CompanyDocumentsPage/CompanyDocumentUploadPage').then((m) => ({
+    default: m.CompanyDocumentUploadPage,
+  })),
+)
+const CompanyDocumentDetailPage = lazy(() =>
+  import('@/pages/CompanyDocumentsPage/CompanyDocumentDetailPage').then((m) => ({
+    default: m.CompanyDocumentDetailPage,
   })),
 )
 const CompanyPermissionsPage = lazy(() =>
@@ -87,6 +142,11 @@ const CompanySettingsPage = lazy(() =>
 const CompanyVerificationPage = lazy(() =>
   import('@/pages/CompanyVerificationPage/CompanyVerificationPage').then((m) => ({
     default: m.CompanyVerificationPage,
+  })),
+)
+const CompanyActivityPage = lazy(() =>
+  import('@/pages/CompanyActivityPage/CompanyActivityPage').then((m) => ({
+    default: m.CompanyActivityPage,
   })),
 )
 const NotificationsPage = lazy(() =>
@@ -208,7 +268,7 @@ function guarded(
   denyReason?: string,
 ) {
   return withSuspense(
-    <PermissionGuard permission={permission} denyReason={denyReason}>
+    <PermissionGuard permission={permission} deniedReason={denyReason}>
       {element}
     </PermissionGuard>,
   )
