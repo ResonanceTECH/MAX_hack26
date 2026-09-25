@@ -272,6 +272,26 @@ const AdminModerationPage = lazy(() =>
     default: m.AdminModerationPage,
   })),
 )
+const AdminDictionaryTypePage = lazy(() =>
+  import('@/pages/AdminDictionaryTypePage/AdminDictionaryTypePage').then((m) => ({
+    default: m.AdminDictionaryTypePage,
+  })),
+)
+const AdminFeatureFlagsPage = lazy(() =>
+  import('@/pages/AdminFeatureFlagsPage/AdminFeatureFlagsPage').then((m) => ({
+    default: m.AdminFeatureFlagsPage,
+  })),
+)
+const AdminNotificationsPage = lazy(() =>
+  import('@/pages/AdminNotificationsPage/AdminNotificationsPage').then((m) => ({
+    default: m.AdminNotificationsPage,
+  })),
+)
+const AdminProfilePage = lazy(() =>
+  import('@/pages/AdminProfilePage/AdminProfilePage').then((m) => ({
+    default: m.AdminProfilePage,
+  })),
+)
 
 function withSuspense(element: ReactNode) {
   return <Suspense fallback={<LoadingState variant="page" />}>{element}</Suspense>
@@ -505,71 +525,79 @@ export const router = createBrowserRouter([
       },
       {
         path: 'admin/users',
-        element: guarded(
-          Permission.MANAGE_PLATFORM_USERS,
-          <AdminUsersPage />,
-          'platform_admin',
-        ),
+        element: guarded(Permission.VIEW_USERS, <AdminUsersPage />, 'platform_admin'),
       },
       {
         path: 'admin/users/:id',
-        element: guarded(
-          Permission.MANAGE_PLATFORM_USERS,
-          <AdminUserDetailPage />,
-          'platform_admin',
-        ),
+        element: guarded(Permission.MANAGE_USERS, <AdminUserDetailPage />, 'platform_admin'),
       },
       {
         path: 'admin/companies',
-        element: guarded(
-          Permission.MANAGE_PLATFORM_COMPANIES,
-          <AdminCompaniesPage />,
-          'platform_admin',
-        ),
+        element: guarded(Permission.VIEW_COMPANIES, <AdminCompaniesPage />, 'platform_admin'),
       },
       {
         path: 'admin/companies/:id',
         element: guarded(
-          Permission.MANAGE_PLATFORM_COMPANIES,
+          Permission.MANAGE_COMPANY_PLATFORM_STATUS,
           <AdminCompanyDetailPage />,
           'platform_admin',
         ),
       },
       {
         path: 'admin/moderation',
-        element: guarded(Permission.VIEW_MODERATION, <AdminModerationPage />),
+        element: guarded(Permission.VIEW_ESCALATIONS, <AdminModerationPage />),
+      },
+      {
+        path: 'admin/moderation/:type/:id',
+        element: guarded(Permission.VIEW_MODERATION_ITEM, <ModerationDetailPage />),
       },
       {
         path: 'admin/dictionaries',
+        element: guarded(Permission.VIEW_DICTIONARIES, <AdminDictionariesPage />, 'platform_admin'),
+      },
+      {
+        path: 'admin/dictionaries/:type',
         element: guarded(
           Permission.MANAGE_DICTIONARIES,
-          <AdminDictionariesPage />,
+          <AdminDictionaryTypePage />,
           'platform_admin',
         ),
       },
       {
         path: 'admin/analytics',
-        element: guarded(
-          Permission.VIEW_PLATFORM_ANALYTICS,
-          <AdminAnalyticsPage />,
-          'platform_admin',
-        ),
+        element: guarded(Permission.VIEW_ANALYTICS, <AdminAnalyticsPage />, 'platform_admin'),
       },
       {
         path: 'admin/audit',
-        element: guarded(
-          Permission.VIEW_ADMIN_DASHBOARD,
-          <AdminAuditPage />,
-          'platform_admin',
-        ),
+        element: guarded(Permission.VIEW_AUDIT_LOG, <AdminAuditPage />, 'platform_admin'),
       },
       {
         path: 'admin/settings',
         element: guarded(
-          Permission.MANAGE_PLATFORM_SETTINGS,
+          Permission.VIEW_PLATFORM_SETTINGS,
           <AdminSettingsPage />,
           'platform_admin',
         ),
+      },
+      {
+        path: 'admin/feature-flags',
+        element: guarded(
+          Permission.VIEW_FEATURE_FLAGS,
+          <AdminFeatureFlagsPage />,
+          'platform_admin',
+        ),
+      },
+      {
+        path: 'admin/notifications',
+        element: guarded(
+          Permission.VIEW_SYSTEM_NOTIFICATIONS,
+          <AdminNotificationsPage />,
+          'platform_admin',
+        ),
+      },
+      {
+        path: 'admin/profile',
+        element: guarded(Permission.VIEW_ADMIN_DASHBOARD, <AdminProfilePage />, 'platform_admin'),
       },
 
       { path: '*', element: withSuspense(<NotFoundPage />) },
