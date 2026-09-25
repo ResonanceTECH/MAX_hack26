@@ -1,12 +1,24 @@
-export const USER_ROLES = {
-  COMPANY_OWNER: 'company_owner',
-  COMPANY_MANAGER: 'company_manager',
-  COMPANY_VIEWER: 'company_viewer',
-  MODERATOR: 'moderator',
-  PLATFORM_ADMIN: 'platform_admin',
+export const SYSTEM_ROLES = {
+  BUSINESS_USER: 'BUSINESS_USER',
+  COMPANY_ADMIN: 'COMPANY_ADMIN',
+  MODERATOR: 'MODERATOR',
+  PLATFORM_ADMIN: 'PLATFORM_ADMIN',
 } as const
 
-export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES]
+export type SystemRole = (typeof SYSTEM_ROLES)[keyof typeof SYSTEM_ROLES]
+
+/** @deprecated use SystemRole / SYSTEM_ROLES */
+export type UserRole = SystemRole
+/** @deprecated use SYSTEM_ROLES */
+export const USER_ROLES = SYSTEM_ROLES
+
+export const USER_STATUS = {
+  ACTIVE: 'active',
+  BLOCKED: 'blocked',
+  INVITED: 'invited',
+} as const
+
+export type UserStatus = (typeof USER_STATUS)[keyof typeof USER_STATUS]
 
 export interface User {
   id: string
@@ -14,6 +26,14 @@ export interface User {
   firstName: string
   lastName: string
   avatarUrl: string | null
-  companyId: string
-  role: UserRole
+  companyId: string | null
+  role: SystemRole
+  status: UserStatus
+  createdAt: string
+}
+
+export interface CurrentSession {
+  user: User
+  company?: import('@/entities/company').Company
+  role: SystemRole
 }

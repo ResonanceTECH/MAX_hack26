@@ -16,6 +16,13 @@ export function useMatches(opportunityId: string) {
   })
 }
 
+export function useAllMatches() {
+  return useQuery({
+    queryKey: [...matchKeys.all, 'all'] as const,
+    queryFn: () => matchingApi.getAll(),
+  })
+}
+
 export function useMatch(opportunityId: string, companyId: string) {
   return useQuery({
     queryKey: matchKeys.forCompany(opportunityId, companyId),

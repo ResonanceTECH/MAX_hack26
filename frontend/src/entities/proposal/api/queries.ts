@@ -1,5 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
-import { proposalApi } from '@/shared/api/proposalApi'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { proposalApi, type CreateProposalPayload } from '@/shared/api/proposalApi'
+import { shortlistKeys } from '@/entities/shortlist/api/queries'
+import { opportunityKeys } from '@/entities/opportunity/api/queries'
 
 export const proposalKeys = {
   all: ['proposals'] as const,
@@ -29,5 +31,46 @@ export function useMyProposals(companyId: string | undefined) {
     queryKey: proposalKeys.mine(companyId ?? ''),
     queryFn: () => proposalApi.getMine(companyId!),
     enabled: Boolean(companyId),
+  })
+}
+
+export function useCreateProposal() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: CreateProposalPayload) => proposalApi.create(payload),
+    onSuccess: (created) => {
+      void qc.invalidateQueries({ queryKey: proposalKeys.all })
+      void qc.invalidateQueries({
+        queryKey: proposalKeys.byOpportunity(created.opportunityId),
+      })
+      void qc.invalidateQueries({ queryKey: opportunityKeys.all })
+    },
+  })
+}
+
+export function useShortlistProposal() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => proposalApi.shortlist(id),
+    onSuccess: (proposal) => {
+      void qc.invalidateQueries({ queryKey: proposalKeys.all })
+      void qc.invalidateQueries({
+        queryKey: proposalKeys.byOpportunity(proposal.opportunityId),
+      })
+      void qc.invalidateQueries({ queryKey: shortlistKeys.all })
+    },
+  })
+}
+
+export function useRejectProposal() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => proposalApi.reject(id),
+    onSuccess: (proposal) => {
+      void qc.invalidateQueries({ queryKey: proposalKeys.all })
+      void qc.invalidateQueries({
+        queryKey: proposalKeys.byOpportunity(proposal.opportunityId),
+      })
+    },
   })
 }

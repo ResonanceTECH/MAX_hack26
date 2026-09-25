@@ -1,3 +1,6 @@
+export type CompanyVerificationStatus = 'pending' | 'verified' | 'rejected' | 'expired'
+export type CompanyStatus = 'active' | 'blocked' | 'draft'
+
 export interface Company {
   id: string
   name: string
@@ -18,4 +21,6 @@ export interface Company {
   reviewsCount: number
   verified: boolean
   casesCount: number
+  verificationStatus: CompanyVerificationStatus
+  status: CompanyStatus
 }

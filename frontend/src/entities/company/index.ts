@@ -1,1 +1,5 @@
-export { type Company } from './model/types'
+export {
+  type Company,
+  type CompanyStatus,
+  type CompanyVerificationStatus,
+} from './model/types'

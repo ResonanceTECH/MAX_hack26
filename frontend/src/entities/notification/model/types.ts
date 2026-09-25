@@ -3,6 +3,7 @@ export const NOTIFICATION_TYPES = {
   NEW_PROPOSAL: 'new_proposal',
   PROPOSAL_VIEWED: 'proposal_viewed',
   SHORTLIST: 'shortlist',
+  NEGOTIATION: 'negotiation',
   RELEVANT_OPPORTUNITY: 'relevant_opportunity',
   DEADLINE_REMINDER: 'deadline_reminder',
 } as const
