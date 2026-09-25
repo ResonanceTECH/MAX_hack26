@@ -18,6 +18,12 @@ const REASON_COPY: Record<string, { title: string; description: string; cta: str
       cta: 'Вернуться к компании',
       href: ROUTES.PROFILE_COMPANY,
     },
+    company_activity: {
+      title: 'Нет доступа',
+      description: 'У вас недостаточно прав для просмотра истории компании.',
+      cta: 'Вернуться к компании',
+      href: ROUTES.PROFILE_COMPANY,
+    },
   }
 
 export function AccessDeniedPage() {
