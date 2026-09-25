@@ -1,226 +1,116 @@
-import { useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Controller, useForm } from 'react-hook-form'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
+import CardActionArea from '@mui/material/CardActionArea'
 import CardContent from '@mui/material/CardContent'
 import Chip from '@mui/material/Chip'
-import Dialog from '@mui/material/Dialog'
-import DialogActions from '@mui/material/DialogActions'
-import DialogContent from '@mui/material/DialogContent'
-import DialogTitle from '@mui/material/DialogTitle'
+import Grid from '@mui/material/Grid2'
 import Stack from '@mui/material/Stack'
-import Tab from '@mui/material/Tab'
-import Tabs from '@mui/material/Tabs'
 import Typography from '@mui/material/Typography'
-import {
-  useArchiveDictionary,
-  useCreateDictionary,
-  useDictionaries,
-  useUpdateDictionary,
-} from '@/features/admin/api/queries'
-import { dictionarySchema, type DictionaryFormValues } from '@/features/admin/model/schemas'
-import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
+import { useDictionaries, DICTIONARY_TYPE_LABELS } from '@/features/admin'
+import { adminDictionaryPath, ROUTES } from '@/shared/constants/routes'
 import type { DictionaryType } from '@/shared/mocks/dictionaries'
-import { ROUTES } from '@/shared/constants/routes'
-import {
-  AppButton,
-  AppInput,
-  ConfirmDialog,
-  EmptyState,
-  ErrorState,
-  LoadingState,
-  PageHeader,
-} from '@/shared/ui'
+import { AppButton, LoadingState, PageHeader } from '@/shared/ui'
 
-const TABS: { key: DictionaryType; label: string }[] = [
-  { key: 'categories', label: 'Categories' },
-  { key: 'subcategories', label: 'Subcategories' },
-  { key: 'industries', label: 'Industries' },
-  { key: 'skills', label: 'Skills' },
-  { key: 'technologies', label: 'Technologies' },
-  { key: 'regions', label: 'Regions' },
-  { key: 'documentTypes', label: 'Document types' },
+const HUB: { type: DictionaryType; path: string; description: string }[] = [
+  {
+    type: 'categories',
+    path: ROUTES.ADMIN_DICTIONARIES_CATEGORIES,
+    description: 'Дерево категорий и подкатегорий запросов',
+  },
+  {
+    type: 'industries',
+    path: ROUTES.ADMIN_DICTIONARIES_INDUSTRIES,
+    description: 'Отрасли компаний',
+  },
+  {
+    type: 'skills',
+    path: ROUTES.ADMIN_DICTIONARIES_SKILLS,
+    description: 'Компетенции и навыки',
+  },
+  {
+    type: 'technologies',
+    path: ROUTES.ADMIN_DICTIONARIES_TECHNOLOGIES,
+    description: 'Технологический стек',
+  },
+  {
+    type: 'regions',
+    path: ROUTES.ADMIN_DICTIONARIES_REGIONS,
+    description: 'Регионы присутствия',
+  },
+  {
+    type: 'documentTypes',
+    path: ROUTES.ADMIN_DICTIONARIES_DOCUMENT_TYPES,
+    description: 'Типы документов для верификации',
+  },
 ]
 
 export function AdminDictionariesPage() {
-  const [tab, setTab] = useState(0)
-  const type = TABS[tab]!.key
-  const query = useDictionaries(type)
-  const create = useCreateDictionary()
-  const update = useUpdateDictionary()
-  const archive = useArchiveDictionary()
-  const showSuccess = useSnackbarStore((s) => s.showSuccess)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [editId, setEditId] = useState<string | null>(null)
-  const [archiveId, setArchiveId] = useState<string | null>(null)
-
-  const form = useForm<DictionaryFormValues>({
-    resolver: zodResolver(dictionarySchema),
-    defaultValues: { name: '', type },
-  })
-
-  const items = query.data ?? []
+  const all = useDictionaries()
 
   return (
     <Box>
       <PageHeader
         title="Справочники"
-        subtitle="Категории, отрасли, навыки и регионы"
+        subtitle="Управление словарями платформы"
         actions={
-          <Stack direction="row" spacing={1}>
-            <AppButton component={RouterLink} to={ROUTES.ADMIN} variant="text">
-              Dashboard
-            </AppButton>
-            <AppButton
-              variant="contained"
-              onClick={() => {
-                form.reset({ name: '', type })
-                setCreateOpen(true)
-              }}
-            >
-              Создать
-            </AppButton>
-          </Stack>
+          <AppButton component={RouterLink} to={ROUTES.ADMIN} variant="text" sx={{ minHeight: 44 }}>
+            К сводке
+          </AppButton>
         }
       />
 
-      <Tabs
-        value={tab}
-        onChange={(_, v) => setTab(v)}
-        variant="scrollable"
-        allowScrollButtonsMobile
-        sx={{ mb: 2 }}
-      >
-        {TABS.map((t) => (
-          <Tab key={t.key} label={t.label} />
-        ))}
-      </Tabs>
+      {all.isLoading ? <LoadingState rows={2} /> : null}
 
-      {query.isLoading ? <LoadingState variant="list" /> : null}
-      {query.isError ? <ErrorState onRetry={() => void query.refetch()} /> : null}
-      {!query.isLoading && items.length === 0 ? (
-        <EmptyState title="Пусто" description="Создайте первый элемент справочника" />
-      ) : null}
-
-      <Stack spacing={1}>
-        {items.map((item) => (
-          <Card key={item.id} variant="outlined">
-            <CardContent>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                justifyContent="space-between"
-                spacing={1}
-                alignItems={{ sm: 'center' }}
-              >
-                <Box>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography variant="h4">{item.name}</Typography>
-                    <Chip
-                      size="small"
-                      label={item.status === 'active' ? 'Активен' : 'Архив'}
-                      color={item.status === 'active' ? 'success' : 'default'}
-                    />
-                  </Stack>
-                  {item.usageCount != null ? (
-                    <Typography variant="body2" color="text.secondary">
-                      Использований: {item.usageCount}
+      <Grid container spacing={1.5}>
+        {HUB.map((item) => {
+          const count =
+            all.data?.filter((d) => d.type === item.type && d.status === 'active').length ?? 0
+          return (
+            <Grid key={item.type} size={{ xs: 12, sm: 6, md: 4 }}>
+              <Card variant="outlined" sx={{ height: '100%' }}>
+                <CardActionArea
+                  component={RouterLink}
+                  to={item.path}
+                  sx={{ height: '100%', alignItems: 'stretch' }}
+                >
+                  <CardContent>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="h4">
+                        {DICTIONARY_TYPE_LABELS[item.type] ?? item.type}
+                      </Typography>
+                      <Chip size="small" label={count} />
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      {item.description}
                     </Typography>
-                  ) : null}
-                </Box>
-                <Stack direction="row" spacing={1}>
-                  <AppButton
-                    size="small"
-                    onClick={() => {
-                      form.reset({ name: item.name, type: item.type })
-                      setEditId(item.id)
-                    }}
-                  >
-                    Изменить
-                  </AppButton>
-                  {item.status === 'active' ? (
-                    <AppButton size="small" color="warning" onClick={() => setArchiveId(item.id)}>
-                      Архив
-                    </AppButton>
-                  ) : null}
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </Grid>
+          )
+        })}
+      </Grid>
+
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
+        Быстрые ссылки:{' '}
+        {HUB.map((h, i) => (
+          <span key={h.type}>
+            {i > 0 ? ' · ' : null}
+            <Typography
+              component={RouterLink}
+              to={adminDictionaryPath(
+                h.type === 'documentTypes' ? 'document-types' : h.type,
+              )}
+              variant="body2"
+              color="primary"
+              sx={{ textDecoration: 'none' }}
+            >
+              {DICTIONARY_TYPE_LABELS[h.type]}
+            </Typography>
+          </span>
         ))}
-      </Stack>
-
-      <Dialog
-        open={createOpen || Boolean(editId)}
-        onClose={() => {
-          setCreateOpen(false)
-          setEditId(null)
-        }}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>{editId ? 'Редактировать' : 'Создать элемент'}</DialogTitle>
-        <DialogContent>
-          <Controller
-            name="name"
-            control={form.control}
-            render={({ field, fieldState }) => (
-              <AppInput
-                {...field}
-                label="Название"
-                error={Boolean(fieldState.error)}
-                helperText={fieldState.error?.message}
-                sx={{ mt: 1 }}
-              />
-            )}
-          />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton
-            onClick={() => {
-              setCreateOpen(false)
-              setEditId(null)
-            }}
-          >
-            Отмена
-          </AppButton>
-          <AppButton
-            variant="contained"
-            onClick={() =>
-              void form.handleSubmit(async (values) => {
-                if (editId) {
-                  await update.mutateAsync({ id: editId, name: values.name })
-                  showSuccess('Элемент обновлён')
-                } else {
-                  await create.mutateAsync({ type, name: values.name })
-                  showSuccess('Категория создана')
-                }
-                setCreateOpen(false)
-                setEditId(null)
-              })()
-            }
-          >
-            Сохранить
-          </AppButton>
-        </DialogActions>
-      </Dialog>
-
-      <ConfirmDialog
-        open={Boolean(archiveId)}
-        title="Архивировать элемент?"
-        description="Элемент останется в истории, но не будет доступен для новых сущностей. Удаление используемых элементов недоступно."
-        confirmLabel="Архивировать"
-        destructive
-        onCancel={() => setArchiveId(null)}
-        onConfirm={() => {
-          if (!archiveId) return
-          void archive.mutateAsync(archiveId).then(() => {
-            showSuccess('Элемент архивирован')
-            setArchiveId(null)
-          })
-        }}
-      />
+      </Typography>
     </Box>
   )
 }
