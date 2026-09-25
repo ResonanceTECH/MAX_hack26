@@ -34,8 +34,12 @@ export function formatDate(iso: string): string {
 
 export function formatRelativeDate(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
-  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  if (days <= 0) return 'сегодня'
+  const mins = Math.floor(diffMs / (1000 * 60))
+  if (mins < 1) return 'только что'
+  if (mins < 60) return `${mins} мин назад`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} ч назад`
+  const days = Math.floor(hours / 24)
   if (days === 1) return 'вчера'
   if (days < 7) return `${days} дн. назад`
   return formatDate(iso)
