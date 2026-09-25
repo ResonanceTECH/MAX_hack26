@@ -1,4 +1,5 @@
 export const COMPANY_SERVICE_STATUS = {
+  DRAFT: 'draft',
   ACTIVE: 'active',
   HIDDEN: 'hidden',
   ARCHIVED: 'archived',
@@ -14,4 +15,15 @@ export interface CompanyService {
   description: string
   category: string
   status: CompanyServiceStatus
+  shortDescription?: string
+  priceMin?: number
+  priceMax?: number
+  currency?: string
+  regions?: string[]
+  remote?: boolean
+  technologies?: string[]
+  capabilities?: string[]
+  targetIndustries?: string[]
+  createdAt?: string
+  updatedAt?: string
 }

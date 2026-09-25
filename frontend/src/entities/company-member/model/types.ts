@@ -7,15 +7,16 @@ export const COMPANY_MEMBER_ROLES = {
 export type CompanyMemberRole = (typeof COMPANY_MEMBER_ROLES)[keyof typeof COMPANY_MEMBER_ROLES]
 
 export const COMPANY_MEMBER_ROLE_LABELS: Record<CompanyMemberRole, string> = {
-  COMPANY_ADMIN: 'Company Admin',
-  MANAGER: 'Manager',
-  VIEWER: 'Viewer',
+  COMPANY_ADMIN: 'Администратор',
+  MANAGER: 'Менеджер',
+  VIEWER: 'Наблюдатель',
 }
 
 export const COMPANY_MEMBER_STATUS = {
   ACTIVE: 'active',
-  BLOCKED: 'blocked',
   INVITED: 'invited',
+  SUSPENDED: 'suspended',
+  DEACTIVATED: 'deactivated',
 } as const
 
 export type CompanyMemberStatus =
@@ -31,4 +32,7 @@ export interface CompanyMember {
   role: CompanyMemberRole
   status: CompanyMemberStatus
   invitedAt: string
+  avatarUrl?: string
+  joinedAt?: string
+  lastActiveAt?: string
 }
