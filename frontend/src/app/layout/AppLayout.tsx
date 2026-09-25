@@ -14,8 +14,7 @@ export function AppLayout() {
   const isInitialized = useSessionStore((s) => s.isInitialized)
   const isLoading = useSessionStore((s) => s.isLoading)
   const role = useSessionStore((s) => s.role)
-  const config = getNavConfig(role)
-  const showBottomNav = !config.mobileAsDrawer
+  const showBottomNav = true
 
   if (!isInitialized || isLoading) {
     return (
