@@ -18,6 +18,8 @@ import {
   WorkflowSquare01Icon,
   Clock01Icon,
   AlertCircleIcon,
+  Share08Icon,
+  Shield01Icon,
 } from '@/shared/ui/icons'
 
 export interface NavItem {
@@ -26,6 +28,7 @@ export interface NavItem {
   icon: IconSvgElement
   emphasize?: boolean
   matchPrefix?: string
+  badgeKey?: 'pendingQueue' | 'openReports'
 }
 
 export interface NavConfig {
@@ -75,11 +78,53 @@ const COMPANY_ADMIN_DESKTOP: NavItem[] = [
   { to: ROUTES.PROFILE_COMPANY, label: 'Компания', icon: Building02Icon },
 ]
 
-const MODERATOR_NAV: NavItem[] = [
-  { to: ROUTES.MODERATION, label: 'Очередь', icon: InboxIcon, matchPrefix: '/moderation/queue' },
-  { to: ROUTES.MODERATION_REPORTS, label: 'Жалобы', icon: AlertCircleIcon },
+const MODERATOR_MOBILE: NavItem[] = [
+  { to: ROUTES.MODERATION, label: 'Обзор', icon: DashboardSquare01Icon },
+  {
+    to: ROUTES.MODERATION_QUEUE,
+    label: 'Очередь',
+    icon: InboxIcon,
+    matchPrefix: '/moderation/queue',
+    badgeKey: 'pendingQueue',
+  },
+  {
+    to: ROUTES.MODERATION_REPORTS,
+    label: 'Жалобы',
+    icon: AlertCircleIcon,
+    matchPrefix: '/moderation/reports',
+    badgeKey: 'openReports',
+  },
   { to: ROUTES.MODERATION_HISTORY, label: 'История', icon: Clock01Icon },
-  { to: ROUTES.PROFILE, label: 'Профиль', icon: UserCircleIcon },
+]
+
+const MODERATOR_DESKTOP: NavItem[] = [
+  { to: ROUTES.MODERATION, label: 'Обзор', icon: DashboardSquare01Icon },
+  { to: ROUTES.MODERATION_QUEUE, label: 'Очередь', icon: InboxIcon, matchPrefix: '/moderation/queue' },
+  {
+    to: ROUTES.MODERATION_QUEUE_COMPANIES,
+    label: 'Компании',
+    icon: Building02Icon,
+  },
+  {
+    to: ROUTES.MODERATION_QUEUE_OPPORTUNITIES,
+    label: 'Запросы',
+    icon: Briefcase02Icon,
+  },
+  {
+    to: ROUTES.MODERATION_QUEUE_CASES,
+    label: 'Кейсы',
+    icon: Layers01Icon,
+  },
+  {
+    to: ROUTES.MODERATION_QUEUE_DOCUMENTS,
+    label: 'Документы',
+    icon: File02Icon,
+  },
+  { to: ROUTES.MODERATION_REPORTS, label: 'Жалобы', icon: AlertCircleIcon },
+  { to: ROUTES.MODERATION_ESCALATIONS, label: 'Эскалации', icon: Share08Icon },
+  { to: ROUTES.MODERATION_HISTORY, label: 'История', icon: Clock01Icon },
+  { to: ROUTES.NOTIFICATIONS, label: 'Уведомления', icon: Shield01Icon },
+  { to: ROUTES.MODERATION_PROFILE, label: 'Профиль', icon: UserCircleIcon },
 ]
 
 const PLATFORM_ADMIN_NAV_RU: NavItem[] = [
@@ -103,16 +148,8 @@ export function getNavConfig(role: SystemRole | null): NavConfig {
       }
     case SYSTEM_ROLES.MODERATOR:
       return {
-        mobile: [
-          { to: ROUTES.MODERATION, label: 'Очередь', icon: InboxIcon },
-          { to: ROUTES.MODERATION_REPORTS, label: 'Жалобы', icon: AlertCircleIcon },
-          { to: ROUTES.MODERATION_HISTORY, label: 'История', icon: Clock01Icon },
-          { to: ROUTES.PROFILE, label: 'Профиль', icon: UserCircleIcon },
-        ],
-        desktop: [
-          { to: ROUTES.MODERATION, label: 'Dashboard', icon: DashboardSquare01Icon },
-          ...MODERATOR_NAV,
-        ],
+        mobile: MODERATOR_MOBILE,
+        desktop: MODERATOR_DESKTOP,
         homePath: ROUTES.MODERATION,
       }
     case SYSTEM_ROLES.PLATFORM_ADMIN:
