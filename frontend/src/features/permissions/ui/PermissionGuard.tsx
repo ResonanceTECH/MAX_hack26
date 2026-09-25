@@ -9,12 +9,21 @@ import type { Permission } from '../model/permissions'
 export interface PermissionGuardProps {
   permission: Permission | Permission[]
   requireAll?: boolean
+  /** Appended as ?reason=… on access-denied redirect */
+  denyReason?: string
+  /** Alias for denyReason */
+  deniedReason?: string
+  /** Optional absolute path override (defaults to /access-denied) */
+  deniedTo?: string
   children: ReactNode
 }
 
 export function PermissionGuard({
   permission,
   requireAll = false,
+  denyReason,
+  deniedReason,
+  deniedTo,
   children,
 }: PermissionGuardProps) {
   const isInitialized = useSessionStore((s) => s.isInitialized)
@@ -28,5 +37,9 @@ export function PermissionGuard({
   const allowed = requireAll ? hasAll(list) : list.length === 1 ? has(list[0]!) : hasAny(list)
 
   if (allowed) return <>{children}</>
-  return <Navigate to={ROUTES.ACCESS_DENIED} replace />
+
+  const reason = deniedReason ?? denyReason
+  const base = deniedTo ?? ROUTES.ACCESS_DENIED
+  const to = reason ? `${base}?reason=${encodeURIComponent(reason)}` : base
+  return <Navigate to={to} replace />
 }
