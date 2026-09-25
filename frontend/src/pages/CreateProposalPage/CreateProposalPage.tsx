@@ -2,14 +2,17 @@ import { useState } from 'react'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Box from '@mui/material/Box'
+import Alert from '@mui/material/Alert'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { useOpportunity } from '@/entities/opportunity/api/queries'
+import { useCreateProposal } from '@/entities/proposal/api/queries'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
-import { proposalApi } from '@/shared/api/proposalApi'
-import { ROUTES } from '@/shared/constants/routes'
+import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
+import { ProposalApiError } from '@/shared/api/proposalApi'
+import { opportunityDetailsPath, ROUTES } from '@/shared/constants/routes'
 import {
   AppButton,
   AppIcon,
@@ -43,10 +46,15 @@ function splitCommaList(value: string | undefined): string[] {
 }
 
 export function CreateProposalPage() {
-  const { id = '' } = useParams()
-  const opportunityQuery = useOpportunity(id)
+  const { id = '', opportunityId: opportunityIdParam = '' } = useParams()
+  const opportunityId = opportunityIdParam || id
+  const opportunityQuery = useOpportunity(opportunityId)
   const company = useSessionStore((s) => s.company)
+  const createProposal = useCreateProposal()
+  const showSuccess = useSnackbarStore((s) => s.showSuccess)
+  const showError = useSnackbarStore((s) => s.showError)
   const [submitted, setSubmitted] = useState(false)
+  const [guardError, setGuardError] = useState<string | null>(null)
 
   const {
     register,
@@ -72,20 +80,54 @@ export function CreateProposalPage() {
 
   const opportunity = opportunityQuery.data
   const currency = opportunity.currency
+  const isOwn = opportunity.company.id === company?.id
+  const isBlocked = opportunity.status === 'expired' || opportunity.status === 'closed'
+
+  if (isOwn || isBlocked) {
+    const message = isOwn
+      ? 'Это ваш запрос. Нельзя откликнуться на собственный запрос.'
+      : opportunity.status === 'expired'
+        ? 'Приём предложений завершён'
+        : 'Запрос закрыт'
+    return (
+      <Box>
+        <PageHeader title="Отклик на запрос" subtitle={opportunity.title} />
+        <Alert severity="info" sx={{ mb: 2 }}>
+          {message}
+        </Alert>
+        <AppButton component={RouterLink} to={opportunityDetailsPath(opportunity.id)} variant="contained">
+          К запросу
+        </AppButton>
+      </Box>
+    )
+  }
 
   const onSubmit = handleSubmit(async (values) => {
-    await proposalApi.create({
-      opportunityId: id,
-      price: values.price,
-      currency,
-      durationDays: values.durationDays,
-      description: values.description,
-      included: splitCommaList(values.included),
-      excluded: splitCommaList(values.excluded),
-      cases: splitCommaList(values.cases),
-      comment: values.comment?.trim() || undefined,
-    })
-    setSubmitted(true)
+    setGuardError(null)
+    try {
+      await createProposal.mutateAsync({
+        opportunityId,
+        price: values.price,
+        currency,
+        durationDays: values.durationDays,
+        description: values.description,
+        included: splitCommaList(values.included),
+        excluded: splitCommaList(values.excluded),
+        cases: splitCommaList(values.cases),
+        comment: values.comment?.trim() || undefined,
+      })
+      showSuccess('Предложение отправлено')
+      setSubmitted(true)
+    } catch (error) {
+      const message =
+        error instanceof ProposalApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Не удалось отправить предложение'
+      setGuardError(message)
+      showError(message)
+    }
   })
 
   if (submitted) {
@@ -96,34 +138,43 @@ export function CreateProposalPage() {
           Предложение отправлено
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-          Заказчик получит ваше предложение по запросу «{opportunity.title}».
+          Заказчик получит уведомление. Статус предложения можно отслеживать в разделе «Мои
+          отклики».
         </Typography>
         <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" sx={{ mb: 3 }}>
           <Typography variant="body2" color="text.secondary">
             Статус:
           </Typography>
           <StatusChip status="submitted" kind="proposal" />
-          <Typography variant="body2" color="text.secondary">
-            · Ожидает просмотра
-          </Typography>
         </Stack>
-        <AppButton component={RouterLink} to={ROUTES.MY_PROPOSALS} variant="contained">
-          Мои отклики
-        </AppButton>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="center">
+          <AppButton component={RouterLink} to={ROUTES.MY_PROPOSALS} variant="contained">
+            Мои отклики
+          </AppButton>
+          <AppButton
+            component={RouterLink}
+            to={opportunityDetailsPath(opportunity.id)}
+            variant="outlined"
+          >
+            Вернуться к заказу
+          </AppButton>
+        </Stack>
       </Box>
     )
   }
 
   return (
     <Box>
-      <PageHeader
-        title="Отклик на запрос"
-        subtitle={opportunity.title}
-      />
+      <PageHeader title="Отклик на запрос" subtitle={opportunity.title} />
       {company ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          От имени {company.shortName}
+          От имени {company.shortName} · заказчик: {opportunity.company.shortName}
         </Typography>
+      ) : null}
+      {guardError ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {guardError}
+        </Alert>
       ) : null}
 
       <Stack component="form" spacing={2} onSubmit={(e) => void onSubmit(e)} noValidate>
@@ -170,7 +221,7 @@ export function CreateProposalPage() {
           {...register('cases')}
         />
         <AppTextarea label="Комментарий для заказчика (необязательно)" {...register('comment')} />
-        <AppButton type="submit" variant="contained" loading={isSubmitting}>
+        <AppButton type="submit" variant="contained" loading={isSubmitting || createProposal.isPending}>
           Отправить предложение
         </AppButton>
       </Stack>
