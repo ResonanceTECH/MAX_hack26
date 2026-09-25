@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link as RouterLink } from 'react-router-dom'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardActionArea from '@mui/material/CardActionArea'
@@ -11,7 +11,10 @@ import { useSessionStore } from '@/features/auth/model/sessionStore'
 import { useMyOpportunities, useRecommendedOpportunities } from '@/entities/opportunity/api/queries'
 import { useMyProposals } from '@/entities/proposal/api/queries'
 import { useDeals } from '@/entities/deal/api/queries'
-import { mockMatches, mockShortlist } from '@/shared/mocks'
+import { useAllMatches } from '@/entities/match/api/queries'
+import { useShortlist } from '@/entities/shortlist/api/queries'
+import { useDismissedRecommendationsStore } from '@/features/recommendations/model/dismissedStore'
+import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import {
   opportunityComparePath,
   opportunityProposalsPath,
@@ -61,22 +64,30 @@ const QUICK_ACTIONS = [
 ]
 
 export function HomePage() {
+  const navigate = useNavigate()
   const [query, setQuery] = useState('')
-  const [dismissed, setDismissed] = useState<string[]>([])
+  const dismissedIds = useDismissedRecommendationsStore((s) => s.ids)
+  const dismiss = useDismissedRecommendationsStore((s) => s.dismiss)
+  const restore = useDismissedRecommendationsStore((s) => s.restore)
+  const showInfo = useSnackbarStore((s) => s.showInfo)
   const companyId = useSessionStore((s) => s.company?.id)
   const recommended = useRecommendedOpportunities(companyId)
   const mineQuery = useMyOpportunities(companyId)
   const proposalsQuery = useMyProposals(companyId)
   const dealsQuery = useDeals()
+  const matchesQuery = useAllMatches()
+  const shortlistQuery = useShortlist()
 
   const forYou = useMemo(() => {
     const items = recommended.data ?? []
     return items
-      .filter((opp) => opp.company.id !== companyId && !dismissed.includes(opp.id))
+      .filter((opp) => opp.company.id !== companyId && !dismissedIds.includes(opp.id))
       .slice(0, 3)
       .map((opp) => ({
         opportunity: opp,
-        match: mockMatches.find((m) => m.opportunityId === opp.id) ?? {
+        match: matchesQuery.data?.find(
+          (m) => m.opportunityId === opp.id && m.companyId === companyId,
+        ) ?? {
           id: `synth-${opp.id}`,
           opportunityId: opp.id,
           companyId: companyId ?? '',
@@ -105,7 +116,7 @@ export function HomePage() {
           status: 'suggested' as const,
         },
       }))
-  }, [recommended.data, companyId, dismissed])
+  }, [recommended.data, companyId, dismissedIds, matchesQuery.data])
 
   const myActive = (mineQuery.data ?? [])
     .filter((o) =>
@@ -197,7 +208,13 @@ export function HomePage() {
                 key={opportunity.id}
                 opportunity={opportunity}
                 match={match}
-                onDismiss={() => setDismissed((d) => [...d, opportunity.id])}
+                onDismiss={() => {
+                  dismiss(opportunity.id)
+                  showInfo('Рекомендация скрыта', {
+                    actionLabel: 'Отменить',
+                    onAction: () => restore(opportunity.id),
+                  })
+                }}
               />
             ))}
           </Stack>
@@ -218,7 +235,7 @@ export function HomePage() {
             description="Создайте первый запрос — и начните собирать предложения."
             actionLabel="Создать"
             onAction={() => {
-              window.location.href = ROUTES.OPPORTUNITY_CREATE
+              void navigate(ROUTES.OPPORTUNITY_CREATE)
             }}
           />
         ) : (
@@ -260,7 +277,7 @@ export function HomePage() {
               <ProposalCard
                 key={p.id}
                 proposal={p}
-                match={mockMatches.find(
+                match={matchesQuery.data?.find(
                   (m) => m.opportunityId === p.opportunityId && m.companyId === p.company.id,
                 )}
                 compact
@@ -292,7 +309,7 @@ export function HomePage() {
               <CardContent>
                 <Typography variant="h4">Shortlist</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {mockShortlist.length} компаний
+                  {shortlistQuery.data?.length ?? 0} компаний
                 </Typography>
               </CardContent>
             </CardActionArea>
