@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import { Menu } from '@base-ui/react/menu'
 import ButtonBase from '@mui/material/ButtonBase'
-import Divider from '@mui/material/Divider'
 import { AppIcon } from '@/shared/ui'
 import { MoreVerticalCircle01Icon } from '@/shared/ui/icons'
 
@@ -30,9 +29,10 @@ export function BaseUiMenu({
   return (
     <Menu.Root>
       <Menu.Trigger
+        nativeButton={!trigger}
         render={
           trigger ? (
-            <span />
+            (props) => <span {...props}>{trigger}</span>
           ) : (
             <ButtonBase
               aria-label={ariaLabel}
@@ -46,15 +46,9 @@ export function BaseUiMenu({
           )
         }
       >
-        {trigger ?? (
-          <>
-            {triggerLabel ? (
-              triggerLabel
-            ) : (
-              <AppIcon icon={MoreVerticalCircle01Icon} size={18} aria-hidden />
-            )}
-          </>
-        )}
+        {trigger
+          ? null
+          : (triggerLabel ?? <AppIcon icon={MoreVerticalCircle01Icon} size={18} aria-hidden />)}
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner sideOffset={4} align="end">
@@ -110,6 +104,3 @@ export function BaseUiMenu({
     </Menu.Root>
   )
 }
-
-/** Re-export Divider for callers that want a visual separator outside menu */
-export { Divider as BaseUiMenuDivider }
