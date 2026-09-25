@@ -9,7 +9,8 @@ import Tabs from '@mui/material/Tabs'
 import Typography from '@mui/material/Typography'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import { useMyProposals } from '@/entities/proposal/api/queries'
-import { getOpportunityById, mockMatches } from '@/shared/mocks'
+import { useOpportunities } from '@/entities/opportunity/api/queries'
+import { useAllMatches } from '@/entities/match/api/queries'
 import { proposalDetailsPath } from '@/shared/constants/routes'
 import {
   AppButton,
@@ -26,6 +27,8 @@ export function MyProposalsPage() {
   const [tab, setTab] = useState(0)
   const companyId = useSessionStore((s) => s.company?.id)
   const { data, isLoading, isError, refetch } = useMyProposals(companyId)
+  const opportunitiesQuery = useOpportunities()
+  const matchesQuery = useAllMatches()
 
   const all = data ?? []
   const buckets = useMemo(() => {
@@ -72,8 +75,8 @@ export function MyProposalsPage() {
       ) : null}
       <Stack spacing={2}>
         {list.map((p) => {
-          const opp = getOpportunityById(p.opportunityId)
-          const match = mockMatches.find(
+          const opp = opportunitiesQuery.data?.find((o) => o.id === p.opportunityId)
+          const match = matchesQuery.data?.find(
             (m) => m.opportunityId === p.opportunityId && m.companyId === p.company.id,
           )
           return (

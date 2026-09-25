@@ -1,34 +1,21 @@
 import { useParams } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Stack from '@mui/material/Stack'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOpportunity } from '@/entities/opportunity/api/queries'
-import { useProposals, proposalKeys } from '@/entities/proposal/api/queries'
+import { useProposals, useRejectProposal, useShortlistProposal } from '@/entities/proposal/api/queries'
 import { useMatches } from '@/entities/match/api/queries'
-import { proposalApi } from '@/shared/api/proposalApi'
+import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '@/shared/ui'
 import { ProposalCard } from '@/widgets/ProposalCard/ProposalCard'
 
 export function ProposalsPage() {
   const { id = '' } = useParams()
-  const queryClient = useQueryClient()
   const opportunity = useOpportunity(id)
   const proposals = useProposals(id)
   const matches = useMatches(id)
-
-  const shortlistMutation = useMutation({
-    mutationFn: (proposalId: string) => proposalApi.shortlist(proposalId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: proposalKeys.byOpportunity(id) })
-    },
-  })
-
-  const rejectMutation = useMutation({
-    mutationFn: (proposalId: string) => proposalApi.reject(proposalId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: proposalKeys.byOpportunity(id) })
-    },
-  })
+  const shortlistMutation = useShortlistProposal()
+  const rejectMutation = useRejectProposal()
+  const showSuccess = useSnackbarStore((s) => s.showSuccess)
 
   if (opportunity.isLoading || proposals.isLoading) return <LoadingState variant="page" />
   if (opportunity.isError || proposals.isError) {
@@ -57,8 +44,13 @@ export function ProposalsPage() {
               key={proposal.id}
               proposal={proposal}
               match={matches.data?.find((m) => m.companyId === proposal.company.id)}
-              onShortlist={(pid) => shortlistMutation.mutate(pid)}
-              onReject={(pid) => rejectMutation.mutate(pid)}
+              onShortlist={async (pid) => {
+                await shortlistMutation.mutateAsync(pid)
+                showSuccess('Добавлено в shortlist')
+              }}
+              onReject={async (pid) => {
+                await rejectMutation.mutateAsync(pid)
+              }}
             />
           ))}
         </Stack>

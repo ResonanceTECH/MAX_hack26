@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Link as RouterLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link as RouterLink, useBlocker } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
 import Box from '@mui/material/Box'
@@ -7,22 +7,22 @@ import Chip from '@mui/material/Chip'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
-import { useUpdateCompanyProfile } from '@/features/company-management/api/queries'
 import {
+  UnsavedChangesDialog,
+  canEditVerifiedField,
   companyProfileSchema,
   type CompanyProfileFormValues,
-} from '@/features/company-management/model/schemas'
-import { Permission } from '@/features/permissions'
-import { usePermission } from '@/features/permissions/hooks/usePermission'
+  useUpdateCompanyProfile,
+} from '@/features/company-management'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { ROUTES } from '@/shared/constants/routes'
 import {
   AppButton,
   AppInput,
   AppTextarea,
-  EmptyState,
   LoadingState,
   PageHeader,
+  Section,
 } from '@/shared/ui'
 
 function parseTags(value: string): string[] {
@@ -34,10 +34,10 @@ function parseTags(value: string): string[] {
 
 export function CompanyEditPage() {
   const company = useSessionStore((s) => s.company)
-  const canEdit = usePermission(Permission.EDIT_COMPANY)
   const updateProfile = useUpdateCompanyProfile(company?.id)
   const showSuccess = useSnackbarStore((s) => s.showSuccess)
   const showError = useSnackbarStore((s) => s.showError)
+  const [allowLeave, setAllowLeave] = useState(false)
 
   const form = useForm<CompanyProfileFormValues>({
     resolver: zodResolver(companyProfileSchema),
@@ -62,16 +62,23 @@ export function CompanyEditPage() {
       capabilities: company.capabilities,
       technologies: company.technologies,
       services: company.services,
+      shortName: company.shortName,
+      priceFrom: company.priceFrom,
+      priceTo: company.priceTo,
     })
   }, [company, form])
 
-  if (!canEdit) {
-    return (
-      <EmptyState title="Нет доступа" description="Редактирование профиля недоступно." />
-    )
-  }
+  const isDirty = form.formState.isDirty
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      !allowLeave && isDirty && currentLocation.pathname !== nextLocation.pathname,
+  )
 
   if (!company) return <LoadingState variant="page" />
+
+  const lockedInn = !canEditVerifiedField('inn', company)
+  const lockedOgrn = !canEditVerifiedField('ogrn', company)
+  const lockedName = !canEditVerifiedField('name', company)
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
@@ -83,8 +90,10 @@ export function CompanyEditPage() {
         capabilities: values.capabilities,
         technologies: values.technologies,
         services: values.services,
+        shortName: values.shortName,
+        priceFrom: values.priceFrom ?? null,
+        priceTo: values.priceTo ?? null,
       })
-      // keep session company in sync
       useSessionStore.setState({
         company: {
           ...company,
@@ -95,8 +104,13 @@ export function CompanyEditPage() {
           capabilities: values.capabilities,
           technologies: values.technologies,
           services: values.services ?? company.services,
+          shortName: values.shortName ?? company.shortName,
+          priceFrom: values.priceFrom ?? null,
+          priceTo: values.priceTo ?? null,
         },
       })
+      form.reset(values)
+      setAllowLeave(false)
       showSuccess('Профиль компании обновлён')
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Не удалось сохранить')
@@ -110,115 +124,150 @@ export function CompanyEditPage() {
         subtitle={company.shortName}
         actions={
           <AppButton component={RouterLink} to={ROUTES.COMPANY_ADMIN} variant="outlined">
-            Назад
+            Обзор
           </AppButton>
         }
       />
 
-      <Stack component="form" spacing={2.5} onSubmit={onSubmit} maxWidth={640}>
-        <AppInput label="ИНН" value={company.inn} disabled helperText="Только для чтения" />
-        <AppInput label="ОГРН" value={company.ogrn} disabled helperText="Только для чтения" />
-        <AppInput label="Название" value={company.name} disabled />
-
-        <Controller
-          name="description"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <AppTextarea
-              {...field}
-              label="Описание"
-              minRows={4}
-              error={Boolean(fieldState.error)}
-              helperText={fieldState.error?.message}
-            />
-          )}
-        />
-
-        <Controller
-          name="website"
-          control={form.control}
-          render={({ field, fieldState }) => (
+      <Stack component="form" spacing={3} onSubmit={onSubmit} maxWidth={640}>
+        <Section title="Юридические данные">
+          <Stack spacing={2}>
             <AppInput
-              {...field}
-              value={field.value ?? ''}
-              label="Сайт"
-              error={Boolean(fieldState.error)}
-              helperText={fieldState.error?.message}
+              label="ИНН"
+              value={company.inn}
+              disabled={lockedInn}
+              helperText={lockedInn ? 'Заблокировано для верифицированной компании' : undefined}
             />
-          )}
-        />
-
-        <Controller
-          name="region"
-          control={form.control}
-          render={({ field, fieldState }) => (
             <AppInput
-              {...field}
-              label="Регион"
-              error={Boolean(fieldState.error)}
-              helperText={fieldState.error?.message}
+              label="ОГРН"
+              value={company.ogrn}
+              disabled={lockedOgrn}
+              helperText={lockedOgrn ? 'Заблокировано для верифицированной компании' : undefined}
             />
-          )}
-        />
-
-        <Controller
-          name="industries"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Box>
-              <AppInput
-                label="Отрасли (через запятую)"
-                value={field.value.join(', ')}
-                onChange={(e) => field.onChange(parseTags(e.target.value))}
-                error={Boolean(fieldState.error)}
-                helperText={fieldState.error?.message}
-              />
-              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-                {field.value.map((t) => (
-                  <Chip key={t} label={t} size="small" />
-                ))}
-              </Stack>
-            </Box>
-          )}
-        />
-
-        <Controller
-          name="capabilities"
-          control={form.control}
-          render={({ field }) => (
             <AppInput
-              label="Компетенции (через запятую)"
-              value={field.value.join(', ')}
-              onChange={(e) => field.onChange(parseTags(e.target.value))}
+              label="Полное название"
+              value={company.name}
+              disabled={lockedName}
+              helperText={lockedName ? 'Заблокировано для верифицированной компании' : undefined}
             />
-          )}
-        />
+            <Controller
+              name="shortName"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <AppInput
+                  {...field}
+                  value={field.value ?? ''}
+                  label="Короткое название"
+                  error={Boolean(fieldState.error)}
+                  helperText={fieldState.error?.message}
+                />
+              )}
+            />
+          </Stack>
+        </Section>
 
-        <Controller
-          name="technologies"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <AppInput
-              label="Технологии (через запятую)"
-              value={field.value.join(', ')}
-              onChange={(e) => field.onChange(parseTags(e.target.value))}
-              error={Boolean(fieldState.error)}
-              helperText={fieldState.error?.message}
+        <Section title="Описание и география">
+          <Stack spacing={2}>
+            <Controller
+              name="description"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <AppTextarea
+                  {...field}
+                  label="Описание"
+                  minRows={4}
+                  error={Boolean(fieldState.error)}
+                  helperText={fieldState.error?.message}
+                />
+              )}
             />
-          )}
-        />
+            <Controller
+              name="website"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <AppInput
+                  {...field}
+                  value={field.value ?? ''}
+                  label="Сайт"
+                  error={Boolean(fieldState.error)}
+                  helperText={fieldState.error?.message}
+                />
+              )}
+            />
+            <Controller
+              name="region"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <AppInput
+                  {...field}
+                  label="Регион / город"
+                  error={Boolean(fieldState.error)}
+                  helperText={fieldState.error?.message}
+                />
+              )}
+            />
+          </Stack>
+        </Section>
 
-        <Controller
-          name="services"
-          control={form.control}
-          render={({ field }) => (
-            <AppInput
-              label="Услуги в профиле (через запятую)"
-              value={(field.value ?? []).join(', ')}
-              onChange={(e) => field.onChange(parseTags(e.target.value))}
+        <Section title="Отрасли и компетенции">
+          <Stack spacing={2}>
+            <Controller
+              name="industries"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Box>
+                  <AppInput
+                    label="Отрасли (через запятую)"
+                    value={field.value.join(', ')}
+                    onChange={(e) => field.onChange(parseTags(e.target.value))}
+                    error={Boolean(fieldState.error)}
+                    helperText={fieldState.error?.message}
+                  />
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                    {field.value.map((t) => (
+                      <Chip key={t} label={t} size="small" />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
             />
-          )}
-        />
+            <Controller
+              name="capabilities"
+              control={form.control}
+              render={({ field }) => (
+                <AppInput
+                  label="Компетенции (через запятую)"
+                  value={field.value.join(', ')}
+                  onChange={(e) => field.onChange(parseTags(e.target.value))}
+                />
+              )}
+            />
+            <Controller
+              name="technologies"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <AppInput
+                  label="Технологии (через запятую)"
+                  value={field.value.join(', ')}
+                  onChange={(e) => field.onChange(parseTags(e.target.value))}
+                  error={Boolean(fieldState.error)}
+                  helperText={fieldState.error?.message}
+                />
+              )}
+            />
+            <Controller
+              name="services"
+              control={form.control}
+              render={({ field }) => (
+                <AppInput
+                  label="Услуги в профиле (через запятую)"
+                  value={(field.value ?? []).join(', ')}
+                  onChange={(e) => field.onChange(parseTags(e.target.value))}
+                />
+              )}
+            />
+          </Stack>
+        </Section>
 
         {form.formState.errors.root ? (
           <Typography color="error">{form.formState.errors.root.message}</Typography>
@@ -228,6 +277,15 @@ export function CompanyEditPage() {
           Сохранить
         </AppButton>
       </Stack>
+
+      <UnsavedChangesDialog
+        open={blocker.state === 'blocked'}
+        onStay={() => blocker.reset?.()}
+        onLeave={() => {
+          setAllowLeave(true)
+          blocker.proceed?.()
+        }}
+      />
     </Box>
   )
 }

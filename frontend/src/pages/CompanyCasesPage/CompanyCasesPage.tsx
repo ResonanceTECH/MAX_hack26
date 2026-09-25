@@ -1,32 +1,29 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Controller, useForm } from 'react-hook-form'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
-import Dialog from '@mui/material/Dialog'
-import DialogActions from '@mui/material/DialogActions'
-import DialogContent from '@mui/material/DialogContent'
-import DialogTitle from '@mui/material/DialogTitle'
 import Stack from '@mui/material/Stack'
+import Tab from '@mui/material/Tab'
+import Tabs from '@mui/material/Tabs'
 import Typography from '@mui/material/Typography'
-import { COMPANY_CASE_STATUS, type CompanyCase } from '@/entities/company-case'
+import {
+  COMPANY_CASE_STATUS,
+  type CompanyCase,
+  type CompanyCaseStatus,
+} from '@/entities/company-case'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import {
+  BaseUiMenu,
+  useArchiveCase,
   useCompanyCases,
-  useCreateCase,
   useDeleteCase,
+  usePublishCase,
   useUpdateCase,
-} from '@/features/company-management/api/queries'
-import { caseSchema, type CaseFormValues } from '@/features/company-management/model/schemas'
-import { Permission } from '@/features/permissions'
-import { usePermission } from '@/features/permissions/hooks/usePermission'
+} from '@/features/company-management'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
-import { ROUTES } from '@/shared/constants/routes'
+import { companyCaseEditPath, companyCasePath, ROUTES } from '@/shared/constants/routes'
 import {
   AppButton,
-  AppInput,
-  AppTextarea,
   ConfirmDialog,
   EmptyState,
   ErrorState,
@@ -35,83 +32,67 @@ import {
   Tag,
 } from '@/shared/ui'
 
-function parseTags(value: string): string[] {
-  return value
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Черновик',
+  published: 'Опубликован',
+  hidden: 'Скрыт',
+  archived: 'В архиве',
 }
+
+type TabKey = 'all' | CompanyCaseStatus
+type ConfirmKind = { type: 'publish' | 'hide' | 'archive' | 'delete'; item: CompanyCase }
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'all', label: 'Все' },
+  { key: COMPANY_CASE_STATUS.PUBLISHED, label: 'Опубликованные' },
+  { key: COMPANY_CASE_STATUS.DRAFT, label: 'Черновики' },
+  { key: COMPANY_CASE_STATUS.HIDDEN, label: 'Скрытые' },
+  { key: COMPANY_CASE_STATUS.ARCHIVED, label: 'Архив' },
+]
 
 export function CompanyCasesPage() {
   const companyId = useSessionStore((s) => s.company?.id)
-  const canManage = usePermission(Permission.MANAGE_COMPANY_CASES)
   const { data, isLoading, isError, refetch } = useCompanyCases(companyId)
-  const createCase = useCreateCase(companyId)
+  const publishCase = usePublishCase(companyId)
   const updateCase = useUpdateCase(companyId)
+  const archiveCase = useArchiveCase(companyId)
   const deleteCase = useDeleteCase(companyId)
   const showSuccess = useSnackbarStore((s) => s.showSuccess)
   const showError = useSnackbarStore((s) => s.showError)
+  const [tab, setTab] = useState<TabKey>('all')
+  const [confirm, setConfirm] = useState<ConfirmKind | null>(null)
 
-  const [editing, setEditing] = useState<CompanyCase | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const filtered = useMemo(() => {
+    const list = data ?? []
+    if (tab === 'all') return list
+    return list.filter((c) => c.status === tab)
+  }, [data, tab])
 
-  const form = useForm<CaseFormValues>({
-    resolver: zodResolver(caseSchema),
-    defaultValues: {
-      title: '',
-      industry: '',
-      description: '',
-      result: '',
-      technologies: [],
-      status: COMPANY_CASE_STATUS.PUBLISHED,
-    },
-  })
-
-  if (!canManage) {
-    return <EmptyState title="Нет доступа" description="Управление кейсами недоступно." />
-  }
-
-  const openCreate = () => {
-    setEditing(null)
-    form.reset({
-      title: '',
-      industry: '',
-      description: '',
-      result: '',
-      technologies: [],
-      status: COMPANY_CASE_STATUS.PUBLISHED,
-    })
-    setDialogOpen(true)
-  }
-
-  const openEdit = (item: CompanyCase) => {
-    setEditing(item)
-    form.reset({
-      title: item.title,
-      industry: item.industry,
-      description: item.description,
-      result: item.result,
-      technologies: item.technologies,
-      status: item.status,
-    })
-    setDialogOpen(true)
-  }
-
-  const onSubmit = form.handleSubmit(async (values) => {
+  const runConfirm = async () => {
+    if (!confirm) return
     try {
-      if (editing) {
-        await updateCase.mutateAsync({ id: editing.id, input: values })
-        showSuccess('Кейс обновлён')
+      if (confirm.type === 'publish') {
+        await publishCase.mutateAsync(confirm.item.id)
+        showSuccess('Кейс опубликован')
+      } else if (confirm.type === 'hide') {
+        await updateCase.mutateAsync({
+          id: confirm.item.id,
+          input: { status: COMPANY_CASE_STATUS.HIDDEN },
+        })
+        showSuccess('Кейс скрыт')
+      } else if (confirm.type === 'archive') {
+        await archiveCase.mutateAsync(confirm.item.id)
+        showSuccess('Кейс в архиве')
       } else {
-        await createCase.mutateAsync(values)
-        showSuccess('Кейс создан')
+        await deleteCase.mutateAsync(confirm.item.id)
+        showSuccess('Кейс удалён')
       }
-      setDialogOpen(false)
+      setConfirm(null)
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Ошибка сохранения')
+      showError(err instanceof Error ? err.message : 'Ошибка')
+      setConfirm(null)
     }
-  })
+  }
 
   return (
     <Box>
@@ -119,25 +100,40 @@ export function CompanyCasesPage() {
         title="Кейсы"
         subtitle="Публичные проекты компании"
         actions={
-          <Stack direction="row" spacing={1}>
-            <AppButton component={RouterLink} to={ROUTES.COMPANY_ADMIN} variant="outlined">
-              Назад
-            </AppButton>
-            <AppButton variant="contained" onClick={openCreate}>
-              Добавить
-            </AppButton>
-          </Stack>
+          <AppButton
+            component={RouterLink}
+            to={ROUTES.PROFILE_COMPANY_CASES_CREATE}
+            variant="contained"
+          >
+            Добавить кейс
+          </AppButton>
         }
       />
 
+      <Tabs
+        value={TABS.findIndex((t) => t.key === tab)}
+        onChange={(_, i: number) => setTab(TABS[i]!.key)}
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+      >
+        {TABS.map((t) => (
+          <Tab key={t.key} label={t.label} />
+        ))}
+      </Tabs>
+
       {isLoading ? <LoadingState variant="cards" /> : null}
       {isError ? <ErrorState onRetry={() => void refetch()} /> : null}
-      {!isLoading && !isError && data?.length === 0 ? (
-        <EmptyState title="Кейсов пока нет" actionLabel="Добавить" onAction={openCreate} />
+      {!isLoading && !isError && filtered.length === 0 ? (
+        <EmptyState
+          title="Кейсов пока нет"
+          actionLabel="Добавить"
+          onAction={() => window.location.assign(ROUTES.PROFILE_COMPANY_CASES_CREATE)}
+        />
       ) : null}
 
       <Stack spacing={1.5}>
-        {data?.map((item) => (
+        {filtered.map((item) => (
           <Box
             key={item.id}
             sx={{
@@ -148,148 +144,99 @@ export function CompanyCasesPage() {
               bgcolor: 'background.paper',
             }}
           >
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="h3">{item.title}</Typography>
-              <Chip
-                size="small"
-                label={item.status === 'published' ? 'Опубликован' : 'Скрыт'}
+            <Stack direction="row" justifyContent="space-between" spacing={1}>
+              <Box sx={{ minWidth: 0 }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography
+                    component={RouterLink}
+                    to={companyCasePath(item.id)}
+                    variant="h3"
+                    color="inherit"
+                    sx={{ textDecoration: 'none', '&:hover': { color: 'primary.main' } }}
+                  >
+                    {item.title}
+                  </Typography>
+                  <Chip size="small" label={STATUS_LABELS[item.status] ?? item.status} />
+                </Stack>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  {item.industry}
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  {item.description}
+                </Typography>
+                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                  {item.technologies.map((t) => (
+                    <Tag key={t} label={t} color="secondary" />
+                  ))}
+                </Stack>
+              </Box>
+              <BaseUiMenu
+                items={[
+                  {
+                    key: 'open',
+                    label: 'Открыть',
+                    onClick: () => window.location.assign(companyCasePath(item.id)),
+                  },
+                  {
+                    key: 'edit',
+                    label: 'Изменить',
+                    onClick: () => window.location.assign(companyCaseEditPath(item.id)),
+                  },
+                  ...(item.status !== COMPANY_CASE_STATUS.PUBLISHED
+                    ? [
+                        {
+                          key: 'publish',
+                          label: 'Опубликовать',
+                          onClick: () => setConfirm({ type: 'publish', item }),
+                        },
+                      ]
+                    : []),
+                  ...(item.status !== COMPANY_CASE_STATUS.HIDDEN &&
+                  item.status !== COMPANY_CASE_STATUS.ARCHIVED
+                    ? [
+                        {
+                          key: 'hide',
+                          label: 'Скрыть',
+                          onClick: () => setConfirm({ type: 'hide', item }),
+                        },
+                      ]
+                    : []),
+                  {
+                    key: 'delete',
+                    label: 'Удалить',
+                    destructive: true,
+                    separatorBefore: true,
+                    onClick: () => setConfirm({ type: 'delete', item }),
+                  },
+                ]}
               />
-            </Stack>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              {item.industry}
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              {item.description}
-            </Typography>
-            <Typography variant="body2" fontWeight={600} sx={{ mt: 1 }}>
-              Результат: {item.result}
-            </Typography>
-            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-              {item.technologies.map((t) => (
-                <Tag key={t} label={t} color="secondary" />
-              ))}
-            </Stack>
-            <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
-              <AppButton size="small" onClick={() => openEdit(item)}>
-                Изменить
-              </AppButton>
-              {item.status !== COMPANY_CASE_STATUS.HIDDEN ? (
-                <AppButton
-                  size="small"
-                  onClick={() =>
-                    void updateCase
-                      .mutateAsync({
-                        id: item.id,
-                        input: { status: COMPANY_CASE_STATUS.HIDDEN },
-                      })
-                      .then(() => showSuccess('Кейс скрыт'))
-                  }
-                >
-                  Скрыть
-                </AppButton>
-              ) : null}
-              <AppButton size="small" color="error" onClick={() => setDeleteId(item.id)}>
-                Удалить
-              </AppButton>
             </Stack>
           </Box>
         ))}
       </Stack>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editing ? 'Редактировать кейс' : 'Новый кейс'}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Controller
-              name="title"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <AppInput
-                  {...field}
-                  label="Название"
-                  error={Boolean(fieldState.error)}
-                  helperText={fieldState.error?.message}
-                />
-              )}
-            />
-            <Controller
-              name="industry"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <AppInput
-                  {...field}
-                  label="Отрасль"
-                  error={Boolean(fieldState.error)}
-                  helperText={fieldState.error?.message}
-                />
-              )}
-            />
-            <Controller
-              name="description"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <AppTextarea
-                  {...field}
-                  label="Описание"
-                  error={Boolean(fieldState.error)}
-                  helperText={fieldState.error?.message}
-                />
-              )}
-            />
-            <Controller
-              name="result"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <AppInput
-                  {...field}
-                  label="Результат"
-                  error={Boolean(fieldState.error)}
-                  helperText={fieldState.error?.message}
-                />
-              )}
-            />
-            <Controller
-              name="technologies"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <AppInput
-                  label="Технологии (через запятую)"
-                  value={field.value.join(', ')}
-                  onChange={(e) => field.onChange(parseTags(e.target.value))}
-                  error={Boolean(fieldState.error)}
-                  helperText={fieldState.error?.message}
-                />
-              )}
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton onClick={() => setDialogOpen(false)}>Отмена</AppButton>
-          <AppButton
-            variant="contained"
-            loading={createCase.isPending || updateCase.isPending}
-            onClick={() => void onSubmit()}
-          >
-            Сохранить
-          </AppButton>
-        </DialogActions>
-      </Dialog>
-
       <ConfirmDialog
-        open={Boolean(deleteId)}
-        title="Удалить кейс?"
-        description="Действие нельзя отменить."
-        confirmLabel="Удалить"
-        destructive
-        loading={deleteCase.isPending}
-        onCancel={() => setDeleteId(null)}
-        onConfirm={() => {
-          if (!deleteId) return
-          void deleteCase.mutateAsync(deleteId).then(() => {
-            showSuccess('Кейс удалён')
-            setDeleteId(null)
-          })
-        }}
+        open={Boolean(confirm)}
+        title={
+          confirm?.type === 'delete'
+            ? 'Удалить кейс?'
+            : confirm?.type === 'publish'
+              ? 'Опубликовать кейс?'
+              : confirm?.type === 'hide'
+                ? 'Скрыть кейс?'
+                : 'В архив?'
+        }
+        description={confirm?.item.title}
+        confirmLabel={confirm?.type === 'delete' ? 'Удалить' : 'Подтвердить'}
+        destructive={confirm?.type === 'delete' || confirm?.type === 'archive'}
+        loading={
+          publishCase.isPending ||
+          updateCase.isPending ||
+          archiveCase.isPending ||
+          deleteCase.isPending
+        }
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => void runConfirm()}
       />
     </Box>
   )

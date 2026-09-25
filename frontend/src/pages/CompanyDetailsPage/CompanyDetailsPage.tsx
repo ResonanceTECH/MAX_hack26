@@ -19,9 +19,12 @@ import { useMatch } from '@/entities/match/api/queries'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import { useMyOpportunities } from '@/entities/opportunity/api/queries'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
+import { COMPANY_DOCUMENT_STATUS } from '@/entities/company-document'
+import { isDocumentExpired } from '@/features/company-management'
 import { casesApi } from '@/shared/api/casesApi'
 import { documentsApi } from '@/shared/api/documentsApi'
 import { inviteApi } from '@/shared/api/inviteApi'
+import { servicesApi } from '@/shared/api/servicesApi'
 import { formatCurrency } from '@/shared/lib/format'
 import {
   AppButton,
@@ -51,14 +54,24 @@ export function CompanyDetailsPage() {
   const showSuccess = useSnackbarStore((s) => s.showSuccess)
   const { data, isLoading, isError, refetch } = useCompany(id)
   const matchQuery = useMatch(fromOpportunity, id)
+  const servicesQuery = useQuery({
+    queryKey: ['company-services-public', id],
+    queryFn: () => servicesApi.listPublic(id),
+    enabled: Boolean(id),
+  })
   const casesQuery = useQuery({
-    queryKey: ['company-cases', id],
-    queryFn: () => casesApi.list(id),
+    queryKey: ['company-cases-public', id],
+    queryFn: () => casesApi.listPublic(id),
     enabled: Boolean(id),
   })
   const docsQuery = useQuery({
-    queryKey: ['company-documents', id],
-    queryFn: () => documentsApi.list(id),
+    queryKey: ['company-documents-public', id],
+    queryFn: async () => {
+      const docs = await documentsApi.list(id)
+      return docs.filter(
+        (d) => d.status === COMPANY_DOCUMENT_STATUS.VERIFIED && !isDocumentExpired(d),
+      )
+    },
     enabled: Boolean(id),
   })
 

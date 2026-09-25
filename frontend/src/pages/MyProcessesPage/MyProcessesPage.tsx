@@ -13,7 +13,7 @@ import { useSessionStore } from '@/features/auth/model/sessionStore'
 import { useMyOpportunities } from '@/entities/opportunity/api/queries'
 import { useMyProposals } from '@/entities/proposal/api/queries'
 import { useDeals } from '@/entities/deal/api/queries'
-import { mockShortlist } from '@/shared/mocks'
+import { useShortlist } from '@/entities/shortlist/api/queries'
 import { ROUTES } from '@/shared/constants/routes'
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui'
 import { OpportunityCard } from '@/widgets/OpportunityCard/OpportunityCard'
@@ -27,17 +27,19 @@ export function MyProcessesPage() {
   const requests = useMyOpportunities(companyId)
   const proposals = useMyProposals(companyId)
   const deals = useDeals()
+  const shortlist = useShortlist()
 
-  if (requests.isLoading || proposals.isLoading || deals.isLoading) {
+  if (requests.isLoading || proposals.isLoading || deals.isLoading || shortlist.isLoading) {
     return <LoadingState variant="page" />
   }
-  if (requests.isError || proposals.isError || deals.isError) {
+  if (requests.isError || proposals.isError || deals.isError || shortlist.isError) {
     return (
       <ErrorState
         onRetry={() => {
           void requests.refetch()
           void proposals.refetch()
           void deals.refetch()
+          void shortlist.refetch()
         }}
       />
     )
@@ -69,7 +71,7 @@ export function MyProcessesPage() {
     },
     {
       title: 'Shortlist',
-      count: mockShortlist.length,
+      count: shortlist.data?.length ?? 0,
       to: ROUTES.MY_SHORTLIST,
     },
     {
@@ -111,7 +113,7 @@ export function MyProcessesPage() {
       >
         <Tab label={`Запросы (${activeRequests.length})`} />
         <Tab label={`Отклики (${(proposals.data ?? []).length})`} />
-        <Tab label={`Shortlist (${mockShortlist.length})`} />
+        <Tab label={`Shortlist (${shortlist.data?.length ?? 0})`} />
         <Tab label={`Переговоры (${negotiationDeals.length})`} />
       </Tabs>
 

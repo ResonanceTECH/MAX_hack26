@@ -1,39 +1,33 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Controller, useForm } from 'react-hook-form'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
-import Dialog from '@mui/material/Dialog'
-import DialogActions from '@mui/material/DialogActions'
-import DialogContent from '@mui/material/DialogContent'
-import DialogTitle from '@mui/material/DialogTitle'
 import Stack from '@mui/material/Stack'
+import Tab from '@mui/material/Tab'
+import Tabs from '@mui/material/Tabs'
 import Typography from '@mui/material/Typography'
 import {
   COMPANY_SERVICE_STATUS,
   type CompanyService,
+  type CompanyServiceStatus,
 } from '@/entities/company-service'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import {
+  BaseUiMenu,
   useArchiveService,
   useCompanyServices,
-  useCreateService,
   useHideService,
-  useUpdateService,
-} from '@/features/company-management/api/queries'
-import {
-  serviceSchema,
-  type ServiceFormValues,
-} from '@/features/company-management/model/schemas'
-import { Permission } from '@/features/permissions'
-import { usePermission } from '@/features/permissions/hooks/usePermission'
+  usePublishService,
+} from '@/features/company-management'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
-import { ROUTES } from '@/shared/constants/routes'
+import {
+  companyServiceEditPath,
+  companyServicePath,
+  ROUTES,
+} from '@/shared/constants/routes'
 import {
   AppButton,
-  AppInput,
-  AppTextarea,
+  ConfirmDialog,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -41,65 +35,59 @@ import {
 } from '@/shared/ui'
 
 const STATUS_LABELS: Record<string, string> = {
+  draft: 'Черновик',
   active: 'Активна',
   hidden: 'Скрыта',
   archived: 'В архиве',
 }
 
+type TabKey = 'all' | CompanyServiceStatus
+type ConfirmKind = { type: 'publish' | 'hide' | 'archive'; service: CompanyService }
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'all', label: 'Все' },
+  { key: COMPANY_SERVICE_STATUS.ACTIVE, label: 'Активные' },
+  { key: COMPANY_SERVICE_STATUS.DRAFT, label: 'Черновики' },
+  { key: COMPANY_SERVICE_STATUS.HIDDEN, label: 'Скрытые' },
+  { key: COMPANY_SERVICE_STATUS.ARCHIVED, label: 'Архив' },
+]
+
 export function CompanyServicesPage() {
   const companyId = useSessionStore((s) => s.company?.id)
-  const canManage = usePermission(Permission.MANAGE_COMPANY_SERVICES)
   const { data, isLoading, isError, refetch } = useCompanyServices(companyId)
-  const createService = useCreateService(companyId)
-  const updateService = useUpdateService(companyId)
+  const publishService = usePublishService(companyId)
   const hideService = useHideService(companyId)
   const archiveService = useArchiveService(companyId)
   const showSuccess = useSnackbarStore((s) => s.showSuccess)
   const showError = useSnackbarStore((s) => s.showError)
+  const [tab, setTab] = useState<TabKey>('all')
+  const [confirm, setConfirm] = useState<ConfirmKind | null>(null)
 
-  const [editing, setEditing] = useState<CompanyService | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const filtered = useMemo(() => {
+    const list = data ?? []
+    if (tab === 'all') return list
+    return list.filter((s) => s.status === tab)
+  }, [data, tab])
 
-  const form = useForm<ServiceFormValues>({
-    resolver: zodResolver(serviceSchema),
-    defaultValues: { title: '', description: '', category: '', status: 'active' },
-  })
-
-  if (!canManage) {
-    return <EmptyState title="Нет доступа" description="Управление услугами недоступно." />
-  }
-
-  const openCreate = () => {
-    setEditing(null)
-    form.reset({ title: '', description: '', category: '', status: COMPANY_SERVICE_STATUS.ACTIVE })
-    setDialogOpen(true)
-  }
-
-  const openEdit = (service: CompanyService) => {
-    setEditing(service)
-    form.reset({
-      title: service.title,
-      description: service.description,
-      category: service.category,
-      status: service.status,
-    })
-    setDialogOpen(true)
-  }
-
-  const onSubmit = form.handleSubmit(async (values) => {
+  const runConfirm = async () => {
+    if (!confirm) return
     try {
-      if (editing) {
-        await updateService.mutateAsync({ id: editing.id, input: values })
-        showSuccess('Услуга обновлена')
+      if (confirm.type === 'publish') {
+        await publishService.mutateAsync(confirm.service.id)
+        showSuccess('Услуга опубликована')
+      } else if (confirm.type === 'hide') {
+        await hideService.mutateAsync(confirm.service.id)
+        showSuccess('Услуга скрыта')
       } else {
-        await createService.mutateAsync(values)
-        showSuccess('Услуга создана')
+        await archiveService.mutateAsync(confirm.service.id)
+        showSuccess('Услуга в архиве')
       }
-      setDialogOpen(false)
+      setConfirm(null)
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Ошибка сохранения')
+      showError(err instanceof Error ? err.message : 'Ошибка')
+      setConfirm(null)
     }
-  })
+  }
 
   return (
     <Box>
@@ -107,30 +95,43 @@ export function CompanyServicesPage() {
         title="Услуги"
         subtitle="Каталог услуг компании"
         actions={
-          <Stack direction="row" spacing={1}>
-            <AppButton component={RouterLink} to={ROUTES.COMPANY_ADMIN} variant="outlined">
-              Назад
-            </AppButton>
-            <AppButton variant="contained" onClick={openCreate}>
-              Добавить
-            </AppButton>
-          </Stack>
+          <AppButton
+            component={RouterLink}
+            to={ROUTES.PROFILE_COMPANY_SERVICES_CREATE}
+            variant="contained"
+          >
+            Создать услугу
+          </AppButton>
         }
       />
 
+      <Tabs
+        value={TABS.findIndex((t) => t.key === tab)}
+        onChange={(_, i: number) => setTab(TABS[i]!.key)}
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+      >
+        {TABS.map((t) => (
+          <Tab key={t.key} label={t.label} />
+        ))}
+      </Tabs>
+
       {isLoading ? <LoadingState variant="cards" /> : null}
       {isError ? <ErrorState onRetry={() => void refetch()} /> : null}
-      {!isLoading && !isError && data?.length === 0 ? (
+      {!isLoading && !isError && filtered.length === 0 ? (
         <EmptyState
           title="Услуг пока нет"
-          description="Добавьте первую услугу для каталога."
-          actionLabel="Добавить"
-          onAction={openCreate}
+          description="Создайте первую услугу для каталога."
+          actionLabel="Создать"
+          onAction={() => {
+            window.location.assign(ROUTES.PROFILE_COMPANY_SERVICES_CREATE)
+          }}
         />
       ) : null}
 
       <Stack spacing={1.5}>
-        {data?.map((service) => (
+        {filtered.map((service) => (
           <Box
             key={service.id}
             sx={{
@@ -146,104 +147,97 @@ export function CompanyServicesPage() {
               justifyContent="space-between"
               spacing={1}
             >
-              <Box>
+              <Box sx={{ minWidth: 0 }}>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography variant="h3">{service.title}</Typography>
+                  <Typography
+                    component={RouterLink}
+                    to={companyServicePath(service.id)}
+                    variant="h3"
+                    color="inherit"
+                    sx={{ textDecoration: 'none', '&:hover': { color: 'primary.main' } }}
+                  >
+                    {service.title}
+                  </Typography>
                   <Chip size="small" label={STATUS_LABELS[service.status] ?? service.status} />
                 </Stack>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                   {service.category}
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 1 }}>
-                  {service.description}
+                  {service.shortDescription || service.description}
                 </Typography>
               </Box>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                <AppButton size="small" onClick={() => openEdit(service)}>
-                  Изменить
-                </AppButton>
-                {service.status !== COMPANY_SERVICE_STATUS.HIDDEN ? (
-                  <AppButton
-                    size="small"
-                    onClick={() =>
-                      void hideService.mutateAsync(service.id).then(() => showSuccess('Скрыто'))
-                    }
-                  >
-                    Скрыть
-                  </AppButton>
-                ) : null}
-                {service.status !== COMPANY_SERVICE_STATUS.ARCHIVED ? (
-                  <AppButton
-                    size="small"
-                    color="warning"
-                    onClick={() =>
-                      void archiveService
-                        .mutateAsync(service.id)
-                        .then(() => showSuccess('В архиве'))
-                    }
-                  >
-                    В архив
-                  </AppButton>
-                ) : null}
-              </Stack>
+              <BaseUiMenu
+                items={[
+                  {
+                    key: 'open',
+                    label: 'Открыть',
+                    onClick: () => window.location.assign(companyServicePath(service.id)),
+                  },
+                  {
+                    key: 'edit',
+                    label: 'Изменить',
+                    onClick: () => window.location.assign(companyServiceEditPath(service.id)),
+                  },
+                  ...(service.status !== COMPANY_SERVICE_STATUS.ACTIVE
+                    ? [
+                        {
+                          key: 'publish',
+                          label: 'Опубликовать',
+                          onClick: () => setConfirm({ type: 'publish', service }),
+                        },
+                      ]
+                    : []),
+                  ...(service.status !== COMPANY_SERVICE_STATUS.HIDDEN &&
+                  service.status !== COMPANY_SERVICE_STATUS.ARCHIVED
+                    ? [
+                        {
+                          key: 'hide',
+                          label: 'Скрыть',
+                          onClick: () => setConfirm({ type: 'hide', service }),
+                        },
+                      ]
+                    : []),
+                  ...(service.status !== COMPANY_SERVICE_STATUS.ARCHIVED
+                    ? [
+                        {
+                          key: 'archive',
+                          label: 'В архив',
+                          destructive: true,
+                          separatorBefore: true,
+                          onClick: () => setConfirm({ type: 'archive', service }),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             </Stack>
           </Box>
         ))}
       </Stack>
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editing ? 'Редактировать услугу' : 'Новая услуга'}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Controller
-              name="title"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <AppInput
-                  {...field}
-                  label="Название"
-                  error={Boolean(fieldState.error)}
-                  helperText={fieldState.error?.message}
-                />
-              )}
-            />
-            <Controller
-              name="category"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <AppInput
-                  {...field}
-                  label="Категория"
-                  error={Boolean(fieldState.error)}
-                  helperText={fieldState.error?.message}
-                />
-              )}
-            />
-            <Controller
-              name="description"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <AppTextarea
-                  {...field}
-                  label="Описание"
-                  error={Boolean(fieldState.error)}
-                  helperText={fieldState.error?.message}
-                />
-              )}
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton onClick={() => setDialogOpen(false)}>Отмена</AppButton>
-          <AppButton
-            variant="contained"
-            loading={createService.isPending || updateService.isPending}
-            onClick={() => void onSubmit()}
-          >
-            Сохранить
-          </AppButton>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        title={
+          confirm?.type === 'publish'
+            ? 'Опубликовать услугу?'
+            : confirm?.type === 'hide'
+              ? 'Скрыть услугу?'
+              : 'Отправить в архив?'
+        }
+        description={confirm?.service.title}
+        confirmLabel={
+          confirm?.type === 'publish'
+            ? 'Опубликовать'
+            : confirm?.type === 'hide'
+              ? 'Скрыть'
+              : 'В архив'
+        }
+        destructive={confirm?.type === 'archive'}
+        loading={publishService.isPending || hideService.isPending || archiveService.isPending}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => void runConfirm()}
+      />
     </Box>
   )
 }

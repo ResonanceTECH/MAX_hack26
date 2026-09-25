@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AppIcon } from '@/shared/ui'
 import { FilterHorizontalIcon } from '@/shared/ui/icons'
@@ -12,6 +12,7 @@ import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import { useOpportunities } from '@/entities/opportunity/api/queries'
+import { useAllMatches } from '@/entities/match/api/queries'
 import { useOpportunitySearchStore } from '@/features/opportunity-search/model/searchStore'
 import type { OpportunitySort } from '@/shared/api/opportunityApi'
 import {
@@ -20,7 +21,6 @@ import {
   OPPORTUNITY_STATUS_LABELS,
   REGIONS,
 } from '@/shared/constants/labels'
-import { mockMatches } from '@/shared/mocks'
 import { useUiStore } from '@/shared/hooks/useUiStore'
 import {
   AppButton,
@@ -161,15 +161,9 @@ export function OpportunitiesPage() {
     { ...filters, query: effectiveQuery || undefined },
     sort,
   )
+  const matchesQuery = useAllMatches()
 
-  const items = useMemo(() => {
-    const list = data ?? []
-    if (filters.minMatchScore == null) return list
-    return list.filter((opp) => {
-      const match = mockMatches.find((m) => m.opportunityId === opp.id)
-      return (match?.score ?? 0) >= filters.minMatchScore!
-    })
-  }, [data, filters.minMatchScore])
+  const items = data ?? []
 
   return (
     <Box>
@@ -254,7 +248,7 @@ export function OpportunitiesPage() {
                 <OpportunityCard
                   key={opp.id}
                   opportunity={opp}
-                  match={mockMatches.find((m) => m.opportunityId === opp.id)}
+                  match={matchesQuery.data?.find((m) => m.opportunityId === opp.id)}
                 />
               ))}
             </Stack>

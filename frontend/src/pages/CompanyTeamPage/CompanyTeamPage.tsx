@@ -1,13 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Controller, useForm } from 'react-hook-form'
 import Box from '@mui/material/Box'
-import Chip from '@mui/material/Chip'
-import Dialog from '@mui/material/Dialog'
-import DialogActions from '@mui/material/DialogActions'
-import DialogContent from '@mui/material/DialogContent'
-import DialogTitle from '@mui/material/DialogTitle'
 import Stack from '@mui/material/Stack'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
@@ -15,170 +8,280 @@ import TableCell from '@mui/material/TableCell'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Typography from '@mui/material/Typography'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import {
-  COMPANY_MEMBER_ROLE_LABELS,
   COMPANY_MEMBER_ROLES,
   COMPANY_MEMBER_STATUS,
   type CompanyMember,
   type CompanyMemberRole,
+  type CompanyMemberStatus,
 } from '@/entities/company-member'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import {
-  useBlockMember,
+  BaseUiMenu,
+  MemberRoleChip,
+  MemberStatusChip,
+  useActivateMember,
   useCompanyMembers,
-  useInviteMember,
   useRemoveMember,
+  useSuspendMember,
   useUpdateMemberRole,
-} from '@/features/company-management/api/queries'
-import {
-  inviteMemberSchema,
-  type InviteMemberFormValues,
-} from '@/features/company-management/model/schemas'
-import { Permission } from '@/features/permissions'
-import { usePermission } from '@/features/permissions/hooks/usePermission'
+} from '@/features/company-management'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { TeamApiError } from '@/shared/api/teamApi'
-import { ROUTES } from '@/shared/constants/routes'
+import { companyTeamMemberPath, ROUTES } from '@/shared/constants/routes'
 import {
   AppButton,
-  AppInput,
   AppSelect,
   ConfirmDialog,
   EmptyState,
   ErrorState,
   LoadingState,
   PageHeader,
+  SearchInput,
 } from '@/shared/ui'
 
-const STATUS_LABELS: Record<string, string> = {
-  active: 'Активен',
-  blocked: 'Заблокирован',
-  invited: 'Приглашён',
-}
-
-const ROLE_OPTIONS = Object.values(COMPANY_MEMBER_ROLES).map((role) => ({
-  value: role,
-  label: COMPANY_MEMBER_ROLE_LABELS[role],
-}))
-
-type ConfirmAction = { type: 'block' | 'remove'; member: CompanyMember }
+type ConfirmAction = { type: 'suspend' | 'remove'; member: CompanyMember }
+type StatusFilter = 'all' | CompanyMemberStatus | 'hide_deactivated'
+type SortKey = 'name' | 'role' | 'status'
 
 export function CompanyTeamPage() {
+  const theme = useTheme()
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'))
   const companyId = useSessionStore((s) => s.company?.id)
-  const canManage = usePermission(Permission.MANAGE_COMPANY_MEMBERS)
   const { data, isLoading, isError, refetch } = useCompanyMembers(companyId)
-  const invite = useInviteMember(companyId)
   const updateRole = useUpdateMemberRole(companyId)
-  const block = useBlockMember(companyId)
+  const suspend = useSuspendMember(companyId)
+  const activate = useActivateMember(companyId)
   const remove = useRemoveMember(companyId)
   const showSuccess = useSnackbarStore((s) => s.showSuccess)
   const showError = useSnackbarStore((s) => s.showError)
 
-  const [inviteOpen, setInviteOpen] = useState(false)
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('hide_deactivated')
+  const [roleFilter, setRoleFilter] = useState<string>('all')
+  const [sort, setSort] = useState<SortKey>('name')
 
-  const form = useForm<InviteMemberFormValues>({
-    resolver: zodResolver(inviteMemberSchema),
-    defaultValues: {
-      email: '',
-      firstName: '',
-      lastName: '',
-      role: COMPANY_MEMBER_ROLES.MANAGER,
-    },
-  })
-
-  const adminCount = useMemo(
-    () =>
-      data?.filter(
+  const summary = useMemo(() => {
+    const list = data ?? []
+    return {
+      total: list.filter((m) => m.status !== COMPANY_MEMBER_STATUS.DEACTIVATED).length,
+      active: list.filter((m) => m.status === COMPANY_MEMBER_STATUS.ACTIVE).length,
+      invited: list.filter((m) => m.status === COMPANY_MEMBER_STATUS.INVITED).length,
+      suspended: list.filter((m) => m.status === COMPANY_MEMBER_STATUS.SUSPENDED).length,
+      admins: list.filter(
         (m) =>
           m.role === COMPANY_MEMBER_ROLES.COMPANY_ADMIN &&
-          m.status !== COMPANY_MEMBER_STATUS.BLOCKED,
-      ).length ?? 0,
-    [data],
-  )
-
-  if (!canManage) {
-    return <EmptyState title="Нет доступа" description="Управление командой недоступно." />
-  }
-
-  const handleInvite = form.handleSubmit(async (values) => {
-    try {
-      await invite.mutateAsync(values)
-      showSuccess('Приглашение отправлено')
-      setInviteOpen(false)
-      form.reset()
-    } catch (err) {
-      showError(err instanceof Error ? err.message : 'Ошибка приглашения')
+          m.status !== COMPANY_MEMBER_STATUS.SUSPENDED &&
+          m.status !== COMPANY_MEMBER_STATUS.DEACTIVATED,
+      ).length,
     }
-  })
+  }, [data])
+
+  const filtered = useMemo(() => {
+    let list = [...(data ?? [])]
+    if (statusFilter === 'hide_deactivated') {
+      list = list.filter((m) => m.status !== COMPANY_MEMBER_STATUS.DEACTIVATED)
+    } else if (statusFilter !== 'all') {
+      list = list.filter((m) => m.status === statusFilter)
+    }
+    if (roleFilter !== 'all') {
+      list = list.filter((m) => m.role === roleFilter)
+    }
+    const q = search.trim().toLowerCase()
+    if (q) {
+      list = list.filter(
+        (m) =>
+          m.email.toLowerCase().includes(q) ||
+          `${m.firstName} ${m.lastName}`.toLowerCase().includes(q),
+      )
+    }
+    list.sort((a, b) => {
+      if (sort === 'role') return a.role.localeCompare(b.role)
+      if (sort === 'status') return a.status.localeCompare(b.status)
+      return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, 'ru')
+    })
+    return list
+  }, [data, search, statusFilter, roleFilter, sort])
 
   const handleRoleChange = async (member: CompanyMember, role: CompanyMemberRole) => {
     try {
       await updateRole.mutateAsync({ memberId: member.id, role })
       showSuccess('Роль обновлена')
     } catch (err) {
-      const msg =
-        err instanceof TeamApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Не удалось сменить роль'
-      showError(msg)
+      showError(err instanceof TeamApiError ? err.message : 'Не удалось сменить роль')
     }
   }
 
   const runConfirm = async () => {
     if (!confirm) return
     try {
-      if (confirm.type === 'block') {
-        await block.mutateAsync(confirm.member.id)
-        showSuccess('Сотрудник заблокирован')
+      if (confirm.type === 'suspend') {
+        await suspend.mutateAsync(confirm.member.id)
+        showSuccess('Доступ сотрудника приостановлен')
       } else {
         await remove.mutateAsync(confirm.member.id)
         showSuccess('Сотрудник удалён')
       }
       setConfirm(null)
     } catch (err) {
-      const msg =
-        err instanceof TeamApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Операция не выполнена'
-      showError(msg)
+      showError(err instanceof TeamApiError ? err.message : 'Операция не выполнена')
       setConfirm(null)
     }
+  }
+
+  const renderActions = (member: CompanyMember) => {
+    const isLastAdmin =
+      member.role === COMPANY_MEMBER_ROLES.COMPANY_ADMIN &&
+      member.status !== COMPANY_MEMBER_STATUS.SUSPENDED &&
+      member.status !== COMPANY_MEMBER_STATUS.DEACTIVATED &&
+      summary.admins <= 1
+    const items = [
+      {
+        key: 'open',
+        label: 'Открыть',
+        onClick: () => {
+          window.location.assign(companyTeamMemberPath(member.id))
+        },
+      },
+    ]
+    if (member.status === COMPANY_MEMBER_STATUS.SUSPENDED) {
+      items.push({
+        key: 'activate',
+        label: 'Восстановить',
+        onClick: () => {
+          void activate.mutateAsync(member.id).then(() => showSuccess('Доступ восстановлен'))
+        },
+      })
+    } else if (member.status !== COMPANY_MEMBER_STATUS.DEACTIVATED) {
+      items.push({
+        key: 'suspend',
+        label: 'Приостановить',
+        onClick: () => {
+          if (!isLastAdmin) setConfirm({ type: 'suspend', member })
+          else showError('В компании должен оставаться минимум один администратор.')
+        },
+      })
+    }
+    if (member.status !== COMPANY_MEMBER_STATUS.DEACTIVATED) {
+      items.push({
+        key: 'remove',
+        label: 'Удалить',
+        destructive: true,
+        separatorBefore: true,
+        disabled: isLastAdmin,
+        onClick: () => {
+          if (!isLastAdmin) setConfirm({ type: 'remove', member })
+          else showError('В компании должен оставаться минимум один администратор.')
+        },
+      })
+    }
+    return <BaseUiMenu items={items} aria-label={`Действия: ${member.firstName}`} />
   }
 
   return (
     <Box>
       <PageHeader
-        title="Команда"
-        subtitle="Сотрудники и роли в компании"
+        title="Сотрудники"
+        subtitle="Команда и роли в компании"
         actions={
-          <Stack direction="row" spacing={1}>
-            <AppButton component={RouterLink} to={ROUTES.COMPANY_ADMIN} variant="outlined">
-              Назад
-            </AppButton>
-            <AppButton variant="contained" onClick={() => setInviteOpen(true)}>
-              Пригласить
-            </AppButton>
-          </Stack>
+          <AppButton
+            component={RouterLink}
+            to={ROUTES.PROFILE_COMPANY_TEAM_INVITE}
+            variant="contained"
+          >
+            Пригласить
+          </AppButton>
         }
       />
 
+      <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+        <Typography variant="body2" color="text.secondary">
+          Всего: {summary.total}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Активны: {summary.active}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Приглашены: {summary.invited}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Приостановлены: {summary.suspended}
+        </Typography>
+      </Stack>
+
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1.5}
+        sx={{ mb: 2 }}
+        alignItems={{ sm: 'center' }}
+      >
+        <Box sx={{ flex: 1, minWidth: 200 }}>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Поиск по имени или email"
+          />
+        </Box>
+        <AppSelect
+          label="Статус"
+          size="small"
+          value={statusFilter}
+          onChange={(v) => setStatusFilter(v as StatusFilter)}
+          options={[
+            { value: 'hide_deactivated', label: 'Без удалённых' },
+            { value: 'all', label: 'Все статусы' },
+            { value: COMPANY_MEMBER_STATUS.ACTIVE, label: 'Активен' },
+            { value: COMPANY_MEMBER_STATUS.INVITED, label: 'Приглашён' },
+            { value: COMPANY_MEMBER_STATUS.SUSPENDED, label: 'Приостановлен' },
+            { value: COMPANY_MEMBER_STATUS.DEACTIVATED, label: 'Удалён' },
+          ]}
+          sx={{ minWidth: 160 }}
+        />
+        <AppSelect
+          label="Роль"
+          size="small"
+          value={roleFilter}
+          onChange={setRoleFilter}
+          options={[
+            { value: 'all', label: 'Все роли' },
+            ...Object.values(COMPANY_MEMBER_ROLES).map((r) => ({
+              value: r,
+              label: r === 'COMPANY_ADMIN' ? 'Администратор' : r === 'MANAGER' ? 'Менеджер' : 'Наблюдатель',
+            })),
+          ]}
+          sx={{ minWidth: 140 }}
+        />
+        <AppSelect
+          label="Сортировка"
+          size="small"
+          value={sort}
+          onChange={(v) => setSort(v as SortKey)}
+          options={[
+            { value: 'name', label: 'По имени' },
+            { value: 'role', label: 'По роли' },
+            { value: 'status', label: 'По статусу' },
+          ]}
+          sx={{ minWidth: 140 }}
+        />
+      </Stack>
+
       {isLoading ? <LoadingState variant="list" /> : null}
       {isError ? <ErrorState onRetry={() => void refetch()} /> : null}
-      {!isLoading && !isError && data?.length === 0 ? (
+      {!isLoading && !isError && filtered.length === 0 ? (
         <EmptyState
-          title="Пока нет сотрудников"
-          description="Пригласите коллег, чтобы совместная работа началась."
+          title="Сотрудники не найдены"
+          description="Измените фильтры или пригласите коллег."
           actionLabel="Пригласить"
-          onAction={() => setInviteOpen(true)}
+          onAction={() => {
+            window.location.assign(ROUTES.PROFILE_COMPANY_TEAM_INVITE)
+          }}
         />
       ) : null}
 
-      {data && data.length > 0 ? (
+      {!isLoading && !isError && filtered.length > 0 && isDesktop ? (
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -190,138 +293,101 @@ export function CompanyTeamPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {data.map((member) => {
-              const isLastAdmin =
-                member.role === COMPANY_MEMBER_ROLES.COMPANY_ADMIN &&
-                member.status !== COMPANY_MEMBER_STATUS.BLOCKED &&
-                adminCount <= 1
-              return (
-                <TableRow key={member.id}>
-                  <TableCell>
+            {filtered.map((member) => (
+              <TableRow key={member.id} hover>
+                <TableCell>
+                  <Typography
+                    component={RouterLink}
+                    to={companyTeamMemberPath(member.id)}
+                    variant="body2"
+                    fontWeight={600}
+                    color="inherit"
+                    sx={{ textDecoration: 'none', '&:hover': { color: 'primary.main' } }}
+                  >
                     {member.firstName} {member.lastName}
-                  </TableCell>
-                  <TableCell>{member.email}</TableCell>
-                  <TableCell>
-                    <AppSelect
-                      label="Роль"
-                      size="small"
-                      options={ROLE_OPTIONS}
-                      value={member.role}
-                      onChange={(value) => void handleRoleChange(member, value as CompanyMemberRole)}
-                      disabled={isLastAdmin}
-                      sx={{ minWidth: 160 }}
-                    />
-                    {isLastAdmin ? (
-                      <Typography variant="caption" color="text.secondary" display="block">
-                        Последний администратор
-                      </Typography>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>
-                    <Chip size="small" label={STATUS_LABELS[member.status] ?? member.status} />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      {member.status !== COMPANY_MEMBER_STATUS.BLOCKED ? (
-                        <AppButton
-                          size="small"
-                          color="warning"
-                          disabled={isLastAdmin}
-                          onClick={() => setConfirm({ type: 'block', member })}
-                        >
-                          Блок
-                        </AppButton>
-                      ) : null}
-                      <AppButton
-                        size="small"
-                        color="error"
-                        disabled={isLastAdmin}
-                        onClick={() => setConfirm({ type: 'remove', member })}
-                      >
-                        Удалить
-                      </AppButton>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
+                  </Typography>
+                </TableCell>
+                <TableCell>{member.email}</TableCell>
+                <TableCell>
+                  <AppSelect
+                    label="Роль"
+                    size="small"
+                    options={Object.values(COMPANY_MEMBER_ROLES).map((role) => ({
+                      value: role,
+                      label:
+                        role === 'COMPANY_ADMIN'
+                          ? 'Администратор'
+                          : role === 'MANAGER'
+                            ? 'Менеджер'
+                            : 'Наблюдатель',
+                    }))}
+                    value={member.role}
+                    onChange={(value) => void handleRoleChange(member, value as CompanyMemberRole)}
+                    disabled={member.status === COMPANY_MEMBER_STATUS.DEACTIVATED}
+                    sx={{ minWidth: 150 }}
+                  />
+                </TableCell>
+                <TableCell>
+                  <MemberStatusChip status={member.status} />
+                </TableCell>
+                <TableCell align="right">{renderActions(member)}</TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       ) : null}
 
-      <Dialog open={inviteOpen} onClose={() => setInviteOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Пригласить сотрудника</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Controller
-              name="email"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <AppInput
-                  {...field}
-                  label="Email"
-                  error={Boolean(fieldState.error)}
-                  helperText={fieldState.error?.message}
-                />
-              )}
-            />
-            <Controller
-              name="firstName"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <AppInput
-                  {...field}
-                  label="Имя"
-                  error={Boolean(fieldState.error)}
-                  helperText={fieldState.error?.message}
-                />
-              )}
-            />
-            <Controller
-              name="lastName"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <AppInput
-                  {...field}
-                  label="Фамилия"
-                  error={Boolean(fieldState.error)}
-                  helperText={fieldState.error?.message}
-                />
-              )}
-            />
-            <Controller
-              name="role"
-              control={form.control}
-              render={({ field }) => (
-                <AppSelect
-                  label="Роль"
-                  options={ROLE_OPTIONS}
-                  value={field.value}
-                  onChange={field.onChange}
-                />
-              )}
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton onClick={() => setInviteOpen(false)}>Отмена</AppButton>
-          <AppButton variant="contained" loading={invite.isPending} onClick={() => void handleInvite()}>
-            Отправить
-          </AppButton>
-        </DialogActions>
-      </Dialog>
+      {!isLoading && !isError && filtered.length > 0 && !isDesktop ? (
+        <Stack spacing={1.5}>
+          {filtered.map((member) => (
+            <Box
+              key={member.id}
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                <Box>
+                  <Typography
+                    component={RouterLink}
+                    to={companyTeamMemberPath(member.id)}
+                    variant="subtitle1"
+                    fontWeight={600}
+                    color="inherit"
+                    sx={{ textDecoration: 'none' }}
+                  >
+                    {member.firstName} {member.lastName}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {member.email}
+                  </Typography>
+                  <Stack direction="row" spacing={0.75} sx={{ mt: 1 }}>
+                    <MemberRoleChip role={member.role} />
+                    <MemberStatusChip status={member.status} />
+                  </Stack>
+                </Box>
+                {renderActions(member)}
+              </Stack>
+            </Box>
+          ))}
+        </Stack>
+      ) : null}
 
       <ConfirmDialog
         open={Boolean(confirm)}
-        title={confirm?.type === 'remove' ? 'Удалить сотрудника?' : 'Заблокировать сотрудника?'}
+        title={confirm?.type === 'remove' ? 'Удалить сотрудника?' : 'Приостановить доступ?'}
         description={
           confirm
             ? `${confirm.member.firstName} ${confirm.member.lastName} (${confirm.member.email})`
             : undefined
         }
-        confirmLabel={confirm?.type === 'remove' ? 'Удалить' : 'Заблокировать'}
+        confirmLabel={confirm?.type === 'remove' ? 'Удалить' : 'Приостановить'}
         destructive
-        loading={block.isPending || remove.isPending}
+        loading={suspend.isPending || remove.isPending}
         onCancel={() => setConfirm(null)}
         onConfirm={() => void runConfirm()}
       />

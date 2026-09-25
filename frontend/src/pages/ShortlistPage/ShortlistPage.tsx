@@ -8,11 +8,28 @@ import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { dealApi } from '@/shared/api/dealApi'
+import { useCompanies } from '@/entities/company/api/queries'
 import { dealKeys } from '@/entities/deal/api/queries'
-import { getCompanyById, getOpportunityById, mockShortlist, type ShortlistItem } from '@/shared/mocks'
+import { useOpportunities } from '@/entities/opportunity/api/queries'
+import type { ShortlistItem } from '@/entities/shortlist'
+import {
+  useRemoveFromShortlist,
+  useShortlist,
+  useUpdateShortlistNote,
+} from '@/entities/shortlist/api/queries'
+import { dealApi } from '@/shared/api/dealApi'
 import { companyDetailsPath, dealDetailsPath, ROUTES } from '@/shared/constants/routes'
-import { AppButton, EmptyState, MatchScore, MoneyValue, PageHeader, VerifiedBadge } from '@/shared/ui'
+import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
+import {
+  AppButton,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  MatchScore,
+  MoneyValue,
+  PageHeader,
+  VerifiedBadge,
+} from '@/shared/ui'
 
 export interface ShortlistPageProps {
   embedded?: boolean
@@ -21,10 +38,15 @@ export interface ShortlistPageProps {
 export function ShortlistPage({ embedded }: ShortlistPageProps) {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const [items, setItems] = useState<ShortlistItem[]>(mockShortlist)
-  const [notes, setNotes] = useState<Record<string, string>>(
-    Object.fromEntries(mockShortlist.map((i) => [i.id, i.note])),
-  )
+  const showSuccess = useSnackbarStore((s) => s.showSuccess)
+  const shortlistQuery = useShortlist()
+  const companiesQuery = useCompanies()
+  const opportunitiesQuery = useOpportunities()
+  const removeMutation = useRemoveFromShortlist()
+  const noteMutation = useUpdateShortlistNote()
+  const [localNotes, setLocalNotes] = useState<Record<string, string>>({})
+
+  const items = shortlistQuery.data ?? []
 
   const grouped = useMemo(() => {
     const map = new Map<string, ShortlistItem[]>()
@@ -40,25 +62,33 @@ export function ShortlistPage({ embedded }: ShortlistPageProps) {
     mutationFn: dealApi.startFromShortlist,
     onSuccess: (deal) => {
       void qc.invalidateQueries({ queryKey: dealKeys.all })
+      showSuccess('Переговоры начаты')
       void navigate(dealDetailsPath(deal.id))
     },
   })
+
+  if (shortlistQuery.isLoading || companiesQuery.isLoading || opportunitiesQuery.isLoading) {
+    return <LoadingState variant="page" />
+  }
+  if (shortlistQuery.isError) {
+    return <ErrorState onRetry={() => void shortlistQuery.refetch()} />
+  }
 
   const content = (
     <>
       {grouped.length === 0 ? (
         <EmptyState
-          title="Shortlist пуст"
-          description="Добавляйте компании из предложений."
+          title="В shortlist пока никого нет"
+          description="Добавляйте наиболее интересные предложения, чтобы сравнить финалистов."
           actionLabel="К возможностям"
           onAction={() => {
-            window.location.href = ROUTES.OPPORTUNITIES
+            void navigate(ROUTES.OPPORTUNITIES)
           }}
         />
       ) : (
         <Stack spacing={4}>
           {grouped.map(([opportunityId, group]) => {
-            const opp = getOpportunityById(opportunityId)
+            const opp = opportunitiesQuery.data?.find((o) => o.id === opportunityId)
             return (
               <Box key={opportunityId}>
                 <Typography variant="h2" sx={{ mb: 0.5 }}>
@@ -69,8 +99,9 @@ export function ShortlistPage({ embedded }: ShortlistPageProps) {
                 </Typography>
                 <Stack spacing={2}>
                   {group.map((item) => {
-                    const company = getCompanyById(item.companyId)
+                    const company = companiesQuery.data?.find((c) => c.id === item.companyId)
                     if (!company) return null
+                    const noteValue = localNotes[item.id] ?? item.note
                     return (
                       <Card key={item.id}>
                         <CardContent>
@@ -98,10 +129,12 @@ export function ShortlistPage({ embedded }: ShortlistPageProps) {
                               label="Заметка"
                               fullWidth
                               size="small"
-                              value={notes[item.id] ?? ''}
-                              onChange={(e) =>
-                                setNotes((n) => ({ ...n, [item.id]: e.target.value }))
-                              }
+                              value={noteValue}
+                              onChange={(e) => {
+                                const note = e.target.value
+                                setLocalNotes((n) => ({ ...n, [item.id]: note }))
+                                noteMutation.mutate({ id: item.id, note })
+                              }}
                             />
                           </Stack>
                         </CardContent>
@@ -137,7 +170,12 @@ export function ShortlistPage({ embedded }: ShortlistPageProps) {
                             variant="text"
                             color="error"
                             size="small"
-                            onClick={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
+                            loading={removeMutation.isPending}
+                            onClick={() => {
+                              removeMutation.mutate(item.id, {
+                                onSuccess: () => showSuccess('Удалено из shortlist'),
+                              })
+                            }}
                           >
                             Удалить
                           </AppButton>

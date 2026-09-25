@@ -61,6 +61,9 @@ vi.mock('@/entities/proposal/api/queries', () => ({
   useProposals: () => proposalQuery.current,
   useProposal: () => proposalQuery.current,
   useMyProposals: () => proposalQuery.current,
+  useShortlistProposal: () => ({ mutate: vi.fn(), isPending: false }),
+  useRejectProposal: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateProposal: () => ({ mutateAsync: vi.fn(), isPending: false }),
   proposalKeys: {
     all: ['proposals'],
     byOpportunity: (id: string) => ['proposals', id],
@@ -71,6 +74,7 @@ vi.mock('@/entities/proposal/api/queries', () => ({
 
 vi.mock('@/entities/match/api/queries', () => ({
   useMatches: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+  useAllMatches: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   useMatch: () => ({ data: null, isLoading: false, isError: false, refetch: vi.fn() }),
 }))
 

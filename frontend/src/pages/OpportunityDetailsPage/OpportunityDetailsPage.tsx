@@ -41,6 +41,9 @@ export function OpportunityDetailsPage() {
   if (isError || !data) return <ErrorState onRetry={() => void refetch()} />
 
   const isOwn = data.company.id === companyId
+  const isExpired = data.status === 'expired'
+  const isClosed = data.status === 'closed'
+  const canPropose = !isOwn && !isExpired && !isClosed
   const match = matchQuery.data
 
   const requiredMatched = data.requiredRequirements.map((req) => ({
@@ -239,6 +242,14 @@ export function OpportunityDetailsPage() {
                 variant="contained"
                 fullWidth
               >
+                Управлять запросом
+              </AppButton>
+              <AppButton
+                component={RouterLink}
+                to={opportunityProposalsPath(data.id)}
+                variant="outlined"
+                fullWidth
+              >
                 Предложения ({data.proposalsCount})
               </AppButton>
               <AppButton
@@ -250,24 +261,32 @@ export function OpportunityDetailsPage() {
                 Сравнить
               </AppButton>
             </>
+          ) : canPropose ? (
+            <AppButton
+              component={RouterLink}
+              to={opportunityProposePath(data.id)}
+              variant="contained"
+              fullWidth
+            >
+              Предложить решение
+            </AppButton>
           ) : (
-            <>
-              <AppButton
-                component={RouterLink}
-                to={opportunityProposePath(data.id)}
-                variant="contained"
-                fullWidth
-              >
-                Предложить решение
-              </AppButton>
-              <AppButton
-                variant="text"
-                color="inherit"
-                onClick={() => window.alert('Mock: рекомендация скрыта')}
-              >
-                Скрыть
-              </AppButton>
-            </>
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: 'action.hover',
+                width: '100%',
+              }}
+            >
+              <Typography variant="body2" fontWeight={600}>
+                {isExpired
+                  ? 'Приём предложений завершён'
+                  : isClosed
+                    ? 'Запрос закрыт'
+                    : 'Отклик недоступен'}
+              </Typography>
+            </Box>
           )}
           <AppButton
             component={RouterLink}

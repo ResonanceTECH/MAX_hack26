@@ -3,10 +3,9 @@ import Box from '@mui/material/Box'
 import Paper from '@mui/material/Paper'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useMatch } from '@/entities/match/api/queries'
-import { proposalKeys, useProposal } from '@/entities/proposal/api/queries'
-import { proposalApi } from '@/shared/api/proposalApi'
+import { useProposal, useRejectProposal, useShortlistProposal } from '@/entities/proposal/api/queries'
+import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { companyDetailsPath } from '@/shared/constants/routes'
 import { formatDate } from '@/shared/lib/format'
 import {
@@ -26,33 +25,11 @@ import {
 
 export function ProposalDetailsPage() {
   const { id = '' } = useParams()
-  const queryClient = useQueryClient()
   const { data, isLoading, isError, refetch } = useProposal(id)
   const matchQuery = useMatch(data?.opportunityId ?? '', data?.company.id ?? '')
-
-  const shortlistMutation = useMutation({
-    mutationFn: () => proposalApi.shortlist(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: proposalKeys.detail(id) })
-      if (data?.opportunityId) {
-        void queryClient.invalidateQueries({
-          queryKey: proposalKeys.byOpportunity(data.opportunityId),
-        })
-      }
-    },
-  })
-
-  const rejectMutation = useMutation({
-    mutationFn: () => proposalApi.reject(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: proposalKeys.detail(id) })
-      if (data?.opportunityId) {
-        void queryClient.invalidateQueries({
-          queryKey: proposalKeys.byOpportunity(data.opportunityId),
-        })
-      }
-    },
-  })
+  const shortlistMutation = useShortlistProposal()
+  const rejectMutation = useRejectProposal()
+  const showSuccess = useSnackbarStore((s) => s.showSuccess)
 
   if (isLoading) return <LoadingState variant="page" />
   if (isError || !data) return <ErrorState onRetry={() => void refetch()} />
@@ -167,7 +144,11 @@ export function ProposalDetailsPage() {
           variant="contained"
           loading={shortlistMutation.isPending}
           disabled={actionsDisabled}
-          onClick={() => shortlistMutation.mutate()}
+          onClick={() =>
+            shortlistMutation.mutate(id, {
+              onSuccess: () => showSuccess('Добавлено в shortlist'),
+            })
+          }
         >
           В shortlist
         </AppButton>
@@ -177,7 +158,7 @@ export function ProposalDetailsPage() {
           color="error"
           loading={rejectMutation.isPending}
           disabled={actionsDisabled}
-          onClick={() => rejectMutation.mutate()}
+          onClick={() => rejectMutation.mutate(id)}
         >
           Отклонить
         </AppButton>
@@ -188,7 +169,11 @@ export function ProposalDetailsPage() {
           variant="contained"
           loading={shortlistMutation.isPending}
           disabled={actionsDisabled}
-          onClick={() => shortlistMutation.mutate()}
+          onClick={() =>
+            shortlistMutation.mutate(id, {
+              onSuccess: () => showSuccess('Добавлено в shortlist'),
+            })
+          }
         >
           В shortlist
         </AppButton>
@@ -197,7 +182,7 @@ export function ProposalDetailsPage() {
           color="error"
           loading={rejectMutation.isPending}
           disabled={actionsDisabled}
-          onClick={() => rejectMutation.mutate()}
+          onClick={() => rejectMutation.mutate(id)}
         >
           Отклонить
         </AppButton>
