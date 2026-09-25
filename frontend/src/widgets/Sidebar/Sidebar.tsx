@@ -1,23 +1,22 @@
-import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Divider from '@mui/material/Divider'
-import IconButton from '@mui/material/IconButton'
 import List from '@mui/material/List'
 import ListItemButton from '@mui/material/ListItemButton'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
-import SwipeableDrawer from '@mui/material/SwipeableDrawer'
 import Typography from '@mui/material/Typography'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
+import { SYSTEM_ROLES } from '@/entities/user'
 import { APP_NAME } from '@/shared/config/app'
-import { getNavConfig, type NavItem } from '@/shared/config/navigation'
-import { AppIcon } from '@/shared/ui'
-import { Layers01Icon } from '@/shared/ui/icons'
+import { getNavConfig, type NavGroup, type NavItem } from '@/shared/config/navigation'
+import { ROUTES } from '@/shared/constants/routes'
+import { AppIcon, CompanyAvatar } from '@/shared/ui'
+import { Notification03Icon, UserCircleIcon } from '@/shared/ui/icons'
 
 function NavList({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
   return (
-    <List sx={{ px: 1, py: 1.5, flex: 1 }}>
+    <List sx={{ px: 1, py: 0.5 }}>
       {items.map((item) => (
         <ListItemButton
           key={item.to}
@@ -26,8 +25,8 @@ function NavList({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
           onClick={onNavigate}
           sx={{
             borderRadius: 2,
-            mb: 0.5,
-            minHeight: 48,
+            mb: 0.25,
+            minHeight: 44,
             '&.active': {
               bgcolor: 'match.light',
               color: 'secondary.dark',
@@ -40,7 +39,7 @@ function NavList({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
           </ListItemIcon>
           <ListItemText
             primary={item.label}
-            primaryTypographyProps={{ fontWeight: item.emphasize ? 700 : 500 }}
+            primaryTypographyProps={{ fontWeight: item.emphasize ? 700 : 500, fontSize: 14 }}
           />
         </ListItemButton>
       ))}
@@ -48,80 +47,111 @@ function NavList({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
   )
 }
 
+function GroupedNav({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () => void }) {
+  return (
+    <Box sx={{ flex: 1, overflow: 'auto', py: 1 }}>
+      {groups.map((group) => (
+        <Box key={group.id} sx={{ mb: 1 }}>
+          {group.label ? (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ px: 2.5, py: 0.75, display: 'block', fontWeight: 700, letterSpacing: 0.4 }}
+            >
+              {group.label}
+            </Typography>
+          ) : null}
+          <NavList items={group.items} onNavigate={onNavigate} />
+        </Box>
+      ))}
+    </Box>
+  )
+}
+
 export function Sidebar() {
   const role = useSessionStore((s) => s.role)
+  const user = useSessionStore((s) => s.user)
   const config = getNavConfig(role)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const navigate = useNavigate()
+  const isPlatformAdmin = role === SYSTEM_ROLES.PLATFORM_ADMIN
 
   return (
-    <>
-      <Box
-        component="nav"
-        aria-label="Основная навигация"
-        sx={{
-          width: 260,
-          flexShrink: 0,
-          borderRight: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'background.paper',
-          display: { xs: 'none', md: 'flex' },
-          flexDirection: 'column',
-          pt: 'env(safe-area-inset-top)',
-          position: 'sticky',
-          top: 0,
-          height: '100dvh',
-        }}
-      >
-        <Box sx={{ px: 2.5, py: 2.5 }}>
-          <Typography variant="h3" color="primary">
-            {APP_NAME}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            B2B-контрагенты
-          </Typography>
-        </Box>
-        <Divider />
-        <NavList items={config.desktop} />
+    <Box
+      component="nav"
+      aria-label="Основная навигация"
+      sx={{
+        width: 260,
+        flexShrink: 0,
+        borderRight: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+        display: { xs: 'none', md: 'flex' },
+        flexDirection: 'column',
+        pt: 'env(safe-area-inset-top)',
+        position: 'sticky',
+        top: 0,
+        height: '100dvh',
+      }}
+    >
+      <Box sx={{ px: 2.5, py: 2.5 }}>
+        <Typography variant="h3" color="primary">
+          {APP_NAME}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {role === SYSTEM_ROLES.MODERATOR
+            ? 'Модерация'
+            : isPlatformAdmin
+              ? 'Platform Admin'
+              : 'B2B-контрагенты'}
+        </Typography>
       </Box>
-
-      {config.mobileAsDrawer ? (
+      <Divider />
+      {config.desktopGroups ? (
+        <GroupedNav groups={config.desktopGroups} />
+      ) : (
+        <Box sx={{ flex: 1, overflow: 'auto' }}>
+          <NavList items={config.desktop} />
+        </Box>
+      )}
+      {isPlatformAdmin ? (
         <>
-          <IconButton
-            aria-label="Открыть меню"
-            onClick={() => setDrawerOpen(true)}
-            sx={{
-              display: { xs: 'inline-flex', md: 'none' },
-              position: 'fixed',
-              left: 12,
-              bottom: 'calc(16px + env(safe-area-inset-bottom))',
-              zIndex: (t) => t.zIndex.fab,
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
-              boxShadow: 2,
-              '&:hover': { bgcolor: 'primary.dark' },
-            }}
-          >
-            <AppIcon icon={Layers01Icon} size={22} />
-          </IconButton>
-          <SwipeableDrawer
-            anchor="left"
-            open={drawerOpen}
-            onOpen={() => setDrawerOpen(true)}
-            onClose={() => setDrawerOpen(false)}
-          >
-            <Box sx={{ width: 280, pt: 'env(safe-area-inset-top)' }}>
-              <Box sx={{ px: 2.5, py: 2 }}>
-                <Typography variant="h3">{APP_NAME}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Platform Admin
-                </Typography>
-              </Box>
-              <Divider />
-              <NavList items={config.desktop} onNavigate={() => setDrawerOpen(false)} />
-            </Box>
-          </SwipeableDrawer>
+          <Divider />
+          <List sx={{ px: 1, py: 1 }}>
+            <ListItemButton
+              component={NavLink}
+              to={ROUTES.ADMIN_NOTIFICATIONS}
+              sx={{ borderRadius: 2, minHeight: 44 }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <AppIcon icon={Notification03Icon} size={22} />
+              </ListItemIcon>
+              <ListItemText primary="Уведомления" />
+            </ListItemButton>
+            <ListItemButton
+              onClick={() => void navigate(ROUTES.ADMIN_PROFILE)}
+              sx={{ borderRadius: 2, minHeight: 48 }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                {user ? (
+                  <CompanyAvatar
+                    name={`${user.firstName} ${user.lastName}`}
+                    logoUrl={user.avatarUrl}
+                    size={28}
+                  />
+                ) : (
+                  <AppIcon icon={UserCircleIcon} size={22} />
+                )}
+              </ListItemIcon>
+              <ListItemText
+                primary={user ? `${user.firstName} ${user.lastName}` : 'Профиль'}
+                secondary="Platform Admin"
+                primaryTypographyProps={{ fontSize: 14, fontWeight: 600 }}
+                secondaryTypographyProps={{ fontSize: 12 }}
+              />
+            </ListItemButton>
+          </List>
         </>
       ) : null}
-    </>
+    </Box>
   )
 }
