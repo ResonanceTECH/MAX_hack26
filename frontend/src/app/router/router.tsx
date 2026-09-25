@@ -1,6 +1,8 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
 import { AppLayout } from '@/app/layout/AppLayout'
+import { PermissionGuard } from '@/features/permissions'
+import { Permission } from '@/features/permissions/model/permissions'
 import { LoadingState } from '@/shared/ui'
 import { companyDetailsPath } from '@/shared/constants/routes'
 
@@ -48,9 +50,43 @@ const ComparisonPage = lazy(() =>
 const ShortlistPage = lazy(() =>
   import('@/pages/ShortlistPage/ShortlistPage').then((m) => ({ default: m.ShortlistPage })),
 )
-const CompanyProfilePage = lazy(() =>
-  import('@/pages/CompanyProfilePage/CompanyProfilePage').then((m) => ({
-    default: m.CompanyProfilePage,
+const CompanyProfileRoute = lazy(() =>
+  import('@/pages/CompanyProfileRoute').then((m) => ({ default: m.CompanyProfileRoute })),
+)
+const CompanyEditPage = lazy(() =>
+  import('@/pages/CompanyEditPage/CompanyEditPage').then((m) => ({ default: m.CompanyEditPage })),
+)
+const CompanyTeamPage = lazy(() =>
+  import('@/pages/CompanyTeamPage/CompanyTeamPage').then((m) => ({ default: m.CompanyTeamPage })),
+)
+const CompanyServicesPage = lazy(() =>
+  import('@/pages/CompanyServicesPage/CompanyServicesPage').then((m) => ({
+    default: m.CompanyServicesPage,
+  })),
+)
+const CompanyCasesPage = lazy(() =>
+  import('@/pages/CompanyCasesPage/CompanyCasesPage').then((m) => ({
+    default: m.CompanyCasesPage,
+  })),
+)
+const CompanyDocumentsPage = lazy(() =>
+  import('@/pages/CompanyDocumentsPage/CompanyDocumentsPage').then((m) => ({
+    default: m.CompanyDocumentsPage,
+  })),
+)
+const CompanyPermissionsPage = lazy(() =>
+  import('@/pages/CompanyPermissionsPage/CompanyPermissionsPage').then((m) => ({
+    default: m.CompanyPermissionsPage,
+  })),
+)
+const CompanySettingsPage = lazy(() =>
+  import('@/pages/CompanySettingsPage/CompanySettingsPage').then((m) => ({
+    default: m.CompanySettingsPage,
+  })),
+)
+const CompanyVerificationPage = lazy(() =>
+  import('@/pages/CompanyVerificationPage/CompanyVerificationPage').then((m) => ({
+    default: m.CompanyVerificationPage,
   })),
 )
 const NotificationsPage = lazy(() =>
@@ -60,6 +96,11 @@ const NotificationsPage = lazy(() =>
 )
 const NotFoundPage = lazy(() =>
   import('@/pages/NotFoundPage/NotFoundPage').then((m) => ({ default: m.NotFoundPage })),
+)
+const AccessDeniedPage = lazy(() =>
+  import('@/pages/AccessDeniedPage/AccessDeniedPage').then((m) => ({
+    default: m.AccessDeniedPage,
+  })),
 )
 const ProposalDetailsPage = lazy(() =>
   import('@/pages/ProposalDetailsPage/ProposalDetailsPage').then((m) => ({
@@ -82,9 +123,89 @@ const DealRoomPage = lazy(() =>
 const FavoritesPage = lazy(() =>
   import('@/pages/FavoritesPage/FavoritesPage').then((m) => ({ default: m.FavoritesPage })),
 )
+const ProfilePage = lazy(() =>
+  import('@/pages/ProfilePage/ProfilePage').then((m) => ({ default: m.ProfilePage })),
+)
+const ModerationDashboardPage = lazy(() =>
+  import('@/pages/ModerationDashboardPage/ModerationDashboardPage').then((m) => ({
+    default: m.ModerationDashboardPage,
+  })),
+)
+const ModerationQueuePage = lazy(() =>
+  import('@/pages/ModerationQueuePage/ModerationQueuePage').then((m) => ({
+    default: m.ModerationQueuePage,
+  })),
+)
+const ModerationDetailPage = lazy(() =>
+  import('@/pages/ModerationDetailPage/ModerationDetailPage').then((m) => ({
+    default: m.ModerationDetailPage,
+  })),
+)
+const ModerationReportsPage = lazy(() =>
+  import('@/pages/ModerationReportsPage/ModerationReportsPage').then((m) => ({
+    default: m.ModerationReportsPage,
+  })),
+)
+const ModerationHistoryPage = lazy(() =>
+  import('@/pages/ModerationHistoryPage/ModerationHistoryPage').then((m) => ({
+    default: m.ModerationHistoryPage,
+  })),
+)
+const AdminDashboardPage = lazy(() =>
+  import('@/pages/AdminDashboardPage/AdminDashboardPage').then((m) => ({
+    default: m.AdminDashboardPage,
+  })),
+)
+const AdminUsersPage = lazy(() =>
+  import('@/pages/AdminUsersPage/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })),
+)
+const AdminUserDetailPage = lazy(() =>
+  import('@/pages/AdminUserDetailPage/AdminUserDetailPage').then((m) => ({
+    default: m.AdminUserDetailPage,
+  })),
+)
+const AdminCompaniesPage = lazy(() =>
+  import('@/pages/AdminCompaniesPage/AdminCompaniesPage').then((m) => ({
+    default: m.AdminCompaniesPage,
+  })),
+)
+const AdminCompanyDetailPage = lazy(() =>
+  import('@/pages/AdminCompanyDetailPage/AdminCompanyDetailPage').then((m) => ({
+    default: m.AdminCompanyDetailPage,
+  })),
+)
+const AdminDictionariesPage = lazy(() =>
+  import('@/pages/AdminDictionariesPage/AdminDictionariesPage').then((m) => ({
+    default: m.AdminDictionariesPage,
+  })),
+)
+const AdminAnalyticsPage = lazy(() =>
+  import('@/pages/AdminAnalyticsPage/AdminAnalyticsPage').then((m) => ({
+    default: m.AdminAnalyticsPage,
+  })),
+)
+const AdminAuditPage = lazy(() =>
+  import('@/pages/AdminAuditPage/AdminAuditPage').then((m) => ({ default: m.AdminAuditPage })),
+)
+const AdminSettingsPage = lazy(() =>
+  import('@/pages/AdminSettingsPage/AdminSettingsPage').then((m) => ({
+    default: m.AdminSettingsPage,
+  })),
+)
+const AdminModerationPage = lazy(() =>
+  import('@/pages/AdminModerationPage/AdminModerationPage').then((m) => ({
+    default: m.AdminModerationPage,
+  })),
+)
 
 function withSuspense(element: ReactNode) {
   return <Suspense fallback={<LoadingState variant="page" />}>{element}</Suspense>
+}
+
+function guarded(permission: Permission | Permission[], element: ReactNode) {
+  return withSuspense(
+    <PermissionGuard permission={permission}>{element}</PermissionGuard>,
+  )
 }
 
 function CompanyAliasRedirect() {
@@ -98,12 +219,25 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: withSuspense(<HomePage />) },
+      { path: 'access-denied', element: withSuspense(<AccessDeniedPage />) },
+      { path: 'profile', element: withSuspense(<ProfilePage />) },
+
       { path: 'opportunities', element: withSuspense(<OpportunitiesPage />) },
-      { path: 'opportunities/create', element: withSuspense(<CreateOpportunityPage />) },
+      {
+        path: 'opportunities/create',
+        element: guarded(Permission.CREATE_OPPORTUNITY, <CreateOpportunityPage />),
+      },
       { path: 'opportunities/:id', element: withSuspense(<OpportunityDetailsPage />) },
       { path: 'opportunities/:id/proposals', element: withSuspense(<ProposalsPage />) },
       { path: 'opportunities/:id/compare', element: withSuspense(<ComparisonPage />) },
-      { path: 'opportunities/:id/propose', element: withSuspense(<CreateProposalPage />) },
+      {
+        path: 'opportunities/:id/propose',
+        element: guarded(Permission.CREATE_PROPOSAL, <CreateProposalPage />),
+      },
+      {
+        path: 'proposals/create/:opportunityId',
+        element: guarded(Permission.CREATE_PROPOSAL, <CreateProposalPage />),
+      },
       { path: 'proposals/:id', element: withSuspense(<ProposalDetailsPage />) },
       { path: 'deals/:id', element: withSuspense(<DealRoomPage />) },
       { path: 'companies', element: withSuspense(<CompaniesPage />) },
@@ -112,11 +246,110 @@ export const router = createBrowserRouter([
       { path: 'my', element: withSuspense(<MyProcessesPage />) },
       { path: 'my/requests', element: withSuspense(<MyRequestsPage />) },
       { path: 'my/proposals', element: withSuspense(<MyProposalsPage />) },
-      { path: 'my/shortlist', element: withSuspense(<ShortlistPage />) },
+      {
+        path: 'my/shortlist',
+        element: guarded(Permission.MANAGE_SHORTLIST, <ShortlistPage />),
+      },
       { path: 'my/negotiations', element: withSuspense(<NegotiationsPage />) },
       { path: 'favorites', element: withSuspense(<FavoritesPage />) },
-      { path: 'profile/company', element: withSuspense(<CompanyProfilePage />) },
       { path: 'notifications', element: withSuspense(<NotificationsPage />) },
+
+      { path: 'profile/company', element: withSuspense(<CompanyProfileRoute />) },
+      {
+        path: 'profile/company/edit',
+        element: guarded(Permission.EDIT_COMPANY, <CompanyEditPage />),
+      },
+      {
+        path: 'profile/company/team',
+        element: guarded(Permission.MANAGE_COMPANY_MEMBERS, <CompanyTeamPage />),
+      },
+      {
+        path: 'profile/company/services',
+        element: guarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServicesPage />),
+      },
+      {
+        path: 'profile/company/cases',
+        element: guarded(Permission.MANAGE_COMPANY_CASES, <CompanyCasesPage />),
+      },
+      {
+        path: 'profile/company/documents',
+        element: guarded(Permission.MANAGE_COMPANY_DOCUMENTS, <CompanyDocumentsPage />),
+      },
+      {
+        path: 'profile/company/permissions',
+        element: guarded(Permission.MANAGE_COMPANY_PERMISSIONS, <CompanyPermissionsPage />),
+      },
+      {
+        path: 'profile/company/settings',
+        element: guarded(Permission.EDIT_COMPANY, <CompanySettingsPage />),
+      },
+      {
+        path: 'profile/company/verification',
+        element: guarded(Permission.EDIT_COMPANY, <CompanyVerificationPage />),
+      },
+
+      {
+        path: 'moderation',
+        element: guarded(Permission.VIEW_MODERATION, <ModerationDashboardPage />),
+      },
+      {
+        path: 'moderation/queue',
+        element: guarded(Permission.VIEW_MODERATION, <ModerationQueuePage />),
+      },
+      {
+        path: 'moderation/reports',
+        element: guarded(Permission.HANDLE_REPORTS, <ModerationReportsPage />),
+      },
+      {
+        path: 'moderation/history',
+        element: guarded(Permission.VIEW_MODERATION, <ModerationHistoryPage />),
+      },
+      {
+        path: 'moderation/:type/:id',
+        element: guarded(Permission.VIEW_MODERATION, <ModerationDetailPage />),
+      },
+
+      {
+        path: 'admin',
+        element: guarded(Permission.VIEW_ADMIN_DASHBOARD, <AdminDashboardPage />),
+      },
+      {
+        path: 'admin/users',
+        element: guarded(Permission.MANAGE_PLATFORM_USERS, <AdminUsersPage />),
+      },
+      {
+        path: 'admin/users/:id',
+        element: guarded(Permission.MANAGE_PLATFORM_USERS, <AdminUserDetailPage />),
+      },
+      {
+        path: 'admin/companies',
+        element: guarded(Permission.MANAGE_PLATFORM_COMPANIES, <AdminCompaniesPage />),
+      },
+      {
+        path: 'admin/companies/:id',
+        element: guarded(Permission.MANAGE_PLATFORM_COMPANIES, <AdminCompanyDetailPage />),
+      },
+      {
+        path: 'admin/moderation',
+        element: guarded(Permission.VIEW_MODERATION, <AdminModerationPage />),
+      },
+      {
+        path: 'admin/dictionaries',
+        element: guarded(Permission.MANAGE_DICTIONARIES, <AdminDictionariesPage />),
+      },
+      {
+        path: 'admin/analytics',
+        element: guarded(Permission.VIEW_PLATFORM_ANALYTICS, <AdminAnalyticsPage />),
+      },
+      {
+        path: 'admin/audit',
+        element: guarded(Permission.VIEW_ADMIN_DASHBOARD, <AdminAuditPage />),
+      },
+      {
+        path: 'admin/settings',
+        element: guarded(Permission.MANAGE_PLATFORM_SETTINGS, <AdminSettingsPage />),
+      },
+
       { path: '*', element: withSuspense(<NotFoundPage />) },
     ],
   },

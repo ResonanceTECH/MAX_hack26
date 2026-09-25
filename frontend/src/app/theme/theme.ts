@@ -120,6 +120,55 @@ export const theme = createTheme({
         root: {
           border: '1px solid #E2E8F0',
           boxShadow: '0 1px 2px rgba(11, 31, 58, 0.06)',
+          borderRadius: 10,
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+        },
+      },
+    },
+    MuiTextField: {
+      defaultProps: {
+        variant: 'outlined',
+        size: 'medium',
+      },
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 10,
+          },
+        },
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          borderRadius: 12,
+        },
+      },
+    },
+    MuiBottomNavigation: {
+      styleOverrides: {
+        root: {
+          height: 64,
+        },
+      },
+    },
+    MuiBottomNavigationAction: {
+      styleOverrides: {
+        root: {
+          minWidth: 56,
+          paddingTop: 8,
+        },
+        label: {
+          fontSize: '0.7rem',
+          '&.Mui-selected': {
+            fontSize: '0.7rem',
+          },
         },
       },
     },
