@@ -5,16 +5,45 @@ import Rating from '@mui/material/Rating'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
+import { Permission } from '@/features/permissions'
+import { usePermissions } from '@/features/permissions/hooks/usePermission'
 import { companyDetailsPath, ROUTES } from '@/shared/constants/routes'
 import { formatCurrency } from '@/shared/lib/format'
-import { AppButton, LoadingState, PageHeader, Tag, VerifiedBadge } from '@/shared/ui'
+import { AppButton, EmptyState, LoadingState, PageHeader, Tag, VerifiedBadge } from '@/shared/ui'
+
+const MANAGEMENT_LINKS = [
+  { to: ROUTES.COMPANY_ADMIN, label: 'Панель управления' },
+  { to: ROUTES.COMPANY_EDIT, label: 'Редактировать' },
+  { to: ROUTES.COMPANY_TEAM, label: 'Команда' },
+  { to: ROUTES.COMPANY_SERVICES, label: 'Услуги' },
+  { to: ROUTES.COMPANY_CASES, label: 'Кейсы' },
+  { to: ROUTES.COMPANY_DOCUMENTS, label: 'Документы' },
+  { to: ROUTES.COMPANY_VERIFICATION, label: 'Верификация' },
+] as const
 
 export function CompanyProfilePage() {
   const user = useSessionStore((s) => s.user)
   const company = useSessionStore((s) => s.company)
   const isLoading = useSessionStore((s) => s.isLoading)
+  const { has } = usePermissions()
+  const canManageCompany =
+    has(Permission.EDIT_COMPANY) || has(Permission.MANAGE_COMPANY_MEMBERS)
 
-  if (isLoading || !company || !user) return <LoadingState variant="page" />
+  if (isLoading) return <LoadingState variant="page" />
+
+  if (!user) return <LoadingState variant="page" />
+
+  if (!company) {
+    return (
+      <Box>
+        <PageHeader title="Профиль компании" subtitle="Компания не привязана к аккаунту" />
+        <EmptyState
+          title="Нет компании"
+          description="Для вашей роли компания не назначена. Marketplace и управление компанией недоступны."
+        />
+      </Box>
+    )
+  }
 
   return (
     <Box>
@@ -60,6 +89,27 @@ export function CompanyProfilePage() {
             <Tag key={t} label={t} color="secondary" />
           ))}
         </Stack>
+
+        {canManageCompany ? (
+          <Box>
+            <Typography variant="h3" sx={{ mb: 1 }}>
+              Управление
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {MANAGEMENT_LINKS.map((link) => (
+                <AppButton
+                  key={link.to}
+                  component={RouterLink}
+                  to={link.to}
+                  variant="outlined"
+                  size="small"
+                >
+                  {link.label}
+                </AppButton>
+              ))}
+            </Stack>
+          </Box>
+        ) : null}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
           <AppButton component={RouterLink} to={companyDetailsPath(company.id)} variant="contained">
