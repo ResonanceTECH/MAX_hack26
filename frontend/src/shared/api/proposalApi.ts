@@ -1,4 +1,13 @@
 import type { Proposal } from '@/entities/proposal'
+import { apiClient } from '@/shared/api/apiClient'
+import { isReal } from '@/shared/api/apiCapabilities'
+import type { ProposalDto } from '@/shared/api/dto/backend'
+import { toApiError } from '@/shared/api/errors'
+import {
+  mapCreateProposalToDto,
+  mapProposalDtoToModel,
+  type ProposalCreateInput,
+} from '@/shared/api/mappers/proposalMapper'
 import { delay } from '@/shared/lib/delay'
 import { persistOpportunities, persistProposals } from '@/shared/mocks/hydrateMocks'
 import {
@@ -11,17 +20,7 @@ import {
 import { CURRENT_COMPANY_ID } from '@/shared/mocks/user'
 import { shortlistApi } from './shortlistApi'
 
-export interface CreateProposalPayload {
-  opportunityId: string
-  price: number
-  currency: string
-  durationDays: number
-  description: string
-  included: string[]
-  excluded: string[]
-  cases: string[]
-  comment?: string
-}
+export type CreateProposalPayload = ProposalCreateInput
 
 const BLOCKED_STATUSES = new Set(['expired', 'closed'])
 
@@ -34,11 +33,29 @@ export class ProposalApiError extends Error {
 
 export const proposalApi = {
   async getByOpportunity(opportunityId: string): Promise<Proposal[]> {
+    if (isReal('proposals')) {
+      try {
+        const { data } = await apiClient.get<ProposalDto[]>(
+          `/opportunities/${opportunityId}/proposals`,
+        )
+        return data.map(mapProposalDtoToModel)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     return getProposalsByOpportunity(opportunityId)
   },
 
   async getById(id: string): Promise<Proposal> {
+    if (isReal('proposals')) {
+      try {
+        const { data } = await apiClient.get<ProposalDto>(`/proposals/${id}`)
+        return mapProposalDtoToModel(data)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     const item = getProposalById(id)
     if (!item) throw new Error('Предложение не найдено')
@@ -46,11 +63,32 @@ export const proposalApi = {
   },
 
   async getMine(companyId: string): Promise<Proposal[]> {
+    if (isReal('proposals')) {
+      try {
+        const { data } = await apiClient.get<ProposalDto[]>('/proposals/mine')
+        return data.map(mapProposalDtoToModel)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     return mockProposals.filter((p) => p.company.id === companyId)
   },
 
   async create(payload: CreateProposalPayload): Promise<Proposal> {
+    if (isReal('proposals')) {
+      try {
+        const body = mapCreateProposalToDto(payload)
+        const { data } = await apiClient.post<ProposalDto>(
+          `/opportunities/${payload.opportunityId}/proposals`,
+          body,
+        )
+        return mapProposalDtoToModel(data)
+      } catch (error) {
+        const err = toApiError(error)
+        throw new ProposalApiError(err.message)
+      }
+    }
     await delay()
     const opportunity = getOpportunityById(payload.opportunityId)
     if (!opportunity) throw new ProposalApiError('Возможность не найдена')
@@ -110,6 +148,14 @@ export const proposalApi = {
   },
 
   async shortlist(id: string): Promise<Proposal> {
+    if (isReal('proposals')) {
+      try {
+        const { data } = await apiClient.post<ProposalDto>(`/proposals/${id}/shortlist`)
+        return mapProposalDtoToModel(data)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     const item = getProposalById(id)
     if (!item) throw new Error('Предложение не найдено')
     item.status = 'shortlisted'
@@ -120,6 +166,16 @@ export const proposalApi = {
   },
 
   async reject(id: string): Promise<Proposal> {
+    if (isReal('proposals')) {
+      try {
+        const { data } = await apiClient.post<ProposalDto>(`/proposals/${id}/status`, {
+          status: 'rejected',
+        })
+        return mapProposalDtoToModel(data)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     const item = getProposalById(id)
     if (!item) throw new Error('Предложение не найдено')

@@ -1,7 +1,14 @@
-import type { Match, MatchReason } from '@/entities/match'
-import { MATCH_REASON_TYPES, MATCH_STATUSES } from '@/entities/match'
+import type { Match } from '@/entities/match'
 import type { Company } from '@/entities/company'
 import type { Opportunity } from '@/entities/opportunity'
+import { MATCH_REASON_TYPES, MATCH_STATUSES } from '@/entities/match'
+import type { MatchReason } from '@/entities/match'
+import { apiClient } from '@/shared/api/apiClient'
+import { isReal } from '@/shared/api/apiCapabilities'
+import type { FeedItemDto, MatchDto, RequestDto } from '@/shared/api/dto/backend'
+import { toApiError } from '@/shared/api/errors'
+import { mapFeedItemToMatch, mapMatchDtoToModel } from '@/shared/api/mappers/matchMapper'
+import { mapRequestDtoToOpportunity } from '@/shared/api/mappers/opportunityMapper'
 import { delay } from '@/shared/lib/delay'
 import { persistMatches } from '@/shared/mocks/hydrateMocks'
 import {
@@ -113,26 +120,49 @@ function buildMatch(opportunity: Opportunity, company: Company): Match {
 
 export const matchingApi = {
   async getByOpportunity(opportunityId: string): Promise<Match[]> {
+    if (isReal('matching')) {
+      try {
+        const { data } = await apiClient.get<MatchDto[]>(`/opportunities/${opportunityId}/matches`)
+        return data.map((m) => mapMatchDtoToModel(m, opportunityId)).sort((a, b) => b.score - a.score)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     return getMatchesByOpportunity(opportunityId).sort((a, b) => b.score - a.score)
   },
 
   async getForCompany(opportunityId: string, companyId: string): Promise<Match | null> {
+    if (isReal('matching')) {
+      const matches = await matchingApi.getByOpportunity(opportunityId)
+      return matches.find((m) => m.companyId === companyId) ?? null
+    }
     await delay()
     return getMatchForCompany(opportunityId, companyId) ?? null
   },
 
   async getAll(): Promise<Match[]> {
+    if (isReal('matching')) {
+      try {
+        const { data } = await apiClient.get<FeedItemDto[]>('/me/recommendations')
+        return data.map(mapFeedItemToMatch)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     return [...mockMatches]
   },
 
   async generateForOpportunity(opportunityId: string): Promise<Match[]> {
+    if (isReal('matching')) {
+      // Backend recomputes matches on publish — just refetch
+      return matchingApi.getByOpportunity(opportunityId)
+    }
     await delay(400)
     const opportunity = getOpportunityById(opportunityId)
     if (!opportunity) throw new Error('Возможность не найдена')
 
-    // Prefer known demo contractors that appear in customer-flow / CR-20 assertions
     const preferred = ['company-techflow', 'company-datacraft', 'company-medsupply']
     const others = mockCompanies
       .map((c) => c.id)
@@ -158,5 +188,18 @@ export const matchingApi = {
     }
     persistMatches()
     return generated
+  },
+
+  /** Map recommendations feed items to opportunities (helper for real mode). */
+  async getRecommendedOpportunities(): Promise<Opportunity[]> {
+    if (isReal('matching')) {
+      try {
+        const { data } = await apiClient.get<FeedItemDto[]>('/me/recommendations')
+        return data.map((item) => mapRequestDtoToOpportunity(item.request as RequestDto))
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
+    return []
   },
 }

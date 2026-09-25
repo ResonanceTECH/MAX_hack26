@@ -1,4 +1,13 @@
 import type { Opportunity } from '@/entities/opportunity'
+import { apiClient } from '@/shared/api/apiClient'
+import { isReal } from '@/shared/api/apiCapabilities'
+import type { RequestDto } from '@/shared/api/dto/backend'
+import { toApiError } from '@/shared/api/errors'
+import {
+  mapCreatePayloadToRequestDto,
+  mapRequestDtoToOpportunity,
+  type OpportunityCreateInput,
+} from '@/shared/api/mappers/opportunityMapper'
 import { delay } from '@/shared/lib/delay'
 import { persistOpportunities } from '@/shared/mocks/hydrateMocks'
 import { getCompanyById, getOpportunityById, mockOpportunities } from '@/shared/mocks'
@@ -20,23 +29,7 @@ export interface OpportunityFilters {
 
 export type OpportunitySort = 'match' | 'newest' | 'budget_asc' | 'budget_desc' | 'deadline'
 
-export interface CreateOpportunityPayload {
-  title: string
-  description: string
-  type: string
-  category: string
-  subcategory: string
-  industries: string[]
-  skills: string[]
-  technologies: string[]
-  budgetMin: number | null
-  budgetMax: number | null
-  currency: string
-  region: string
-  remoteAllowed: boolean
-  proposalDeadline: string
-  executionDeadline: string | null
-}
+export type CreateOpportunityPayload = OpportunityCreateInput
 
 function scoreFor(opportunityId: string): number {
   return (
@@ -106,13 +99,47 @@ function applySort(items: Opportunity[], sort?: OpportunitySort): Opportunity[] 
   }
 }
 
+async function realGetAll(filters?: OpportunityFilters, sort?: OpportunitySort): Promise<Opportunity[]> {
+  try {
+    const { data } = await apiClient.get<RequestDto[]>('/opportunities', {
+      params: {
+        q: filters?.query,
+        category: filters?.category,
+        region: filters?.region,
+        budget_max: filters?.budgetMax,
+        limit: 100,
+      },
+    })
+    let items = data.map(mapRequestDtoToOpportunity)
+    items = applyFilters(items, {
+      industries: filters?.industries,
+      technologies: filters?.technologies,
+      remoteAllowed: filters?.remoteAllowed,
+      status: filters?.status,
+      budgetMin: filters?.budgetMin,
+    })
+    return applySort(items, sort)
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
 export const opportunityApi = {
   async getAll(filters?: OpportunityFilters, sort?: OpportunitySort): Promise<Opportunity[]> {
+    if (isReal('opportunities')) return realGetAll(filters, sort)
     await delay()
     return applySort(applyFilters(mockOpportunities, filters), sort)
   },
 
   async getById(id: string): Promise<Opportunity> {
+    if (isReal('opportunities')) {
+      try {
+        const { data } = await apiClient.get<RequestDto>(`/opportunities/${id}`)
+        return mapRequestDtoToOpportunity(data)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     const item = getOpportunityById(id)
     if (!item) throw new Error('Возможность не найдена')
@@ -120,6 +147,15 @@ export const opportunityApi = {
   },
 
   async create(payload: CreateOpportunityPayload): Promise<Opportunity> {
+    if (isReal('opportunities')) {
+      try {
+        const body = mapCreatePayloadToRequestDto(payload, false)
+        const { data } = await apiClient.post<RequestDto>('/opportunities', body)
+        return mapRequestDtoToOpportunity(data)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     const company = getCompanyById(CURRENT_COMPANY_ID) ?? mockOpportunities[0]?.company
     if (!company) throw new Error('Нет данных компании')
@@ -154,6 +190,25 @@ export const opportunityApi = {
   },
 
   async update(id: string, payload: Partial<CreateOpportunityPayload>): Promise<Opportunity> {
+    if (isReal('opportunities')) {
+      try {
+        const body: Record<string, unknown> = {}
+        if (payload.title != null) body.title = payload.title
+        if (payload.description != null) body.description_raw = payload.description
+        if (payload.category != null) body.category = payload.category
+        if (payload.subcategory != null) body.subcategory = payload.subcategory
+        if (payload.skills != null || payload.technologies != null) {
+          body.requirements = [...(payload.skills ?? []), ...(payload.technologies ?? [])]
+        }
+        if (payload.budgetMin !== undefined) body.budget_min = payload.budgetMin
+        if (payload.budgetMax !== undefined) body.budget_max = payload.budgetMax
+        if (payload.region != null) body.regions = [payload.region]
+        const { data } = await apiClient.patch<RequestDto>(`/opportunities/${id}`, body)
+        return mapRequestDtoToOpportunity(data)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     const item = getOpportunityById(id)
     if (!item) throw new Error('Возможность не найдена')
@@ -163,6 +218,14 @@ export const opportunityApi = {
   },
 
   async publish(id: string): Promise<Opportunity> {
+    if (isReal('opportunities')) {
+      try {
+        const { data } = await apiClient.post<RequestDto>(`/opportunities/${id}/publish`)
+        return mapRequestDtoToOpportunity(data)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     const item = getOpportunityById(id)
     if (!item) throw new Error('Возможность не найдена')
@@ -176,7 +239,31 @@ export const opportunityApi = {
   },
 
   async getMine(companyId: string): Promise<Opportunity[]> {
+    if (isReal('opportunities')) {
+      try {
+        const { data } = await apiClient.get<RequestDto[]>('/opportunities/mine')
+        return data.map(mapRequestDtoToOpportunity)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     return mockOpportunities.filter((o) => o.company.id === companyId)
+  },
+
+  /** Personal executor feed from backend recommendations. */
+  async getRecommended(): Promise<Opportunity[]> {
+    if (isReal('opportunities')) {
+      try {
+        const { data } = await apiClient.get<
+          Array<{ match_id: number; request: RequestDto; score: number }>
+        >('/me/recommendations')
+        return data.map((item) => mapRequestDtoToOpportunity(item.request))
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
+    await delay()
+    return mockOpportunities.filter((o) => o.status === 'published').slice(0, 10)
   },
 }

@@ -1,4 +1,6 @@
 export { apiClient } from './apiClient'
+export { apiCapabilities, isReal } from './apiCapabilities'
+export { normalizeApiError, toApiError } from './errors'
 export { authApi } from './authApi'
 export { companyApi } from './companyApi'
 export { opportunityApi } from './opportunityApi'

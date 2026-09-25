@@ -5,6 +5,11 @@ import {
   canEditVerifiedField,
   type ProfileCompletionResult,
 } from '@/features/company-management/model/businessRules'
+import { apiClient } from '@/shared/api/apiClient'
+import { isReal } from '@/shared/api/apiCapabilities'
+import type { CompanyDto } from '@/shared/api/dto/backend'
+import { toApiError } from '@/shared/api/errors'
+import { mapCompanyDtoToModel } from '@/shared/api/mappers/companyMapper'
 import { delay } from '@/shared/lib/delay'
 import {
   getCompanyById,
@@ -40,6 +45,14 @@ const LOCKED_ON_VERIFIED = ['inn', 'ogrn', 'name'] as const
 
 export const companyManagementApi = {
   async getCurrent(companyId = CURRENT_COMPANY_ID): Promise<Company> {
+    if (isReal('companies')) {
+      try {
+        const { data } = await apiClient.get<CompanyDto>('/companies/me')
+        return mapCompanyDtoToModel(data)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     const company = getCompanyById(companyId)
     if (!company) throw new Error('Компания не найдена')
@@ -47,6 +60,14 @@ export const companyManagementApi = {
   },
 
   async getCompletion(companyId = CURRENT_COMPANY_ID): Promise<ProfileCompletionResult> {
+    if (isReal('companies')) {
+      const company = await companyManagementApi.getCurrent(companyId)
+      return calculateCompanyProfileCompletion(company, {
+        services: [],
+        cases: [],
+        documents: [],
+      })
+    }
     await delay()
     const company = getCompanyById(companyId)
     if (!company) throw new Error('Компания не найдена')
@@ -58,6 +79,25 @@ export const companyManagementApi = {
   },
 
   async updateProfile(companyId: string, patch: CompanyProfileUpdate): Promise<Company> {
+    if (isReal('companies')) {
+      try {
+        const body: Record<string, unknown> = {}
+        if (patch.name != null) body.name = patch.name
+        if (patch.inn != null) body.inn = patch.inn
+        if (patch.description != null) body.description = patch.description
+        if (patch.website !== undefined) body.website = patch.website
+        if (patch.region != null) body.regions = [patch.region]
+        if (patch.industries != null) body.industries = patch.industries
+        if (patch.services != null) body.services = patch.services
+        if (patch.capabilities != null) body.competencies = patch.capabilities
+        if (patch.priceFrom !== undefined) body.budget_min = patch.priceFrom
+        if (patch.priceTo !== undefined) body.budget_max = patch.priceTo
+        const { data } = await apiClient.patch<CompanyDto>(`/companies/${companyId}`, body)
+        return mapCompanyDtoToModel(data)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     const company = getCompanyById(companyId)
     if (!company) throw new Error('Компания не найдена')
