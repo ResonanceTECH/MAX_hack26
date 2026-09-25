@@ -320,46 +320,111 @@ export const router = createBrowserRouter([
       { path: 'favorites', element: withSuspense(<FavoritesPage />) },
       { path: 'notifications', element: withSuspense(<NotificationsPage />) },
 
-      { path: 'profile/company', element: withSuspense(<CompanyProfileRoute />) },
       {
-        path: 'profile/company/edit',
-        element: guarded(Permission.EDIT_COMPANY, <CompanyEditPage />),
-      },
-      {
-        path: 'profile/company/team',
-        element: guarded(
-          Permission.MANAGE_COMPANY_MEMBERS,
-          <CompanyTeamPage />,
-          'company_members',
-        ),
-      },
-      {
-        path: 'profile/company/services',
-        element: guarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServicesPage />),
-      },
-      {
-        path: 'profile/company/cases',
-        element: guarded(Permission.MANAGE_COMPANY_CASES, <CompanyCasesPage />),
-      },
-      {
-        path: 'profile/company/documents',
-        element: guarded(Permission.MANAGE_COMPANY_DOCUMENTS, <CompanyDocumentsPage />),
-      },
-      {
-        path: 'profile/company/permissions',
-        element: guarded(Permission.MANAGE_COMPANY_PERMISSIONS, <CompanyPermissionsPage />),
-      },
-      {
-        path: 'profile/company/settings',
-        element: guarded(
-          Permission.MANAGE_COMPANY_SETTINGS,
-          <CompanySettingsPage />,
-          'company_settings',
-        ),
-      },
-      {
-        path: 'profile/company/verification',
-        element: guarded(Permission.VIEW_COMPANY_VERIFICATION, <CompanyVerificationPage />),
+        path: 'profile/company',
+        element: withSuspense(<CompanyManagementLayoutRoute />),
+        children: [
+          { index: true, element: withSuspense(<CompanyProfileRoute />) },
+          {
+            path: 'edit',
+            element: guarded(Permission.EDIT_COMPANY, <CompanyEditPage />),
+          },
+          {
+            path: 'team',
+            element: guarded(
+              Permission.MANAGE_COMPANY_MEMBERS,
+              <CompanyTeamPage />,
+              'company_members',
+            ),
+          },
+          {
+            path: 'team/invite',
+            element: guarded(
+              Permission.MANAGE_COMPANY_MEMBERS,
+              <CompanyInviteMemberPage />,
+              'company_members',
+            ),
+          },
+          {
+            path: 'team/:memberId',
+            element: guarded(
+              Permission.MANAGE_COMPANY_MEMBERS,
+              <CompanyMemberDetailPage />,
+              'company_members',
+            ),
+          },
+          {
+            path: 'services',
+            element: guarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServicesPage />),
+          },
+          {
+            path: 'services/create',
+            element: guarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServiceCreatePage />),
+          },
+          {
+            path: 'services/:serviceId',
+            element: guarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServiceDetailPage />),
+          },
+          {
+            path: 'services/:serviceId/edit',
+            element: guarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServiceEditPage />),
+          },
+          {
+            path: 'cases',
+            element: guarded(Permission.MANAGE_COMPANY_CASES, <CompanyCasesPage />),
+          },
+          {
+            path: 'cases/create',
+            element: guarded(Permission.MANAGE_COMPANY_CASES, <CompanyCaseCreatePage />),
+          },
+          {
+            path: 'cases/:caseId',
+            element: guarded(Permission.MANAGE_COMPANY_CASES, <CompanyCaseDetailPage />),
+          },
+          {
+            path: 'cases/:caseId/edit',
+            element: guarded(Permission.MANAGE_COMPANY_CASES, <CompanyCaseEditPage />),
+          },
+          {
+            path: 'documents',
+            element: guarded(Permission.MANAGE_COMPANY_DOCUMENTS, <CompanyDocumentsPage />),
+          },
+          {
+            path: 'documents/upload',
+            element: guarded(Permission.MANAGE_COMPANY_DOCUMENTS, <CompanyDocumentUploadPage />),
+          },
+          {
+            path: 'documents/:documentId',
+            element: guarded(Permission.MANAGE_COMPANY_DOCUMENTS, <CompanyDocumentDetailPage />),
+          },
+          {
+            path: 'permissions',
+            element: guarded(
+              [Permission.VIEW_COMPANY_PERMISSIONS, Permission.MANAGE_COMPANY_PERMISSIONS],
+              <CompanyPermissionsPage />,
+            ),
+          },
+          {
+            path: 'settings',
+            element: guarded(
+              Permission.MANAGE_COMPANY_SETTINGS,
+              <CompanySettingsPage />,
+              'company_settings',
+            ),
+          },
+          {
+            path: 'verification',
+            element: guarded(Permission.VIEW_COMPANY_VERIFICATION, <CompanyVerificationPage />),
+          },
+          {
+            path: 'activity',
+            element: guarded(
+              Permission.VIEW_COMPANY_ACTIVITY,
+              <CompanyActivityPage />,
+              'company_activity',
+            ),
+          },
+        ],
       },
 
       {

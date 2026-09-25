@@ -22,6 +22,7 @@ export function loginAsBusinessUser() {
   useSessionStore.setState({
     user: mockCurrentUser,
     company: company ?? null,
+    role: mockCurrentUser.role,
     isInitialized: true,
     isLoading: false,
     error: null,

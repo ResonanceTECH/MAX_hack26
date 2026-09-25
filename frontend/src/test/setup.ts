@@ -30,4 +30,7 @@ window.ResizeObserver = ResizeObserverStub
 
 afterEach(() => {
   cleanup()
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith('b2b_match_mock_v1_')) localStorage.removeItem(key)
+  }
 })
