@@ -206,9 +206,24 @@ const ModerationReportsPage = lazy(() =>
     default: m.ModerationReportsPage,
   })),
 )
+const ModerationReportDetailPage = lazy(() =>
+  import('@/pages/ModerationReportDetailPage/ModerationReportDetailPage').then((m) => ({
+    default: m.ModerationReportDetailPage,
+  })),
+)
+const ModerationEscalationsPage = lazy(() =>
+  import('@/pages/ModerationEscalationsPage/ModerationEscalationsPage').then((m) => ({
+    default: m.ModerationEscalationsPage,
+  })),
+)
 const ModerationHistoryPage = lazy(() =>
   import('@/pages/ModerationHistoryPage/ModerationHistoryPage').then((m) => ({
     default: m.ModerationHistoryPage,
+  })),
+)
+const ModerationProfilePage = lazy(() =>
+  import('@/pages/ModerationProfilePage/ModerationProfilePage').then((m) => ({
+    default: m.ModerationProfilePage,
   })),
 )
 const AdminDashboardPage = lazy(() =>
@@ -429,44 +444,96 @@ export const router = createBrowserRouter([
 
       {
         path: 'moderation',
-        element: guarded(Permission.VIEW_MODERATION, <ModerationDashboardPage />),
+        element: guarded(Permission.VIEW_MODERATION_DASHBOARD, <ModerationDashboardPage />),
       },
       {
         path: 'moderation/queue',
-        element: guarded(Permission.VIEW_MODERATION, <ModerationQueuePage />),
+        element: guarded(Permission.VIEW_MODERATION_QUEUE, <ModerationQueuePage />),
+      },
+      {
+        path: 'moderation/queue/:queueType',
+        element: guarded(Permission.VIEW_MODERATION_QUEUE, <ModerationQueuePage />),
       },
       {
         path: 'moderation/reports',
-        element: guarded(Permission.HANDLE_REPORTS, <ModerationReportsPage />),
+        element: guarded(Permission.VIEW_REPORTS, <ModerationReportsPage />),
+      },
+      {
+        path: 'moderation/reports/:id',
+        element: guarded(Permission.HANDLE_REPORTS, <ModerationReportDetailPage />),
+      },
+      {
+        path: 'moderation/escalations',
+        element: guarded(Permission.VIEW_ESCALATIONS, <ModerationEscalationsPage />),
       },
       {
         path: 'moderation/history',
-        element: guarded(Permission.VIEW_MODERATION, <ModerationHistoryPage />),
+        element: guarded(Permission.VIEW_MODERATION_HISTORY, <ModerationHistoryPage />),
+      },
+      {
+        path: 'moderation/profile',
+        element: guarded(Permission.VIEW_MODERATION_DASHBOARD, <ModerationProfilePage />),
+      },
+      {
+        path: 'moderation/company/:id',
+        element: guarded(Permission.VIEW_MODERATION_ITEM, <ModerationDetailPage />),
+      },
+      {
+        path: 'moderation/opportunity/:id',
+        element: guarded(Permission.VIEW_MODERATION_ITEM, <ModerationDetailPage />),
+      },
+      {
+        path: 'moderation/case/:id',
+        element: guarded(Permission.VIEW_MODERATION_ITEM, <ModerationDetailPage />),
+      },
+      {
+        path: 'moderation/document/:id',
+        element: guarded(Permission.VIEW_MODERATION_ITEM, <ModerationDetailPage />),
       },
       {
         path: 'moderation/:type/:id',
-        element: guarded(Permission.VIEW_MODERATION, <ModerationDetailPage />),
+        element: guarded(Permission.VIEW_MODERATION_ITEM, <ModerationDetailPage />),
       },
 
       {
         path: 'admin',
-        element: guarded(Permission.VIEW_ADMIN_DASHBOARD, <AdminDashboardPage />),
+        element: guarded(
+          Permission.VIEW_ADMIN_DASHBOARD,
+          <AdminDashboardPage />,
+          'platform_admin',
+        ),
       },
       {
         path: 'admin/users',
-        element: guarded(Permission.MANAGE_PLATFORM_USERS, <AdminUsersPage />),
+        element: guarded(
+          Permission.MANAGE_PLATFORM_USERS,
+          <AdminUsersPage />,
+          'platform_admin',
+        ),
       },
       {
         path: 'admin/users/:id',
-        element: guarded(Permission.MANAGE_PLATFORM_USERS, <AdminUserDetailPage />),
+        element: guarded(
+          Permission.MANAGE_PLATFORM_USERS,
+          <AdminUserDetailPage />,
+          'platform_admin',
+        ),
       },
       {
         path: 'admin/companies',
-        element: guarded(Permission.MANAGE_PLATFORM_COMPANIES, <AdminCompaniesPage />),
+        element: guarded(
+          Permission.MANAGE_PLATFORM_COMPANIES,
+          <AdminCompaniesPage />,
+          'platform_admin',
+        ),
       },
       {
         path: 'admin/companies/:id',
-        element: guarded(Permission.MANAGE_PLATFORM_COMPANIES, <AdminCompanyDetailPage />),
+        element: guarded(
+          Permission.MANAGE_PLATFORM_COMPANIES,
+          <AdminCompanyDetailPage />,
+          'platform_admin',
+        ),
       },
       {
         path: 'admin/moderation',
@@ -474,19 +541,35 @@ export const router = createBrowserRouter([
       },
       {
         path: 'admin/dictionaries',
-        element: guarded(Permission.MANAGE_DICTIONARIES, <AdminDictionariesPage />),
+        element: guarded(
+          Permission.MANAGE_DICTIONARIES,
+          <AdminDictionariesPage />,
+          'platform_admin',
+        ),
       },
       {
         path: 'admin/analytics',
-        element: guarded(Permission.VIEW_PLATFORM_ANALYTICS, <AdminAnalyticsPage />),
+        element: guarded(
+          Permission.VIEW_PLATFORM_ANALYTICS,
+          <AdminAnalyticsPage />,
+          'platform_admin',
+        ),
       },
       {
         path: 'admin/audit',
-        element: guarded(Permission.VIEW_ADMIN_DASHBOARD, <AdminAuditPage />),
+        element: guarded(
+          Permission.VIEW_ADMIN_DASHBOARD,
+          <AdminAuditPage />,
+          'platform_admin',
+        ),
       },
       {
         path: 'admin/settings',
-        element: guarded(Permission.MANAGE_PLATFORM_SETTINGS, <AdminSettingsPage />),
+        element: guarded(
+          Permission.MANAGE_PLATFORM_SETTINGS,
+          <AdminSettingsPage />,
+          'platform_admin',
+        ),
       },
 
       { path: '*', element: withSuspense(<NotFoundPage />) },
