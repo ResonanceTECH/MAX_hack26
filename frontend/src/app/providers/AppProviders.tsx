@@ -8,9 +8,9 @@ import { theme } from '@/app/theme/theme'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import { useMaxStore } from '@/features/auth/model/maxStore'
 import { useNotificationsStore } from '@/features/notifications/model/notificationsStore'
-import { MockMaxBridgeAdapter, setMaxBridgeAdapter } from '@/shared/lib/max'
+import { detectAndInstallMaxBridge } from '@/shared/lib/max'
 
-setMaxBridgeAdapter(new MockMaxBridgeAdapter())
+detectAndInstallMaxBridge()
 
 function SessionBootstrap({ children }: { children: ReactNode }) {
   const initSession = useSessionStore((s) => s.initSession)
