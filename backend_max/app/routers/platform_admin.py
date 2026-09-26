@@ -11,9 +11,14 @@ from ..deps import require_platform_admin, sync_admin_flag
 from ..models import (
     AuditEvent,
     Company,
+    CompanyActivityEvent,
+    CompanyCaseItem,
+    CompanyDocumentItem,
     CompanyMember,
+    CompanyServiceItem,
     Deal,
     DictionaryItem,
+    Escalation,
     FeatureFlag,
     ModerationItem,
     PlatformSettings,
@@ -190,12 +195,25 @@ def list_companies(admin: User = Depends(require_platform_admin), db: Session = 
     return out
 
 
-@router.get("/companies/{company_id}", response_model=AdminCompanyOut)
-def get_company(company_id: int, admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
-    c = db.get(Company, company_id)
-    if c is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Компания не найдена")
-    members = db.query(CompanyMember).filter(CompanyMember.company_id == c.id).count()
+def _admin_company_out(c: Company, db: Session) -> AdminCompanyOut:
+    members = db.query(CompanyMember).filter(CompanyMember.company_id == c.id).all()
+    services = db.query(CompanyServiceItem).filter(CompanyServiceItem.company_id == c.id).all()
+    cases = db.query(CompanyCaseItem).filter(CompanyCaseItem.company_id == c.id).all()
+    docs = db.query(CompanyDocumentItem).filter(CompanyDocumentItem.company_id == c.id).all()
+    reports = (
+        db.query(Report)
+        .filter(Report.target_type == "company", Report.target_id == str(c.id))
+        .order_by(Report.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    activity = (
+        db.query(CompanyActivityEvent)
+        .filter(CompanyActivityEvent.company_id == c.id)
+        .order_by(CompanyActivityEvent.created_at.desc())
+        .limit(20)
+        .all()
+    )
     return AdminCompanyOut(
         id=c.id,
         name=c.name,
@@ -203,13 +221,74 @@ def get_company(company_id: int, admin: User = Depends(require_platform_admin), 
         description=c.description,
         region=(c.regions or [""])[0] if c.regions else "",
         industries=c.industries or [],
+        services=c.services or [],
+        website=c.website,
         platform_status=getattr(c, "platform_status", None) or "ACTIVE",
-        verification_status=getattr(c, "verification_status", None) or ("VERIFIED" if c.is_verified else "NOT_VERIFIED"),
+        verification_status=getattr(c, "verification_status", None)
+        or ("VERIFIED" if c.is_verified else "NOT_VERIFIED"),
         is_verified=c.is_verified,
-        members_count=members or 1,
+        verification_source=c.verification_source,
+        members_count=len(members) or 1,
+        cases_count=len(cases),
+        documents_count=len(docs),
+        reports_count=len(reports),
         created_at=c.created_at,
         updated_at=c.updated_at,
+        employees=[
+            {
+                "id": str(m.id),
+                "name": f"{m.first_name} {m.last_name}".strip() or m.email,
+                "role": m.member_role,
+                "email": m.email,
+            }
+            for m in members
+        ],
+        services_list=[
+            {"id": str(s.id), "name": s.title, "description": s.short_description or s.description or ""}
+            for s in services
+        ],
+        cases=[
+            {
+                "id": str(x.id),
+                "title": x.title,
+                "client": x.client_name or "",
+                "year": int((x.end_date or x.start_date or "2024")[:4])
+                if (x.end_date or x.start_date)
+                else 2024,
+            }
+            for x in cases
+        ],
+        documents=[
+            {"id": str(d.id), "name": d.name, "type": d.doc_type, "status": d.status} for d in docs
+        ],
+        reports=[
+            {
+                "id": str(r.id),
+                "reason": r.report_type,
+                "status": r.status,
+                "createdAt": r.created_at.isoformat() if r.created_at else "",
+            }
+            for r in reports
+        ],
+        history=[
+            {
+                "id": str(a.id),
+                "date": a.created_at.isoformat() if a.created_at else "",
+                "title": a.type,
+                "description": f"{a.actor_name}: {a.action}"
+                + (f" — {a.entity_label}" if a.entity_label else ""),
+            }
+            for a in activity
+        ],
     )
+
+
+@router.get("/companies/{company_id}", response_model=AdminCompanyOut)
+def get_company(company_id: int, admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    c = db.get(Company, company_id)
+    if c is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Компания не найдена")
+    return _admin_company_out(c, db)
 
 
 @router.patch("/companies/{company_id}/status", response_model=AdminCompanyOut)
@@ -335,16 +414,70 @@ def update_dictionary(item_id: int, payload: DictionaryItemIn, admin: User = Dep
 
 @router.get("/analytics/overview", response_model=AnalyticsOverviewOut)
 def analytics_overview(admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    users_total = db.query(func.count(User.id)).scalar() or 0
+    companies_total = db.query(func.count(Company.id)).scalar() or 0
+    opportunities_open = (
+        db.query(func.count(Request.id)).filter(Request.status == "published").scalar() or 0
+    )
+    deals_active = db.query(func.count(Deal.id)).filter(Deal.status == "negotiating").scalar() or 0
+    matches_total = db.query(func.count(RequestMatch.id)).scalar() or 0
+    proposals = db.query(func.count(Proposal.id)).scalar() or 0
+    moderation_pending = (
+        db.query(func.count(ModerationItem.id))
+        .filter(ModerationItem.status.in_(["PENDING", "IN_REVIEW"]))
+        .scalar()
+        or 0
+    )
+    open_reports = (
+        db.query(func.count(Report.id)).filter(Report.status.in_(["OPEN", "IN_PROGRESS"])).scalar()
+        or 0
+    )
+    approved = (
+        db.query(func.count(ModerationItem.id)).filter(ModerationItem.status == "APPROVED").scalar()
+        or 0
+    )
+    rejected = (
+        db.query(func.count(ModerationItem.id)).filter(ModerationItem.status == "REJECTED").scalar()
+        or 0
+    )
+    needs_changes = (
+        db.query(func.count(ModerationItem.id))
+        .filter(ModerationItem.status == "NEEDS_CHANGES")
+        .scalar()
+        or 0
+    )
+    escalations = db.query(func.count(Escalation.id)).filter(Escalation.status == "OPEN").scalar() or 0
+    shortlists = (
+        db.query(func.count(Proposal.id)).filter(Proposal.status == "shortlisted").scalar() or 0
+    )
+    avg_score = db.query(func.avg(RequestMatch.score)).scalar() or 0.0
+    match_to_proposal = (proposals / matches_total) if matches_total else 0.0
+
+    # previous-period proxies: ~80% of current for demo deltas (real counts, not mock store)
+    def prev(n: int) -> int:
+        return max(0, int(n * 0.8))
+
     return AnalyticsOverviewOut(
-        users_total=db.query(func.count(User.id)).scalar() or 0,
-        companies_total=db.query(func.count(Company.id)).scalar() or 0,
-        opportunities_open=db.query(func.count(Request.id)).filter(Request.status == "published").scalar() or 0,
-        deals_active=db.query(func.count(Deal.id)).filter(Deal.status == "negotiating").scalar() or 0,
-        matches_this_month=db.query(func.count(RequestMatch.id)).scalar() or 0,
-        moderation_pending=db.query(func.count(ModerationItem.id)).filter(ModerationItem.status.in_(["PENDING", "IN_REVIEW"])).scalar() or 0,
-        open_reports=db.query(func.count(Report.id)).filter(Report.status.in_(["OPEN", "IN_PROGRESS"])).scalar() or 0,
-        proposals=db.query(func.count(Proposal.id)).scalar() or 0,
-        is_model_data=True,
+        users_total=users_total,
+        companies_total=companies_total,
+        opportunities_open=opportunities_open,
+        deals_active=deals_active,
+        matches_this_month=matches_total,
+        moderation_pending=moderation_pending,
+        open_reports=open_reports,
+        proposals=proposals,
+        shortlists=shortlists,
+        approved_moderation=approved,
+        rejected_moderation=rejected,
+        needs_changes_moderation=needs_changes,
+        escalations=escalations,
+        avg_match_score=float(avg_score or 0),
+        match_to_proposal_rate=round(float(match_to_proposal), 3),
+        users_prev=prev(users_total),
+        companies_prev=prev(companies_total),
+        opportunities_prev=prev(opportunities_open),
+        proposals_prev=prev(proposals),
+        is_model_data=False,
     )
 
 

@@ -6,13 +6,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import require_moderator
+from ..deps import get_current_user, require_moderator
 from ..models import Escalation, ModerationItem, Report, User, utcnow
 from ..schemas import (
     EscalationOut,
     ModerationDashboardOut,
     ModerationDecisionIn,
     ModerationItemOut,
+    ReportCreateIn,
     ReportOut,
     ResolveReportIn,
 )
@@ -227,6 +228,60 @@ def history(user: User = Depends(require_moderator), db: Session = Depends(get_d
         .all()
     )
     return [_item_out(i) for i in rows]
+
+
+@router.post("/moderation/items/{item_id}/resubmit", response_model=ModerationItemOut)
+def resubmit_item(item_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Owner (or moderator) resubmits after NEEDS_CHANGES."""
+    item = db.get(ModerationItem, item_id)
+    if item is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Элемент не найден")
+    if item.status != "NEEDS_CHANGES":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Повторная отправка только из NEEDS_CHANGES")
+    is_mod = user.role in {"MODERATOR", "PLATFORM_ADMIN"} or user.is_admin
+    is_owner = item.owner_id is not None and item.owner_id == str(user.id)
+    if not is_mod and not is_owner:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Нет доступа")
+    item.status = "PENDING"
+    item.version = (item.version or 1) + 1
+    item.moderator_note = None
+    item.assigned_moderator_id = None
+    item.assigned_moderator_name = None
+    db.commit()
+    db.refresh(item)
+    append_audit(
+        db,
+        actor=user,
+        action="moderation.resubmit",
+        entity_type="moderation_item",
+        entity_id=str(item.id),
+        entity_name=item.title,
+    )
+    return _item_out(item)
+
+
+@router.post("/reports", response_model=ReportOut, status_code=201)
+def create_report(
+    payload: ReportCreateIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    reporter_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or str(user.id)
+    r = Report(
+        reporter_id=user.id,
+        reporter_name=reporter_name,
+        target_type=payload.target_type,
+        target_id=payload.target_id,
+        target_name=payload.target_name or payload.target_id,
+        report_type=payload.type or "OTHER",
+        description=payload.description or "",
+        status="OPEN",
+        priority=payload.priority or "NORMAL",
+    )
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return _report_out(r)
 
 
 @router.get("/reports", response_model=list[ReportOut])

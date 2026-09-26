@@ -186,6 +186,96 @@ def publish_request(db: Session, request: Request) -> None:
     request.published_at = datetime.now(timezone.utc)
     request.expires_at = request.published_at + timedelta(days=request.proposals_deadline_days)
     db.commit()
+    enqueue_moderation_for_request(db, request)
+
+
+def enqueue_moderation_for_request(db: Session, request: Request) -> None:
+    """Create a moderation queue item for a published opportunity (idempotent per entity)."""
+    from .models import ModerationItem
+
+    entity_id = str(request.id)
+    existing = (
+        db.query(ModerationItem)
+        .filter(
+            ModerationItem.entity_type == "opportunity",
+            ModerationItem.entity_id == entity_id,
+            ModerationItem.status.in_(["PENDING", "IN_REVIEW", "NEEDS_CHANGES", "ESCALATED"]),
+        )
+        .first()
+    )
+    if existing is not None:
+        return
+
+    company = get_company_or_404(db, request.company_id)
+    owner = db.get(User, company.user_id)
+    owner_name = ""
+    if owner is not None:
+        owner_name = f"{owner.first_name or ''} {owner.last_name or ''}".strip() or str(owner.id)
+
+    db.add(
+        ModerationItem(
+            entity_type="opportunity",
+            entity_id=entity_id,
+            title=request.title,
+            owner_id=str(owner.id) if owner else None,
+            owner_name=owner_name or None,
+            company_name=company.name,
+            status="PENDING",
+            priority="NORMAL",
+            reason="NEW_OPPORTUNITY",
+            summary=(request.description_raw or "")[:500] or None,
+            payload={
+                "category": request.category,
+                "subcategory": request.subcategory,
+                "budget_min": request.budget_min,
+                "budget_max": request.budget_max,
+                "regions": request.regions or [],
+            },
+            checklist=[
+                "Корректность категории",
+                "Бюджет и сроки адекватны",
+                "Нет запрещённого контента",
+            ],
+            data_origin="USER",
+        )
+    )
+    db.commit()
+
+
+def enqueue_moderation_item(
+    db: Session,
+    *,
+    entity_type: str,
+    entity_id: str,
+    title: str,
+    company_name: str | None = None,
+    owner_id: str | None = None,
+    owner_name: str | None = None,
+    reason: str = "NEW_CONTENT",
+    summary: str | None = None,
+    payload: dict | None = None,
+    priority: str = "NORMAL",
+    status: str = "PENDING",
+) -> None:
+    from .models import ModerationItem
+
+    db.add(
+        ModerationItem(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            title=title,
+            owner_id=owner_id,
+            owner_name=owner_name,
+            company_name=company_name,
+            status=status,
+            priority=priority,
+            reason=reason,
+            summary=summary,
+            payload=payload or {},
+            data_origin="USER",
+        )
+    )
+    db.commit()
 
 
 def get_company_for_user(db: Session, user: User) -> Company | None:

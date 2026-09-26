@@ -19,6 +19,7 @@ from .roles import (
 )
 from .services import ensure_owner_member, publish_request
 from .structurizer import structure_request
+from .seed_extras import seed_wave_a_extras
 
 settings = get_settings()
 
@@ -259,6 +260,7 @@ def seed_demo(db: Session) -> None:
         recompute_matches_for_seed(db, request)
         existing_titles.add(structured["title"])
     db.commit()
+    seed_wave_a_extras(db)
 
 
 def recompute_matches_for_seed(db: Session, request: Request) -> None:

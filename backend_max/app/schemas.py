@@ -675,6 +675,15 @@ class ReportOut(BaseModel):
     related_report_ids: list[str] = Field(default_factory=list)
 
 
+class ReportCreateIn(BaseModel):
+    target_type: str
+    target_id: str
+    target_name: str = ""
+    type: str = "OTHER"
+    description: str = ""
+    priority: str = "NORMAL"
+
+
 class ResolveReportIn(BaseModel):
     resolution_code: str
     comment: str | None = None
@@ -782,12 +791,24 @@ class AdminCompanyOut(BaseModel):
     description: str | None = None
     region: str = ""
     industries: list[str] = Field(default_factory=list)
+    services: list[str] = Field(default_factory=list)
+    website: str | None = None
     platform_status: str = "ACTIVE"
     verification_status: str = "NOT_VERIFIED"
     is_verified: bool = False
+    verification_source: str | None = None
     members_count: int = 0
+    cases_count: int = 0
+    documents_count: int = 0
+    reports_count: int = 0
     created_at: datetime
     updated_at: datetime
+    employees: list[dict] = Field(default_factory=list)
+    services_list: list[dict] = Field(default_factory=list)
+    cases: list[dict] = Field(default_factory=list)
+    documents: list[dict] = Field(default_factory=list)
+    reports: list[dict] = Field(default_factory=list)
+    history: list[dict] = Field(default_factory=list)
 
 
 class AdminCompanyStatusIn(BaseModel):
@@ -804,4 +825,15 @@ class AnalyticsOverviewOut(BaseModel):
     moderation_pending: int = 0
     open_reports: int = 0
     proposals: int = 0
-    is_model_data: bool = True
+    shortlists: int = 0
+    approved_moderation: int = 0
+    rejected_moderation: int = 0
+    needs_changes_moderation: int = 0
+    escalations: int = 0
+    avg_match_score: float = 0.0
+    match_to_proposal_rate: float = 0.0
+    users_prev: int = 0
+    companies_prev: int = 0
+    opportunities_prev: int = 0
+    proposals_prev: int = 0
+    is_model_data: bool = False
