@@ -4,10 +4,16 @@ import os
 import tempfile
 from urllib.parse import urlparse, urlunparse
 
-os.environ["DATABASE_URL"] = os.environ.get(
-    "TEST_DATABASE_URL",
-    "postgresql+psycopg2://b2b:b2b_pass@localhost:5432/b2b_match_test",
-)
+# Prefer explicit TEST_DATABASE_URL; fall back to Postgres; if unreachable → SQLite.
+_DEFAULT_PG = "postgresql+psycopg2://b2b:b2b_pass@localhost:5432/b2b_match_test"
+_sqlite_path = tempfile.mktemp(prefix="b2b_test_", suffix=".db")
+_DEFAULT_SQLITE = f"sqlite:///{_sqlite_path}"
+
+if "DATABASE_URL" not in os.environ and "TEST_DATABASE_URL" not in os.environ:
+    os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", _DEFAULT_PG)
+elif "TEST_DATABASE_URL" in os.environ:
+    os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
+
 os.environ["FILES_DIR"] = tempfile.mkdtemp(prefix="b2b_files_")
 os.environ["DEV_MODE"] = "1"
 os.environ["JWT_SECRET"] = "test-secret-key-for-hackathon-demo-0123456789"
@@ -20,40 +26,70 @@ from sqlalchemy.exc import OperationalError  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from backend_max.app.db import Base, engine, init_db  # noqa: E402
-from backend_max.app.main import app  # noqa: E402
 
-
-def ensure_test_database(url: str) -> None:
-    """Создаёт тестовую БД, если её нет (нужен запущенный PostgreSQL)."""
+def _can_connect(url: str) -> bool:
     probe = create_engine(url)
     try:
         with probe.connect():
-            return
+            return True
     except OperationalError:
-        pass
+        return False
     finally:
         probe.dispose()
 
-    parts = urlparse(url.replace("postgresql+psycopg2://", "postgresql://"))
-    dbname = parts.path.lstrip("/")
-    base = urlunparse(parts._replace(path="/postgres"))
-    admin = create_engine(base, isolation_level="AUTOCOMMIT")
-    with admin.connect() as conn:
-        conn.execute(text(f'CREATE DATABASE "{dbname}"'))
-    admin.dispose()
+
+def ensure_test_database(url: str) -> str:
+    """Ensure Postgres test DB exists, or fall back to SQLite for offline runs."""
+    if url.startswith("sqlite"):
+        return url
+    if _can_connect(url):
+        return url
+
+    # Try create DB on server
+    try:
+        parts = urlparse(url.replace("postgresql+psycopg2://", "postgresql://"))
+        dbname = parts.path.lstrip("/")
+        base = urlunparse(parts._replace(path="/postgres"))
+        admin = create_engine(base, isolation_level="AUTOCOMMIT")
+        with admin.connect() as conn:
+            exists = conn.execute(text("SELECT 1 FROM pg_database WHERE datname=:n"), {"n": dbname}).scalar()
+            if not exists:
+                conn.execute(text(f'CREATE DATABASE "{dbname}"'))
+        admin.dispose()
+        if _can_connect(url):
+            return url
+    except Exception:
+        pass
+
+    print(f"[conftest] Postgres unavailable ({url}); using SQLite {_DEFAULT_SQLITE}")
+    os.environ["DATABASE_URL"] = _DEFAULT_SQLITE
+    return _DEFAULT_SQLITE
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _database():
-    ensure_test_database(os.environ["DATABASE_URL"])
-    Base.metadata.drop_all(bind=engine)
+    url = ensure_test_database(os.environ["DATABASE_URL"])
+    os.environ["DATABASE_URL"] = url
+
+    # Re-bind engine after possible DATABASE_URL swap
+    import backend_max.app.db as db_mod
+    from backend_max.app.db import Base, init_db
+    from backend_max.app.config import get_settings
+
+    get_settings.cache_clear()  # type: ignore[attr-defined]
+    db_mod.engine = db_mod._engine()
+    db_mod.SessionLocal.configure(bind=db_mod.engine)
+
+    Base.metadata.drop_all(bind=db_mod.engine)
     init_db()
     yield
+    Base.metadata.drop_all(bind=db_mod.engine)
 
 
 @pytest.fixture(scope="session")
 def client(_database):
+    from backend_max.app.main import app
+
     with TestClient(app) as c:
         yield c
 

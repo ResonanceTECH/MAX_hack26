@@ -22,7 +22,7 @@ def test_full_mvp_scenario(client, login, company_payload_factory):
     client.put(
         "/companies/me",
         json=company_payload_factory(
-            "DigitalLab",
+            "ТестЛаб",
             ["IT-разработка"],
             services=["web-разработка", "интеграции"],
             competencies=["react", "python", "1с", "crm"],
@@ -38,7 +38,7 @@ def test_full_mvp_scenario(client, login, company_payload_factory):
     client.put(
         "/companies/me",
         json=company_payload_factory(
-            "WebForge",
+            "ТестФордж",
             ["IT-разработка"],
             services=["web-разработка"],
             competencies=["react", "figma"],
@@ -73,7 +73,7 @@ def test_full_mvp_scenario(client, login, company_payload_factory):
     assert detail["matches"], "матчи должны быть вычислены при публикации"
     top = detail["matches"][0]
     assert top["score"] >= 60
-    assert top["company_name"] == "DigitalLab"
+    assert top["company_name"] == "ТестЛаб"
     assert any(c["key"] == "category" and c["passed"] for c in top["criteria"])
 
     # 4. Персональная лента исполнителя: релевантный заказ виден с объяснением
@@ -113,7 +113,7 @@ def test_full_mvp_scenario(client, login, company_payload_factory):
     compare = client.get(f"/opportunities/{opportunity_id}/comparison", headers=customer).json()
     assert compare["rows"]
     assert compare["rows"][0]["price"] == 480_000
-    assert compare["rows"][0]["company_name"] == "DigitalLab"
+    assert compare["rows"][0]["company_name"] == "ТестЛаб"
 
     # 7. Shortlist (по потребности с company_id) и выбор исполнителя
     shortlisted = client.post(
@@ -171,22 +171,23 @@ def test_full_mvp_scenario(client, login, company_payload_factory):
     assert dl.status_code == 200 and dl.content == b"%PDF-contract"
     assert client.get(f"/files/{file_id}", headers=exec2).status_code == 403
 
-    # 12. Verified Business: дата регистрации, статус, источник
+    # 12. Verified Business: дата регистрации — только при создании (BU не редактирует профиль)
     my_company = client.get("/companies/me", headers=customer).json()
-    verified_patch = client.patch(
+    assert my_company["id"]
+    denied = client.patch(
         f"/companies/{my_company['id']}",
         json={"registration_date": "2012-04-17", "company_status": "Действующая", "verification_source": "ЕГРЮЛ (тестовые данные)"},
         headers=customer,
     )
-    assert verified_patch.status_code == 200
-    assert verified_patch.json()["registration_date"] == "2012-04-17"
-    assert verified_patch.json()["company_status"] == "Действующая"
+    assert denied.status_code == 403
 
     # 13. Шеринг из MAX (#9): диплинк :share и карточка через бота
+    from urllib.parse import unquote
+
     share_link = client.get(f"/share/company/{compare['rows'][0]['company_id']}/link")
     assert share_link.status_code == 200
     assert "max.ru/:share" in share_link.json()["url"]
-    assert "DigitalLab" in share_link.json()["url"]
+    assert "ТестЛаб" in unquote(share_link.json()["url"])
 
     opp_link = client.get(f"/share/opportunity/{opportunity_id}/link")
     assert opp_link.status_code == 200 and "max.ru/:share" in opp_link.json()["url"]
@@ -196,14 +197,14 @@ def test_full_mvp_scenario(client, login, company_payload_factory):
     body = share_card.json()
     assert body["sent"] is False  # BOT_TOKEN не задан в тестах
     assert "BOT_TOKEN" in (body["error"] or "")
-    assert "DigitalLab" in body["text"]
+    assert "ТестЛаб" in body["text"]
 
     share_opp = client.post(f"/share/opportunity/{opportunity_id}", headers=customer)
     assert share_opp.status_code == 200 and share_opp.json()["sent"] is False
 
     # 11. Feedback по матчу (исполнитель оценивает релевантность рекомендации)
     matches = client.get(f"/opportunities/{opportunity_id}/matches", headers=customer).json()
-    digital_match = next(m for m in matches if m["company_name"] == "DigitalLab")
+    digital_match = next(m for m in matches if m["company_name"] == "ТестЛаб")
     feedback = client.post(
         f"/matches/{digital_match['id']}/feedback",
         json={"positive": True},
@@ -263,9 +264,9 @@ def test_company_patch_and_catalog(client, login, company_payload_factory):
     created = client.put("/companies/me", json=company_payload_factory("КаталогКом", ["Логистика"]), headers=user)
     company_id = created.json()["id"]
 
+    # BUSINESS_USER owner: marketplace only — edit profile denied (intentional)
     patched = client.patch(f"/companies/{company_id}", json={"description": "Обновлено", "budget_max": 900_000}, headers=user)
-    assert patched.status_code == 200
-    assert patched.json()["description"] == "Обновлено"
+    assert patched.status_code == 403
 
     stranger = login(9502, "Чужой")
     assert client.patch(f"/companies/{company_id}", json={"name": "Хак"}, headers=stranger).status_code == 403
