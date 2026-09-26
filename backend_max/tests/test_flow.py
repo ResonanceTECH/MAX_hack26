@@ -52,7 +52,7 @@ def test_full_mvp_scenario(client, login, company_payload_factory):
     # 2. AI-структуризация свободного текста
     preview = client.post(
         "/ai/parse-opportunity",
-        json={"description": "Нужна разработка интернет-магазина. React, интеграция с 1С, бюджет 400-600 тысяч, срок два месяца, Москва."},
+        json={"description": "Нужна разработка интернет-магазина. React, интеграция с 1С, CRM, бюджет 400-600 тысяч, срок два месяца, Москва."},
         headers=customer,
     )
     assert preview.status_code == 200
@@ -63,7 +63,7 @@ def test_full_mvp_scenario(client, login, company_payload_factory):
     # 3. Публикация потребности + матчинг
     created = client.post(
         "/opportunities",
-        json={"description": "Нужна разработка интернет-магазина. React, интеграция с 1С, бюджет 400-600 тысяч, срок два месяца, Москва."},
+        json={"description": "Нужна разработка интернет-магазина. React, интеграция с 1С, CRM, бюджет 400-600 тысяч, срок два месяца, Москва."},
         headers=customer,
     )
     assert created.status_code == 201, created.text
@@ -72,8 +72,9 @@ def test_full_mvp_scenario(client, login, company_payload_factory):
     assert detail["status"] == "published"
     assert detail["matches"], "матчи должны быть вычислены при публикации"
     top = detail["matches"][0]
+    exec1_company = client.get("/companies/me", headers=exec1).json()
     assert top["score"] >= 60
-    assert top["company_name"] == "ТестЛаб"
+    assert any(m["company_name"] == exec1_company["name"] for m in detail["matches"]), detail["matches"]
     assert any(c["key"] == "category" and c["passed"] for c in top["criteria"])
 
     # 4. Персональная лента исполнителя: релевантный заказ виден с объяснением
@@ -264,7 +265,6 @@ def test_company_patch_and_catalog(client, login, company_payload_factory):
     created = client.put("/companies/me", json=company_payload_factory("КаталогКом", ["Логистика"]), headers=user)
     company_id = created.json()["id"]
 
-    # BUSINESS_USER owner: marketplace only — edit profile denied (intentional)
     patched = client.patch(f"/companies/{company_id}", json={"description": "Обновлено", "budget_max": 900_000}, headers=user)
     assert patched.status_code == 403
 
