@@ -13,7 +13,7 @@ import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import { Permission } from '@/features/permissions/model/permissions'
-import { usePermissions } from '@/features/permissions/hooks/usePermission'
+import { useCompanyPermissions } from '@/features/permissions/hooks/useCompanyPermission'
 import { ROUTES } from '@/shared/constants/routes'
 import { AppIcon } from '@/shared/ui'
 import {
@@ -65,21 +65,21 @@ export const COMPANY_ADMIN_NAV: CompanyNavItem[] = [
     to: ROUTES.PROFILE_COMPANY_SERVICES,
     label: 'Услуги',
     icon: Briefcase02Icon,
-    permission: Permission.MANAGE_COMPANY_SERVICES,
+    permission: [Permission.VIEW_COMPANY_SERVICES, Permission.MANAGE_COMPANY_SERVICES],
     match: 'prefix',
   },
   {
     to: ROUTES.PROFILE_COMPANY_CASES,
     label: 'Кейсы',
     icon: Layers01Icon,
-    permission: Permission.MANAGE_COMPANY_CASES,
+    permission: [Permission.VIEW_COMPANY_CASES, Permission.MANAGE_COMPANY_CASES],
     match: 'prefix',
   },
   {
     to: ROUTES.PROFILE_COMPANY_DOCUMENTS,
     label: 'Документы',
     icon: File02Icon,
-    permission: Permission.MANAGE_COMPANY_DOCUMENTS,
+    permission: [Permission.VIEW_COMPANY_DOCUMENTS, Permission.MANAGE_COMPANY_DOCUMENTS],
     match: 'prefix',
   },
   {
@@ -123,7 +123,7 @@ function isActive(pathname: string, item: CompanyNavItem): boolean {
 }
 
 function useVisibleNav(): CompanyNavItem[] {
-  const { has, hasAny } = usePermissions()
+  const { has, hasAny } = useCompanyPermissions()
   return COMPANY_ADMIN_NAV.filter((item) => {
     if (!item.permission) return true
     const list = Array.isArray(item.permission) ? item.permission : [item.permission]
@@ -288,11 +288,25 @@ export function CompanyManagementLayout({ children }: { children?: ReactNode }) 
   const theme = useTheme()
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'))
   const location = useLocation()
-  const { has } = usePermissions()
-  const canManage = has(Permission.EDIT_COMPANY)
+  const { hasAny } = useCompanyPermissions()
+  const showWorkspaceNav = hasAny([
+    Permission.EDIT_COMPANY,
+    Permission.MANAGE_COMPANY_MEMBERS,
+    Permission.MANAGE_COMPANY_SERVICES,
+    Permission.VIEW_COMPANY_SERVICES,
+    Permission.MANAGE_COMPANY_CASES,
+    Permission.VIEW_COMPANY_CASES,
+    Permission.MANAGE_COMPANY_DOCUMENTS,
+    Permission.VIEW_COMPANY_DOCUMENTS,
+    Permission.VIEW_COMPANY_PERMISSIONS,
+    Permission.MANAGE_COMPANY_PERMISSIONS,
+    Permission.MANAGE_COMPANY_SETTINGS,
+    Permission.VIEW_COMPANY_VERIFICATION,
+    Permission.VIEW_COMPANY_ACTIVITY,
+  ])
   const items = useVisibleNav()
 
-  if (!canManage) {
+  if (!showWorkspaceNav) {
     return <>{children ?? null}</>
   }
 

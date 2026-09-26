@@ -12,10 +12,14 @@ import Paper from '@mui/material/Paper'
 import SwipeableDrawer from '@mui/material/SwipeableDrawer'
 import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
+import { useAdminUnreadCount } from '@/features/admin/api/queries'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import { useModerationDashboard } from '@/features/moderation/api/queries'
 import { SYSTEM_ROLES } from '@/entities/user'
+import { Permission } from '@/features/permissions/model/permissions'
+import { useCompanyPermission } from '@/features/permissions/hooks/useCompanyPermission'
 import { getNavConfig } from '@/shared/config/navigation'
+import { ROUTES } from '@/shared/constants/routes'
 import { AppIcon } from '@/shared/ui'
 
 function resolveValue(pathname: string, items: { to: string; matchPrefix?: string; isMore?: boolean }[]): string {
@@ -32,16 +36,21 @@ export function AppBottomNavigation() {
   const location = useLocation()
   const navigate = useNavigate()
   const role = useSessionStore((s) => s.role)
+  const canCreateOpportunity = useCompanyPermission(Permission.CREATE_OPPORTUNITY)
   const config = getNavConfig(role)
   const dashboard = useModerationDashboard()
+  const { unread: adminUnread } = useAdminUnreadCount()
   const isModerator = role === SYSTEM_ROLES.MODERATOR
   const [moreOpen, setMoreOpen] = useState(false)
 
-  const value = resolveValue(location.pathname, config.mobile)
+  const mobileItems = config.mobile.filter(
+    (item) => item.to !== ROUTES.OPPORTUNITY_CREATE || canCreateOpportunity,
+  )
+  const value = resolveValue(location.pathname, mobileItems)
   const badges = {
     pendingQueue: isModerator ? (dashboard.data?.pendingTotal ?? 0) : 0,
     openReports: isModerator ? (dashboard.data?.openReports ?? 0) : 0,
-    adminNotifications: 0,
+    adminNotifications: adminUnread,
   }
 
   const moreMatched = (config.mobileMore ?? []).some(
@@ -67,7 +76,7 @@ export function AppBottomNavigation() {
         }}
       >
         <BottomNavigation value={moreMatched ? '#more' : value} showLabels>
-          {config.mobile.map((item) => {
+          {mobileItems.map((item) => {
             const count = item.badgeKey ? badges[item.badgeKey] : 0
             const icon = (
               <AppIcon
@@ -77,12 +86,24 @@ export function AppBottomNavigation() {
               />
             )
             if (item.isMore) {
+              const moreBadge = (config.mobileMore ?? []).reduce((sum, moreItem) => {
+                if (!moreItem.badgeKey) return sum
+                return sum + (badges[moreItem.badgeKey] ?? 0)
+              }, 0)
               return (
                 <BottomNavigationAction
                   key="more"
                   label={item.label}
                   value="#more"
-                  icon={icon}
+                  icon={
+                    moreBadge > 0 ? (
+                      <Badge badgeContent={moreBadge} color="secondary" max={99}>
+                        {icon}
+                      </Badge>
+                    ) : (
+                      icon
+                    )
+                  }
                   onClick={() => setMoreOpen(true)}
                 />
               )
@@ -136,21 +157,30 @@ export function AppBottomNavigation() {
             </Box>
             <Divider />
             <List sx={{ px: 1, py: 1 }}>
-              {config.mobileMore.map((item) => (
-                <ListItemButton
-                  key={item.to}
-                  sx={{ borderRadius: 2, minHeight: 48, mb: 0.5 }}
-                  onClick={() => {
-                    setMoreOpen(false)
-                    void navigate(item.to)
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 40 }}>
-                    <AppIcon icon={item.icon} size={22} />
-                  </ListItemIcon>
-                  <ListItemText primary={item.label} />
-                </ListItemButton>
-              ))}
+              {config.mobileMore.map((item) => {
+                const count = item.badgeKey ? badges[item.badgeKey] : 0
+                return (
+                  <ListItemButton
+                    key={item.to}
+                    sx={{ borderRadius: 2, minHeight: 48, mb: 0.5 }}
+                    onClick={() => {
+                      setMoreOpen(false)
+                      void navigate(item.to)
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 40 }}>
+                      {count > 0 ? (
+                        <Badge badgeContent={count} color="secondary" max={99}>
+                          <AppIcon icon={item.icon} size={22} />
+                        </Badge>
+                      ) : (
+                        <AppIcon icon={item.icon} size={22} />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText primary={item.label} />
+                  </ListItemButton>
+                )
+              })}
             </List>
           </Box>
         </SwipeableDrawer>

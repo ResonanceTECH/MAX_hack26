@@ -6,6 +6,7 @@ import AppBar from '@mui/material/AppBar'
 import Toolbar from '@mui/material/Toolbar'
 import Typography from '@mui/material/Typography'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
+import { useAdminUnreadCount } from '@/features/admin/api/queries'
 import { useNotificationsStore } from '@/features/notifications/model/notificationsStore'
 import { SYSTEM_ROLES } from '@/entities/user'
 import { BaseUiMenu } from '@/features/company-management/ui/BaseUiMenu'
@@ -24,9 +25,11 @@ export function AppHeader({ showBack, title }: AppHeaderProps) {
   const company = useSessionStore((s) => s.company)
   const user = useSessionStore((s) => s.user)
   const role = useSessionStore((s) => s.role)
-  const unread = useNotificationsStore((s) => s.unreadCount())
+  const storeUnread = useNotificationsStore((s) => s.unreadCount())
+  const { unread: adminUnread } = useAdminUnreadCount()
   const isModerator = role === SYSTEM_ROLES.MODERATOR
   const isPlatformAdmin = role === SYSTEM_ROLES.PLATFORM_ADMIN
+  const unread = isPlatformAdmin ? adminUnread : storeUnread
   const home = isPlatformAdmin
     ? ROUTES.ADMIN
     : isModerator

@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import Badge from '@mui/material/Badge'
 import Box from '@mui/material/Box'
 import Divider from '@mui/material/Divider'
 import List from '@mui/material/List'
@@ -6,8 +7,11 @@ import ListItemButton from '@mui/material/ListItemButton'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
 import Typography from '@mui/material/Typography'
+import { useAdminUnreadCount } from '@/features/admin/api/queries'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import { SYSTEM_ROLES } from '@/entities/user'
+import { Permission } from '@/features/permissions/model/permissions'
+import { useCompanyPermission } from '@/features/permissions/hooks/useCompanyPermission'
 import { APP_NAME } from '@/shared/config/app'
 import { getNavConfig, type NavGroup, type NavItem } from '@/shared/config/navigation'
 import { ROUTES } from '@/shared/constants/routes'
@@ -71,9 +75,21 @@ function GroupedNav({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: (
 export function Sidebar() {
   const role = useSessionStore((s) => s.role)
   const user = useSessionStore((s) => s.user)
+  const canCreateOpportunity = useCompanyPermission(Permission.CREATE_OPPORTUNITY)
   const config = getNavConfig(role)
   const navigate = useNavigate()
   const isPlatformAdmin = role === SYSTEM_ROLES.PLATFORM_ADMIN
+
+  const desktopItems = config.desktop.filter(
+    (item) => item.to !== ROUTES.OPPORTUNITY_CREATE || canCreateOpportunity,
+  )
+  const desktopGroups = config.desktopGroups?.map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) => item.to !== ROUTES.OPPORTUNITY_CREATE || canCreateOpportunity,
+    ),
+  }))
+  const { unread: adminUnread } = useAdminUnreadCount()
 
   return (
     <Box
@@ -106,11 +122,11 @@ export function Sidebar() {
         </Typography>
       </Box>
       <Divider />
-      {config.desktopGroups ? (
-        <GroupedNav groups={config.desktopGroups} />
+      {desktopGroups ? (
+        <GroupedNav groups={desktopGroups} />
       ) : (
         <Box sx={{ flex: 1, overflow: 'auto' }}>
-          <NavList items={config.desktop} />
+          <NavList items={desktopItems} />
         </Box>
       )}
       {isPlatformAdmin ? (
@@ -123,7 +139,13 @@ export function Sidebar() {
               sx={{ borderRadius: 2, minHeight: 44 }}
             >
               <ListItemIcon sx={{ minWidth: 40 }}>
-                <AppIcon icon={Notification03Icon} size={22} />
+                {adminUnread > 0 ? (
+                  <Badge badgeContent={adminUnread} color="secondary" max={99}>
+                    <AppIcon icon={Notification03Icon} size={22} />
+                  </Badge>
+                ) : (
+                  <AppIcon icon={Notification03Icon} size={22} />
+                )}
               </ListItemIcon>
               <ListItemText primary="Уведомления" />
             </ListItemButton>
