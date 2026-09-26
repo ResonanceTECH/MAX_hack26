@@ -9,6 +9,8 @@ import {
   type AdminUser,
 } from '@/shared/mocks/adminUsers'
 import { AUDIT_ACTIONS, appendAudit } from '@/shared/mocks/audit'
+import { isReal } from '@/shared/api/apiCapabilities'
+import { adminUsersReal, createApiProxy } from '@/shared/api/real/moderationAdmin'
 
 export interface AdminUserFilters {
   query?: string
@@ -71,7 +73,7 @@ function displayName(u: AdminUser) {
   return `${u.firstName} ${u.lastName}`
 }
 
-export const adminUsersApi = {
+const mockAdminUsersApi = {
   async getAll(filters?: AdminUserFilters): Promise<AdminUser[]> {
     return this.list(filters)
   },
@@ -272,5 +274,7 @@ export const adminUsersApi = {
     return { ...user }
   },
 }
+
+export const adminUsersApi = createApiProxy(adminUsersReal, mockAdminUsersApi, () => isReal('admin'))
 
 export type { AdminUser }

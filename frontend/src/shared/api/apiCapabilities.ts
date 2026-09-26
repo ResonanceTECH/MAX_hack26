@@ -4,7 +4,7 @@ export type ApiSource = 'real' | 'mock'
 
 /**
  * Central per-domain API mode.
- * When VITE_USE_MOCK_API=false, core domains hit FastAPI; gaps stay mock.
+ * When VITE_USE_MOCK_API=false, implemented domains hit FastAPI.
  */
 export const apiCapabilities = {
   auth: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
@@ -15,19 +15,18 @@ export const apiCapabilities = {
   deals: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
   notifications: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
   shortlist: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
-  // Backend missing or incompatible — always mock
-  favorites: 'mock' as ApiSource,
-  team: 'mock' as ApiSource,
-  services: 'mock' as ApiSource,
-  cases: 'mock' as ApiSource,
-  documents: 'mock' as ApiSource,
-  settings: 'mock' as ApiSource,
-  verification: 'mock' as ApiSource,
-  moderation: 'mock' as ApiSource,
-  reports: 'mock' as ApiSource,
-  admin: 'mock' as ApiSource,
-  dictionaries: 'mock' as ApiSource,
-  analytics: 'mock' as ApiSource,
+  favorites: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
+  team: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
+  services: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
+  cases: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
+  documents: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
+  settings: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
+  verification: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
+  moderation: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
+  reports: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
+  admin: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
+  dictionaries: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
+  analytics: (USE_MOCK_API ? 'mock' : 'real') as ApiSource,
 } as const
 
 export function isReal(domain: keyof typeof apiCapabilities): boolean {

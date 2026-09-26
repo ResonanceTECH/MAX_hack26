@@ -10,6 +10,8 @@ import {
   type DictionaryType,
 } from '@/shared/mocks/dictionaries'
 import type { AdminActor } from './adminUsersApi'
+import { isReal } from '@/shared/api/apiCapabilities'
+import { createApiProxy, dictionariesReal } from '@/shared/api/real/moderationAdmin'
 
 function persist() {
   saveMockState('dictionaries', mockDictionaries)
@@ -60,7 +62,7 @@ export interface DictionaryUpdateInput {
   status?: 'active' | 'archived'
 }
 
-export const dictionariesApi = {
+const mockDictionariesApi = {
   async getAll(type?: DictionaryType): Promise<DictionaryItem[]> {
     return this.list(type)
   },
@@ -197,3 +199,7 @@ export const dictionariesApi = {
     return this.update(id, { status: 'active' }, actor)
   },
 }
+
+export const dictionariesApi = createApiProxy(dictionariesReal, mockDictionariesApi, () =>
+  isReal('dictionaries'),
+)

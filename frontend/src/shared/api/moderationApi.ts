@@ -44,6 +44,8 @@ import {
   persistModerationItems,
   persistOwnerNotifications,
 } from '@/shared/mocks/hydrateMocks'
+import { isReal } from '@/shared/api/apiCapabilities'
+import { createApiProxy, moderationReal } from '@/shared/api/real/moderationAdmin'
 
 const decisionInFlight = new Set<string>()
 
@@ -181,7 +183,7 @@ function todayPrefix() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export const moderationApi = {
+const mockModerationApi = {
   async getDashboard(): Promise<ModerationDashboard> {
     await readDelay()
     const open = mockModerationItems.filter((i) => isOpenQueueStatus(i.status))
@@ -530,3 +532,7 @@ export const moderationApi = {
       .map((h) => ({ ...h, decision: { ...h.decision } }))
   },
 }
+
+export const moderationApi = createApiProxy(moderationReal, mockModerationApi, () =>
+  isReal('moderation'),
+)

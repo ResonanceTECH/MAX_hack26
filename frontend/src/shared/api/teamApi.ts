@@ -10,6 +10,9 @@ import {
   canSuspendMember,
   LAST_ADMIN_MESSAGE,
 } from '@/features/company-management/model/businessRules'
+import { apiClient } from '@/shared/api/apiClient'
+import { isReal } from '@/shared/api/apiCapabilities'
+import { toApiError } from '@/shared/api/errors'
 import { delay } from '@/shared/lib/delay'
 import { CURRENT_COMPANY_ID, mockCompanyMembers } from '@/shared/mocks'
 import { persistCompanyMembers } from '@/shared/mocks/hydrateMocks'
@@ -23,6 +26,36 @@ export class TeamApiError extends Error {
 }
 
 const DEFAULT_ACTOR = 'Анна Смирнова'
+
+interface MemberDto {
+  id: number
+  user_id: number | null
+  company_id: number
+  first_name: string
+  last_name: string
+  email: string
+  role: string
+  status: string
+  invited_at: string
+  joined_at: string | null
+  last_active_at: string | null
+}
+
+function mapMember(dto: MemberDto): CompanyMember {
+  return {
+    id: String(dto.id),
+    userId: dto.user_id != null ? String(dto.user_id) : `pending-${dto.id}`,
+    companyId: String(dto.company_id),
+    firstName: dto.first_name,
+    lastName: dto.last_name,
+    email: dto.email,
+    role: dto.role as CompanyMemberRole,
+    status: dto.status as CompanyMember['status'],
+    invitedAt: dto.invited_at,
+    joinedAt: dto.joined_at ?? undefined,
+    lastActiveAt: dto.last_active_at ?? undefined,
+  }
+}
 
 function companyMembers(companyId: string): CompanyMember[] {
   return mockCompanyMembers.filter((m) => m.companyId === companyId)
@@ -45,11 +78,25 @@ export interface InviteMemberInput {
 
 export const teamApi = {
   async list(companyId = CURRENT_COMPANY_ID): Promise<CompanyMember[]> {
+    if (isReal('team')) {
+      try {
+        const { data } = await apiClient.get<MemberDto[]>('/companies/me/members')
+        return data.map(mapMember)
+      } catch (error) {
+        throw toApiError(error)
+      }
+    }
     await delay()
     return companyMembers(companyId)
   },
 
   async getById(memberId: string): Promise<CompanyMember> {
+    if (isReal('team')) {
+      const members = await teamApi.list()
+      const member = members.find((m) => m.id === memberId)
+      if (!member) throw new TeamApiError('Сотрудник не найден')
+      return member
+    }
     await delay()
     const member = mockCompanyMembers.find((m) => m.id === memberId)
     if (!member) throw new TeamApiError('Сотрудник не найден')
@@ -57,6 +104,20 @@ export const teamApi = {
   },
 
   async invite(input: InviteMemberInput, companyId = CURRENT_COMPANY_ID): Promise<CompanyMember> {
+    if (isReal('team')) {
+      try {
+        const { data } = await apiClient.post<MemberDto>('/companies/me/members', {
+          email: input.email,
+          first_name: input.firstName,
+          last_name: input.lastName,
+          role: input.role,
+          message: input.message ?? input.optionalMessage,
+        })
+        return mapMember(data)
+      } catch (error) {
+        throw new TeamApiError(toApiError(error).message)
+      }
+    }
     await delay()
     const email = input.email.trim().toLowerCase()
     const duplicate = mockCompanyMembers.find(
@@ -93,51 +154,63 @@ export const teamApi = {
   },
 
   async updateRole(memberId: string, role: CompanyMemberRole): Promise<CompanyMember> {
+    if (isReal('team')) {
+      try {
+        const { data } = await apiClient.patch<MemberDto>(`/companies/me/members/${memberId}`, {
+          role,
+        })
+        return mapMember(data)
+      } catch (error) {
+        throw new TeamApiError(toApiError(error).message)
+      }
+    }
     await delay()
     const member = mockCompanyMembers.find((m) => m.id === memberId)
     if (!member) throw new TeamApiError('Сотрудник не найден')
     assertAllowed(canChangeMemberRole(companyMembers(member.companyId), member, role))
     member.role = role
     persistCompanyMembers()
-    activityApi.appendSync({
-      companyId: member.companyId,
-      type: COMPANY_ACTIVITY_TYPE.MEMBER_ROLE_CHANGED,
-      actorName: DEFAULT_ACTOR,
-      action: 'изменила роль сотрудника',
-      entityLabel: `${member.firstName} ${member.lastName}`,
-    })
     return { ...member }
   },
 
   async suspend(memberId: string): Promise<CompanyMember> {
+    if (isReal('team')) {
+      try {
+        const { data } = await apiClient.patch<MemberDto>(`/companies/me/members/${memberId}`, {
+          status: 'suspended',
+        })
+        return mapMember(data)
+      } catch (error) {
+        throw new TeamApiError(toApiError(error).message)
+      }
+    }
     await delay()
     const member = mockCompanyMembers.find((m) => m.id === memberId)
     if (!member) throw new TeamApiError('Сотрудник не найден')
     assertAllowed(canSuspendMember(companyMembers(member.companyId), member))
     member.status = COMPANY_MEMBER_STATUS.SUSPENDED
     persistCompanyMembers()
-    activityApi.appendSync({
-      companyId: member.companyId,
-      type: COMPANY_ACTIVITY_TYPE.MEMBER_SUSPENDED,
-      actorName: DEFAULT_ACTOR,
-      action: 'приостановила доступ сотрудника',
-      entityLabel: `${member.firstName} ${member.lastName}`,
-    })
     return { ...member }
   },
 
-  /** @deprecated use suspend */
   async block(memberId: string): Promise<CompanyMember> {
     return teamApi.suspend(memberId)
   },
 
   async activate(memberId: string): Promise<CompanyMember> {
+    if (isReal('team')) {
+      try {
+        const { data } = await apiClient.patch<MemberDto>(`/companies/me/members/${memberId}`, {
+          status: 'active',
+        })
+        return mapMember(data)
+      } catch (error) {
+        throw new TeamApiError(toApiError(error).message)
+      }
+    }
     await delay()
     const member = mockCompanyMembers.find((m) => m.id === memberId)
     if (!member) throw new TeamApiError('Сотрудник не найден')
-    if (member.status === COMPANY_MEMBER_STATUS.INVITED) {
-      return { ...member }
-    }
     member.status = COMPANY_MEMBER_STATUS.ACTIVE
     member.joinedAt = member.joinedAt ?? new Date().toISOString()
     persistCompanyMembers()
@@ -145,18 +218,19 @@ export const teamApi = {
   },
 
   async remove(memberId: string): Promise<void> {
+    if (isReal('team')) {
+      try {
+        await apiClient.delete(`/companies/me/members/${memberId}`)
+        return
+      } catch (error) {
+        throw new TeamApiError(toApiError(error).message)
+      }
+    }
     await delay()
     const member = mockCompanyMembers.find((m) => m.id === memberId)
     if (!member) throw new TeamApiError('Сотрудник не найден')
     assertAllowed(canRemoveMember(companyMembers(member.companyId), member))
     member.status = COMPANY_MEMBER_STATUS.DEACTIVATED
     persistCompanyMembers()
-    activityApi.appendSync({
-      companyId: member.companyId,
-      type: COMPANY_ACTIVITY_TYPE.MEMBER_REMOVED,
-      actorName: DEFAULT_ACTOR,
-      action: 'деактивировала сотрудника',
-      entityLabel: `${member.firstName} ${member.lastName}`,
-    })
   },
 }

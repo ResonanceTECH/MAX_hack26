@@ -8,6 +8,8 @@ import {
   type FeatureFlag,
 } from '@/shared/mocks/featureFlags'
 import type { AdminActor } from './adminUsersApi'
+import { isReal } from '@/shared/api/apiCapabilities'
+import { createApiProxy, featureFlagsReal } from '@/shared/api/real/moderationAdmin'
 
 function persist() {
   saveMockState('featureFlags', mockFeatureFlags)
@@ -21,7 +23,7 @@ function defaultActor(): AdminActor {
   }
 }
 
-export const featureFlagsApi = {
+const mockFeatureFlagsApi = {
   async getAll(): Promise<FeatureFlag[]> {
     await delay(200 + Math.floor(Math.random() * 300))
     return mockFeatureFlags.map((f) => ({ ...f }))
@@ -64,5 +66,9 @@ export const featureFlagsApi = {
     return { ...flag }
   },
 }
+
+export const featureFlagsApi = createApiProxy(featureFlagsReal, mockFeatureFlagsApi, () =>
+  isReal('admin'),
+)
 
 export type { FeatureFlag }

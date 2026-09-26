@@ -1,8 +1,10 @@
 import type { Escalation } from '@/entities/escalation'
+import { isReal } from '@/shared/api/apiCapabilities'
+import { createApiProxy, escalationsReal } from '@/shared/api/real/moderationAdmin'
 import { delay } from '@/shared/lib/delay'
 import { getEscalationById, mockEscalations } from '@/shared/mocks/escalations'
 
-export const escalationsApi = {
+const mockEscalationsApi = {
   async getAll(): Promise<Escalation[]> {
     await delay(200 + Math.floor(Math.random() * 400))
     return [...mockEscalations]
@@ -17,3 +19,7 @@ export const escalationsApi = {
     return { ...item }
   },
 }
+
+export const escalationsApi = createApiProxy(escalationsReal, mockEscalationsApi, () =>
+  isReal('moderation'),
+)

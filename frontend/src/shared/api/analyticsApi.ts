@@ -1,3 +1,5 @@
+import { isReal } from '@/shared/api/apiCapabilities'
+import { analyticsReal, createApiProxy } from '@/shared/api/real/moderationAdmin'
 import { delay } from '@/shared/lib/delay'
 import {
   getAnalyticsByPeriod,
@@ -10,7 +12,7 @@ import {
   type ModerationAnalytics,
 } from '@/shared/mocks/analytics'
 
-export const analyticsApi = {
+const mockAnalyticsApi = {
   async getOverview(period: AnalyticsPeriod = '30d'): Promise<AnalyticsOverview> {
     await delay(200 + Math.floor(Math.random() * 400))
     return getAnalyticsByPeriod(period)
@@ -36,5 +38,9 @@ export const analyticsApi = {
     return mockAnalyticsTable.map((r) => ({ ...r }))
   },
 }
+
+export const analyticsApi = createApiProxy(analyticsReal, mockAnalyticsApi, () =>
+  isReal('analytics'),
+)
 
 export type { AnalyticsPeriod, FunnelStep }

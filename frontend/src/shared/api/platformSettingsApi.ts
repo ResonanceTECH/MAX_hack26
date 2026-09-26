@@ -8,6 +8,8 @@ import {
   type PlatformSettings,
 } from '@/shared/mocks/platformSettings'
 import type { AdminActor } from './adminUsersApi'
+import { isReal } from '@/shared/api/apiCapabilities'
+import { createApiProxy, platformSettingsReal } from '@/shared/api/real/moderationAdmin'
 
 function persist() {
   saveMockState('platformSettings', mockPlatformSettings)
@@ -44,7 +46,7 @@ function auditSetting(
   })
 }
 
-export const platformSettingsApi = {
+const mockPlatformSettingsApi = {
   async get(): Promise<PlatformSettings> {
     await delay(200 + Math.floor(Math.random() * 300))
     return structuredClone(mockPlatformSettings)
@@ -144,5 +146,11 @@ export const platformSettingsApi = {
     return structuredClone(mockPlatformSettings)
   },
 }
+
+export const platformSettingsApi = createApiProxy(
+  platformSettingsReal,
+  mockPlatformSettingsApi,
+  () => isReal('admin'),
+)
 
 export type { PlatformSettings }

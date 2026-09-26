@@ -18,6 +18,8 @@ import {
   persistModerationItems,
   persistReports,
 } from '@/shared/mocks/hydrateMocks'
+import { isReal } from '@/shared/api/apiCapabilities'
+import { createApiProxy, reportsReal } from '@/shared/api/real/moderationAdmin'
 
 export interface ReportListFilters {
   status?: ReportStatus | 'all' | 'open_tab' | 'in_progress_tab' | 'closed_tab' | 'escalated_tab'
@@ -33,7 +35,7 @@ function decisionDelay() {
   return delay(400 + Math.floor(Math.random() * 400))
 }
 
-export const reportsApi = {
+const mockReportsApi = {
   async getAll(filters?: ReportListFilters): Promise<Report[]> {
     await readDelay()
     let items = [...mockReports]
@@ -186,6 +188,8 @@ export const reportsApi = {
     })
   },
 }
+
+export const reportsApi = createApiProxy(reportsReal, mockReportsApi, () => isReal('reports'))
 
 // silence unused if tree-shaken oddly
 void mockModerationItems

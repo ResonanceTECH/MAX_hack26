@@ -1,3 +1,5 @@
+import { isReal } from '@/shared/api/apiCapabilities'
+import { auditReal, createApiProxy } from '@/shared/api/real/moderationAdmin'
 import { delay } from '@/shared/lib/delay'
 import {
   getAuditEventById,
@@ -6,7 +8,7 @@ import {
   type AuditFilters,
 } from '@/shared/mocks/audit'
 
-export const auditApi = {
+const mockAuditApi = {
   async getAll(filters?: AuditFilters): Promise<AuditEvent[]> {
     return this.list(filters)
   },
@@ -55,5 +57,7 @@ export const auditApi = {
     return { ...event }
   },
 }
+
+export const auditApi = createApiProxy(auditReal, mockAuditApi, () => isReal('admin'))
 
 export type { AuditFilters, AuditEvent }

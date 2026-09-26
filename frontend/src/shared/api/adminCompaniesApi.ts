@@ -5,6 +5,8 @@ import { saveMockState } from '@/shared/lib/mockPersist'
 import { AUDIT_ACTIONS, appendAudit } from '@/shared/mocks/audit'
 import { mockCompanies } from '@/shared/mocks/companies'
 import type { AdminActor } from './adminUsersApi'
+import { isReal } from '@/shared/api/apiCapabilities'
+import { adminCompaniesReal, createApiProxy } from '@/shared/api/real/moderationAdmin'
 
 export type PlatformCompanyStatus = 'ACTIVE' | 'SUSPENDED' | 'BLOCKED' | 'ARCHIVED'
 
@@ -295,7 +297,7 @@ function defaultActor(): AdminActor {
   }
 }
 
-export const adminCompaniesApi = {
+const mockAdminCompaniesApi = {
   async getAll(filters?: AdminCompanyFilters): Promise<AdminCompany[]> {
     return this.list(filters)
   },
@@ -415,5 +417,9 @@ export const adminCompaniesApi = {
     return this.changeStatus(id, 'ACTIVE', reason, actor)
   },
 }
+
+export const adminCompaniesApi = createApiProxy(adminCompaniesReal, mockAdminCompaniesApi, () =>
+  isReal('admin'),
+)
 
 export type { SystemRole }
