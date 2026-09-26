@@ -6,6 +6,7 @@ export {
   MODERATION_ACTION,
   DATA_ORIGIN,
   DOCUMENT_VERIFICATION_STATUS,
+  VERSION_CONFLICT_MESSAGE,
   type ModerationEntityType,
   type ModerationStatus,
   type ModerationPriority,

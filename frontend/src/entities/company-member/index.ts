@@ -5,4 +5,6 @@ export {
   type CompanyMember,
   type CompanyMemberRole,
   type CompanyMemberStatus,
+  type CompanyInvitation,
+  type CompanyInvitationStatus,
 } from './model/types'

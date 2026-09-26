@@ -15,6 +15,14 @@ export const DEAL_STATUSES = {
 
 export type DealStatus = (typeof DEAL_STATUSES)[keyof typeof DEAL_STATUSES]
 
+export interface DealFile {
+  id: string
+  name: string
+  contentType: string | null
+  size: number
+  createdAt: string
+}
+
 export interface Deal {
   id: string
   opportunityId: string
@@ -31,4 +39,5 @@ export interface Deal {
   lastAction: string
   updatedAt: string
   events: DealEvent[]
+  files: DealFile[]
 }

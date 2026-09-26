@@ -25,7 +25,7 @@ export const REPORT_STATUS = {
 
 export type ReportStatus = (typeof REPORT_STATUS)[keyof typeof REPORT_STATUS]
 
-export type ReportEntityType = ModerationEntityType | 'user'
+export type ReportEntityType = ModerationEntityType | 'user' | 'proposal'
 
 export interface Report {
   id: string
@@ -51,4 +51,12 @@ export interface ResolveReportInput {
   resolutionCode: string
   comment?: string
   applyAction?: 'none' | 'request_changes' | 'reject' | 'block'
+}
+
+export interface CreateReportInput {
+  targetType: ReportEntityType
+  targetId: string
+  targetName: string
+  type: ReportType
+  description: string
 }

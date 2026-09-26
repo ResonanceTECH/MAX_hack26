@@ -31,6 +31,8 @@ export interface User {
   role: SystemRole
   status: UserStatus
   createdAt: string
+  companyMemberRole?: import('@/entities/company-member').CompanyMemberRole | null
+  email?: string | null
 }
 
 export interface CurrentSession {

@@ -35,4 +35,25 @@ export interface CompanyMember {
   avatarUrl?: string
   joinedAt?: string
   lastActiveAt?: string
+  inviteToken?: string
+}
+
+export type CompanyInvitationStatus =
+  | 'pending'
+  | 'accepted'
+  | 'declined'
+  | 'expired'
+  | 'cancelled'
+
+export interface CompanyInvitation {
+  token: string
+  companyId: string
+  companyName: string
+  role: CompanyMemberRole
+  invitedBy: string
+  email: string
+  status: CompanyInvitationStatus
+  expiresAt: string | null
+  firstName?: string
+  lastName?: string
 }

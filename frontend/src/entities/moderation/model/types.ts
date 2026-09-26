@@ -182,6 +182,10 @@ export interface ModerationRelatedData {
   }
 }
 
+/** Shown on 409 / version mismatch for moderation decisions */
+export const VERSION_CONFLICT_MESSAGE =
+  'Объект был изменён другим пользователем. Обновите данные.'
+
 export interface ApproveInput {
   privateNote?: string
   expectedVersion?: number

@@ -7,4 +7,5 @@ export {
   type ReportEntityType,
   type Report,
   type ResolveReportInput,
+  type CreateReportInput,
 } from './model/types'
