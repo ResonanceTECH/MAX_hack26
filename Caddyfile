@@ -15,6 +15,24 @@
 	encode zstd gzip
 
 	# --- API бэкенда ---
+	handle /favorites* {
+		reverse_proxy backend:8000
+	}
+	handle /invites* {
+		reverse_proxy backend:8000
+	}
+	handle /moderation* {
+		reverse_proxy backend:8000
+	}
+	handle /reports* {
+		reverse_proxy backend:8000
+	}
+	handle /escalations* {
+		reverse_proxy backend:8000
+	}
+	handle /admin* {
+		reverse_proxy backend:8000
+	}
 	handle /api/* {
 		reverse_proxy backend:8000
 	}
