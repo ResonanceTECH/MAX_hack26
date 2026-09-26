@@ -9,7 +9,13 @@ from ..deps import get_current_user, user_has_company_permission
 from ..models import Company, Proposal, Request, User
 from ..permissions import PERM_EDIT_COMPANY
 from ..schemas import CompanyIn, CompanyOut, CompanyPatchIn, CompanyStatsOut
-from ..services import ensure_owner_member, get_company_for_user, get_company_or_404, require_company
+from ..services import (
+    ensure_owner_member,
+    get_company_for_user,
+    get_company_or_404,
+    is_company_active,
+    require_company,
+)
 
 router = APIRouter(tags=["companies"])
 
@@ -24,8 +30,7 @@ def list_companies(
     offset: int = 0,
     db: Session = Depends(get_db),
 ) -> list[CompanyOut]:
-    """Каталог компаний (витрина исполнителей)."""
-    query = db.query(Company)
+    query = db.query(Company).filter(Company.platform_status.in_(["ACTIVE", None]))
     if q:
         like = f"%{q}%"
         query = query.filter(or_(Company.name.ilike(like), Company.description.ilike(like)))
@@ -55,8 +60,12 @@ def upsert_my_company(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CompanyOut:
-    """Создаёт или обновляет профиль своей компании."""
     company = get_company_for_user(db, user)
+    if company is not None and not is_company_active(company):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Компания заблокирована или приостановлена: операции недоступны",
+        )
     data = payload.model_dump(exclude_unset=True)
     if company is None:
         company = Company(user_id=user.id, **data)
@@ -78,6 +87,8 @@ def get_company(
     db: Session = Depends(get_db),
 ) -> CompanyStatsOut:
     company = get_company_or_404(db, company_id)
+    if not is_company_active(company):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Компания не найдена")
     active_requests = (
         db.query(Request).filter(Request.company_id == company.id, Request.status == "published").count()
     )
@@ -96,6 +107,11 @@ def patch_company(
     db: Session = Depends(get_db),
 ) -> CompanyOut:
     company = get_company_or_404(db, company_id)
+    if not is_company_active(company):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Компания заблокирована или приостановлена: операции недоступны",
+        )
     my = get_company_for_user(db, user)
     if my is None or my.id != company.id:
         if not user.is_admin:

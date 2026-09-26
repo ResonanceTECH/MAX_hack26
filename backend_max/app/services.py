@@ -10,6 +10,7 @@ from .config import Settings, get_settings
 from .matching import match_company
 from .models import Company, CompanyMember, Proposal, Request, RequestMatch, User
 from .notifications import notifier
+from .roles import MEMBER_STATUS_ACTIVE
 from .schemas import (
     CriterionOut,
     MatchOut,
@@ -128,7 +129,14 @@ def match_out(request_match: RequestMatch, db: Session) -> MatchOut:
 
 
 def recompute_matches(db: Session, request: Request, notify: bool = True) -> list[MatchOut]:
-    companies = db.query(Company).filter(Company.id != request.company_id).all()
+    companies = (
+        db.query(Company)
+        .filter(
+            Company.id != request.company_id,
+            Company.platform_status.in_(["ACTIVE", None]),
+        )
+        .all()
+    )
     db.query(RequestMatch).filter(RequestMatch.request_id == request.id).delete()
 
     results: list[RequestMatch] = []
@@ -273,10 +281,6 @@ def enqueue_moderation_item(
 
 
 def get_company_for_user(db: Session, user: User) -> Company | None:
-    from .models import CompanyMember
-    from .roles import MEMBER_STATUS_ACTIVE
-
-    # Prefer active membership (Manager/Viewer on DigitalLab over any owned shell)
     membership = (
         db.query(CompanyMember)
         .filter(CompanyMember.user_id == user.id, CompanyMember.status == MEMBER_STATUS_ACTIVE)
@@ -292,12 +296,21 @@ def get_company_for_user(db: Session, user: User) -> Company | None:
     return None
 
 
+def is_company_active(company: Company) -> bool:
+    return (company.platform_status or "ACTIVE").upper() == "ACTIVE"
+
+
 def require_company(db: Session, user: User) -> Company:
     company = get_company_for_user(db, user)
     if company is None:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "Сначала создайте профиль компании: PUT /companies/me",
+        )
+    if not is_company_active(company):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Компания заблокирована или приостановлена: операции недоступны",
         )
     return company
 
@@ -308,10 +321,6 @@ def ensure_owns_request(user: User, company: Company, request: Request) -> None:
 
 
 def ensure_owner_member(db: Session, company: Company, user: User) -> None:
-    """Ensure owner row exists in company_members for COMPANY_ADMIN owners only.
-
-    BUSINESS_USER owners (e.g. WebForge) stay marketplace-only — no ADMIN membership.
-    """
     from .models import CompanyMember, utcnow
     from .roles import MEMBER_ROLE_ADMIN, MEMBER_STATUS_ACTIVE, ROLE_COMPANY_ADMIN
 

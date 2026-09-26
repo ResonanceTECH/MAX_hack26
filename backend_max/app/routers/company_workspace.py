@@ -25,7 +25,6 @@ from ..models import (
     utcnow,
 )
 from ..permissions import (
-    PERM_EDIT_COMPANY,
     PERM_MANAGE_COMPANY_CASES,
     PERM_MANAGE_COMPANY_DOCUMENTS,
     PERM_MANAGE_COMPANY_SERVICES,
@@ -63,8 +62,17 @@ from ..schemas import (
 from ..services import (
     append_activity,
     ensure_owner_member,
+    get_company_or_404,
     get_request_or_404,
+    is_company_active,
     require_company,
+)
+from ..statuses import (
+    PUBLIC_SERVICE_STATUS,
+    SERVICE_STATUS_ARCHIVED,
+    SERVICE_STATUS_DRAFT,
+    SERVICE_STATUSES,
+    normalize_service_status,
 )
 
 router = APIRouter(tags=["company-workspace"])
@@ -373,7 +381,6 @@ def resend_member_invite(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Company admin resends an outstanding team invite (bumps invited_at / expires_at)."""
     _user, company = require_company_admin_member(user=user, db=db)
     member = db.get(CompanyMember, member_id)
     if member is None or member.company_id != company.id:
@@ -491,9 +498,12 @@ def list_services(user: User = Depends(get_current_user), db: Session = Depends(
 
 @router.get("/companies/{company_id}/services", response_model=list[ServiceOut])
 def list_public_services(company_id: int, db: Session = Depends(get_db)):
+    company = get_company_or_404(db, company_id)
+    if not is_company_active(company):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Компания не найдена")
     rows = (
         db.query(CompanyServiceItem)
-        .filter(CompanyServiceItem.company_id == company_id, CompanyServiceItem.status == "active")
+        .filter(CompanyServiceItem.company_id == company_id, CompanyServiceItem.status == PUBLIC_SERVICE_STATUS)
         .all()
     )
     return [_service_out(s) for s in rows]
@@ -507,9 +517,14 @@ def create_service(
 ):
     company = require_company_permission(db, user, PERM_MANAGE_COMPANY_SERVICES)
     data = payload.model_dump(exclude_unset=True)
-    item = CompanyServiceItem(company_id=company.id, **{k: v for k, v in data.items() if v is not None or k in ("description", "title", "category")})
-    if "status" not in data or data["status"] is None:
-        item.status = "draft"
+    status_value = normalize_service_status(data.get("status") or SERVICE_STATUS_DRAFT)
+    if status_value not in SERVICE_STATUSES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"status: {sorted(SERVICE_STATUSES)}")
+    item = CompanyServiceItem(
+        company_id=company.id,
+        **{k: v for k, v in data.items() if v is not None or k in ("description", "title", "category")},
+    )
+    item.status = status_value
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -529,8 +544,13 @@ def patch_service(
     if item is None or item.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Услуга не найдена")
     for k, v in payload.model_dump(exclude_unset=True).items():
-        if v is not None:
-            setattr(item, k, v)
+        if v is None:
+            continue
+        if k == "status":
+            v = normalize_service_status(v)
+            if v not in SERVICE_STATUSES:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"status: {sorted(SERVICE_STATUSES)}")
+        setattr(item, k, v)
     db.commit()
     db.refresh(item)
     append_activity(db, company.id, "SERVICE_UPDATED", _actor_name(user), "обновила услугу", item.title)
@@ -543,7 +563,7 @@ def delete_service(service_id: int, user: User = Depends(get_current_user), db: 
     item = db.get(CompanyServiceItem, service_id)
     if item is None or item.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Услуга не найдена")
-    item.status = "archived"
+    item.status = SERVICE_STATUS_ARCHIVED
     db.commit()
     return {"archived": True}
 
@@ -559,6 +579,9 @@ def list_cases(user: User = Depends(get_current_user), db: Session = Depends(get
 
 @router.get("/companies/{company_id}/cases", response_model=list[CaseItemOut])
 def list_public_cases(company_id: int, db: Session = Depends(get_db)):
+    company = get_company_or_404(db, company_id)
+    if not is_company_active(company):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Компания не найдена")
     rows = (
         db.query(CompanyCaseItem)
         .filter(CompanyCaseItem.company_id == company_id, CompanyCaseItem.status == "published")

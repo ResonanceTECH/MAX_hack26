@@ -44,8 +44,17 @@ _MIGRATIONS = [
     "ALTER TABLE company_members ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ",
     "ALTER TABLE company_members ADD COLUMN IF NOT EXISTS message TEXT",
     "CREATE UNIQUE INDEX IF NOT EXISTS ix_company_members_invite_token ON company_members (invite_token)",
-    # backfill role from is_admin
     "UPDATE users SET role = 'PLATFORM_ADMIN' WHERE is_admin = true AND (role IS NULL OR role = 'BUSINESS_USER')",
+    "UPDATE company_services SET status='published' WHERE status='active'",
+    "UPDATE company_services SET status='archived' WHERE status='inactive'",
+    "UPDATE company_services SET status='published' WHERE status='PUBLISHED'",
+    "UPDATE company_services SET status='draft' WHERE status='DRAFT'",
+    "UPDATE company_services SET status='hidden' WHERE status='HIDDEN'",
+    "UPDATE company_services SET status='archived' WHERE status='ARCHIVED'",
+    "UPDATE company_cases SET status='published' WHERE status='PUBLISHED'",
+    "UPDATE company_cases SET status='draft' WHERE status='DRAFT'",
+    "UPDATE company_cases SET status='hidden' WHERE status='HIDDEN'",
+    "UPDATE company_cases SET status='archived' WHERE status='ARCHIVED'",
 ]
 
 
