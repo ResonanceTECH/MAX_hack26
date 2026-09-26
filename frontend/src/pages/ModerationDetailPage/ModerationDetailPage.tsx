@@ -436,11 +436,11 @@ export function ModerationDetailPage() {
                         description: `${String(item.payload.description ?? '')} (исправлено владельцем)`,
                       },
                     })
-                    .then(() => showSuccess('Mock: владелец отправил исправления'))
+                    .then(() => showSuccess('Владелец отправил исправления'))
                     .catch(handleError)
                 }
               >
-                Mock: владелец исправил и отправил снова
+                Владелец исправил и отправил снова
               </AppButton>
             ) : null}
 

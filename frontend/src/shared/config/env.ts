@@ -4,5 +4,5 @@
  */
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
-/** true unless VITE_USE_MOCK_API === 'false' */
-export const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API !== 'false'
+/** false unless VITE_USE_MOCK_API === 'true' (Wave A: real API by default) */
+export const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === 'true'

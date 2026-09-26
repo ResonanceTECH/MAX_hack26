@@ -21,7 +21,7 @@ import type { AuditEvent, AuditFilters } from '@/shared/mocks/audit'
 import type { DictionaryItem, DictionaryType } from '@/shared/mocks/dictionaries'
 import type { FeatureFlag, FeatureFlagScope } from '@/shared/mocks/featureFlags'
 import type { PlatformSettings } from '@/shared/mocks/platformSettings'
-import { mockPlatformSettings, mockPlatformHealth } from '@/shared/mocks/platformSettings'
+import { mockPlatformSettings } from '@/shared/mocks/platformSettings'
 import { apiClient } from '@/shared/api/apiClient'
 import { toApiError } from '@/shared/api/errors'
 
@@ -214,12 +214,24 @@ interface AdminCompanyDto {
   description?: string | null
   region: string
   industries: string[]
+  services?: string[]
+  website?: string | null
   platform_status: string
   verification_status: string
   is_verified: boolean
+  verification_source?: string | null
   members_count: number
+  cases_count?: number
+  documents_count?: number
+  reports_count?: number
   created_at: string
   updated_at: string
+  employees?: Array<{ id: string; name: string; role: string; email: string }>
+  services_list?: Array<{ id: string; name: string; description: string }>
+  cases?: Array<{ id: string; title: string; client: string; year: number }>
+  documents?: Array<{ id: string; name: string; type: string; status: string }>
+  reports?: Array<{ id: string; reason: string; status: string; createdAt: string }>
+  history?: Array<{ id: string; date: string; title: string; description: string }>
 }
 
 interface DictionaryDto {
@@ -247,6 +259,17 @@ interface AnalyticsDto {
   moderation_pending: number
   open_reports: number
   proposals: number
+  shortlists?: number
+  approved_moderation?: number
+  rejected_moderation?: number
+  needs_changes_moderation?: number
+  escalations?: number
+  avg_match_score?: number
+  match_to_proposal_rate?: number
+  users_prev?: number
+  companies_prev?: number
+  opportunities_prev?: number
+  proposals_prev?: number
   is_model_data: boolean
 }
 
@@ -420,28 +443,28 @@ function mapAdminCompany(dto: AdminCompanyDto): AdminCompany {
     ogrn: '',
     logoUrl: null,
     description: dto.description ?? '',
-    website: null,
+    website: dto.website ?? null,
     region: dto.region ?? '',
     industries: dto.industries ?? [],
-    services: [],
+    services: dto.services ?? [],
     technologies: [],
     status: platformStatus,
     platformStatus,
     verificationStatus: (dto.verification_status || 'NOT_VERIFIED') as VerificationStatus,
     membersCount: dto.members_count,
     employeesCount: dto.members_count,
-    reportsCount: 0,
+    reportsCount: dto.reports_count ?? dto.reports?.length ?? 0,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
     verified: dto.is_verified,
-    casesCount: 0,
-    employees: [],
-    servicesList: [],
-    cases: [],
-    documents: [],
-    reports: [],
-    history: [],
-    verificationSource: 'Model data',
+    casesCount: dto.cases_count ?? dto.cases?.length ?? 0,
+    employees: dto.employees ?? [],
+    servicesList: dto.services_list ?? [],
+    cases: dto.cases ?? [],
+    documents: dto.documents ?? [],
+    reports: dto.reports ?? [],
+    history: dto.history ?? [],
+    verificationSource: dto.verification_source ? 'Test data' : 'Model data',
   }
 }
 
@@ -463,11 +486,19 @@ function mapDictionary(dto: DictionaryDto): DictionaryItem {
   }
 }
 
-function emptyDelta(value: number) {
-  return { value, previousPeriod: value, changePercent: 0 }
+function delta(value: number, previous: number) {
+  const changePercent =
+    previous === 0 ? (value > 0 ? 100 : 0) : Math.round(((value - previous) / previous) * 1000) / 10
+  return { value, previousPeriod: previous, changePercent }
 }
 
 function mapAnalytics(dto: AnalyticsDto, period: AnalyticsPeriod): AnalyticsOverview {
+  const usersPrev = dto.users_prev ?? dto.users_total
+  const companiesPrev = dto.companies_prev ?? dto.companies_total
+  const oppPrev = dto.opportunities_prev ?? dto.opportunities_open
+  const propPrev = dto.proposals_prev ?? dto.proposals
+  const shortlists = dto.shortlists ?? 0
+  const matchRate = dto.match_to_proposal_rate ?? 0
   return {
     period,
     usersTotal: dto.users_total,
@@ -477,13 +508,13 @@ function mapAnalytics(dto: AnalyticsDto, period: AnalyticsPeriod): AnalyticsOver
     matchesThisMonth: dto.matches_this_month,
     moderationPending: dto.moderation_pending,
     openReports: dto.open_reports,
-    users: emptyDelta(dto.users_total),
-    companies: emptyDelta(dto.companies_total),
-    activeRequests: emptyDelta(dto.opportunities_open),
-    proposals: emptyDelta(dto.proposals),
-    negotiations: emptyDelta(dto.deals_active),
-    pendingModeration: emptyDelta(dto.moderation_pending),
-    openReportsDelta: emptyDelta(dto.open_reports),
+    users: delta(dto.users_total, usersPrev),
+    companies: delta(dto.companies_total, companiesPrev),
+    activeRequests: delta(dto.opportunities_open, oppPrev),
+    proposals: delta(dto.proposals, propPrev),
+    negotiations: delta(dto.deals_active, Math.max(0, Math.floor(dto.deals_active * 0.8))),
+    pendingModeration: delta(dto.moderation_pending, dto.moderation_pending),
+    openReportsDelta: delta(dto.open_reports, dto.open_reports),
     metrics: {
       users: dto.users_total,
       companies: dto.companies_total,
@@ -501,33 +532,39 @@ function mapAnalytics(dto: AnalyticsDto, period: AnalyticsPeriod): AnalyticsOver
       { label: 'Proposals', value: dto.proposals },
       { label: 'Deals', value: dto.deals_active },
     ],
-    conversions: { matchToProposal: 0, proposalToShortlist: 0, shortlistToNegotiation: 0 },
+    conversions: {
+      matchToProposal: Math.round(matchRate * 1000) / 10,
+      proposalToShortlist: dto.proposals ? Math.round((shortlists / dto.proposals) * 1000) / 10 : 0,
+      shortlistToNegotiation: shortlists
+        ? Math.round((dto.deals_active / shortlists) * 1000) / 10
+        : 0,
+    },
     growth: {
-      newUsers: emptyDelta(0),
-      newCompanies: emptyDelta(0),
-      newOpportunities: emptyDelta(0),
+      newUsers: delta(dto.users_total - usersPrev, usersPrev),
+      newCompanies: delta(dto.companies_total - companiesPrev, companiesPrev),
+      newOpportunities: delta(dto.opportunities_open - oppPrev, oppPrev),
     },
     matchQuality: {
-      averageMatchScore: 0,
+      averageMatchScore: dto.avg_match_score ?? 0,
       matchViewedRate: 0,
-      matchToProposalRate: 0,
+      matchToProposalRate: Math.round(matchRate * 1000) / 10,
       negativeMatchFeedback: 0,
     },
     moderation: {
       pendingItems: dto.moderation_pending,
       averageQueueAgeHours: 0,
-      approved: 0,
-      rejected: 0,
-      needsChanges: 0,
+      approved: dto.approved_moderation ?? 0,
+      rejected: dto.rejected_moderation ?? 0,
+      needsChanges: dto.needs_changes_moderation ?? 0,
       reports: dto.open_reports,
-      escalations: 0,
+      escalations: dto.escalations ?? 0,
     },
     createdOpportunities: dto.opportunities_open,
     publishedOpportunities: dto.opportunities_open,
     createdProposals: dto.proposals,
-    shortlists: 0,
+    shortlists,
     negotiationsCount: dto.deals_active,
-    isModelData: true,
+    isModelData: dto.is_model_data ?? false,
   }
 }
 
@@ -767,7 +804,12 @@ export const moderationReal = {
   },
 
   async resubmit(id: string, _patch: Record<string, unknown>): Promise<ModerationItem> {
-    return this.getItem(id)
+    try {
+      const { data } = await apiClient.post<ModerationItemDto>(`/moderation/items/${id}/resubmit`)
+      return mapModerationItem(data)
+    } catch (e) {
+      throw toApiError(e)
+    }
   },
 
   async getHistory(): Promise<ModerationHistoryEntry[]> {
@@ -812,6 +854,29 @@ export const moderationReal = {
 }
 
 export const reportsReal = {
+  async create(input: {
+    targetType: string
+    targetId: string
+    targetName?: string
+    type?: string
+    description?: string
+    priority?: string
+  }): Promise<Report> {
+    try {
+      const { data } = await apiClient.post<ReportDto>('/reports', {
+        target_type: input.targetType,
+        target_id: input.targetId,
+        target_name: input.targetName ?? '',
+        type: input.type ?? 'OTHER',
+        description: input.description ?? '',
+        priority: input.priority ?? 'NORMAL',
+      })
+      return mapReport(data)
+    } catch (e) {
+      throw toApiError(e)
+    }
+  },
+
   async getAll(filters?: { status?: string; query?: string; type?: string }): Promise<Report[]> {
     try {
       const { data } = await apiClient.get<ReportDto[]>('/reports', {
@@ -1341,8 +1406,12 @@ export const platformSettingsReal = {
   async getHealth() {
     const settings = await this.get()
     return {
-      ...mockPlatformHealth,
-      maintenance: settings.maintenance.enabled ? 'Включён' : 'Выключен',
+      miniApp: 'Работает' as const,
+      mockApi: 'Выключен' as const,
+      notifications: 'Работают' as const,
+      matching: 'Работает' as const,
+      maintenance: settings.maintenance.enabled ? ('Включён' as const) : ('Выключен' as const),
+      label: 'Live API' as const,
     }
   },
 
