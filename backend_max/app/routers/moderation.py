@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -254,7 +253,6 @@ def history(user: User = Depends(require_moderator), db: Session = Depends(get_d
 
 @router.post("/moderation/items/{item_id}/resubmit", response_model=ModerationItemOut)
 def resubmit_item(item_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Owner (or moderator) resubmits after NEEDS_CHANGES."""
     item = db.get(ModerationItem, item_id)
     if item is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Элемент не найден")

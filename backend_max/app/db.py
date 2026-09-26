@@ -21,9 +21,6 @@ def _engine():
 engine = _engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
-# Лёгкие миграции: добавление новых колонок к существующим таблицам
-# (create_all не меняет уже созданные таблицы). Для MVP достаточно;
-# для продакшена — Alembic.
 _MIGRATIONS = [
     "ALTER TABLE companies ADD COLUMN IF NOT EXISTS registration_date DATE",
     "ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_status VARCHAR(100)",

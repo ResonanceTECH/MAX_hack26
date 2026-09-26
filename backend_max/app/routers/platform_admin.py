@@ -1,5 +1,3 @@
-"""Platform admin APIs: users, companies, dictionaries, analytics, audit, flags, settings."""
-
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -27,9 +25,8 @@ from ..models import (
     Request,
     RequestMatch,
     User,
-    utcnow,
 )
-from ..roles import PLATFORM_ROLES, ROLE_PLATFORM_ADMIN
+from ..roles import PLATFORM_ROLES
 from ..schemas import (
     AdminCompanyOut,
     AdminCompanyStatusIn,

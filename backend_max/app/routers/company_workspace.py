@@ -1,5 +1,3 @@
-"""Company workspace: members, services, cases, documents, settings, verification, activity, invites."""
-
 from __future__ import annotations
 
 import uuid
@@ -732,7 +730,7 @@ def get_verification(user: User = Depends(get_current_user), db: Session = Depen
 
 @router.post("/companies/me/verification", response_model=CompanyVerificationOut)
 def submit_verification(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    company = require_company_permission(db, user, PERM_EDIT_COMPANY)
+    company = require_company(db, user)
     company.verification_status = "PENDING"
     db.commit()
     return get_verification(user, db)
@@ -803,7 +801,6 @@ def create_invite(
         opportunity_id=opportunity_id,
         company_id=payload.company_id,
         invited_by_user_id=user.id,
-        status="PENDING",
     )
     db.add(inv)
     db.commit()
