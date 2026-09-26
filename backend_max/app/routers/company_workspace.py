@@ -36,6 +36,7 @@ from ..roles import (
     INVITE_STATUS_EXPIRED,
     INVITE_STATUS_PENDING,
     MEMBER_ROLES,
+    MEMBER_ROLE_ADMIN,
     MEMBER_STATUS_ACTIVE,
     MEMBER_STATUS_DEACTIVATED,
     MEMBER_STATUS_INVITED,
@@ -61,6 +62,7 @@ from ..schemas import (
 )
 from ..services import (
     append_activity,
+    enqueue_moderation_item,
     ensure_owner_member,
     get_company_or_404,
     get_request_or_404,
@@ -334,6 +336,18 @@ def invite_member(
     return _member_out(member)
 
 
+def _active_admin_count(db: Session, company: Company, exclude_member_id: int | None = None) -> int:
+    q = db.query(CompanyMember).filter(
+        CompanyMember.company_id == company.id,
+        CompanyMember.member_role == MEMBER_ROLE_ADMIN,
+        CompanyMember.status == MEMBER_STATUS_ACTIVE,
+        CompanyMember.user_id != company.user_id,
+    )
+    if exclude_member_id is not None:
+        q = q.filter(CompanyMember.id != exclude_member_id)
+    return q.count()
+
+
 @router.patch("/companies/me/members/{member_id}", response_model=CompanyMemberOut)
 def patch_member(
     member_id: int,
@@ -345,6 +359,14 @@ def patch_member(
     member = db.get(CompanyMember, member_id)
     if member is None or member.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Сотрудник не найден")
+    is_active_admin = (
+        member.member_role == MEMBER_ROLE_ADMIN and member.status == MEMBER_STATUS_ACTIVE
+    )
+    demoting = (payload.role is not None and payload.role != MEMBER_ROLE_ADMIN)
+    suspending = (payload.status is not None and payload.status != MEMBER_STATUS_ACTIVE)
+    if is_active_admin and (demoting or suspending):
+        if _active_admin_count(db, company, exclude_member_id=member.id) == 0:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Нельзя понизить или приостановить последнего администратора")
     if payload.role is not None:
         if payload.role not in MEMBER_ROLES:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Недопустимая роль")
@@ -369,6 +391,9 @@ def remove_member(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Сотрудник не найден")
     if member.user_id == company.user_id:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нельзя удалить владельца")
+    if member.member_role == MEMBER_ROLE_ADMIN and member.status == MEMBER_STATUS_ACTIVE:
+        if _active_admin_count(db, company, exclude_member_id=member.id) == 0:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Нельзя удалить последнего администратора")
     member.status = MEMBER_STATUS_DEACTIVATED
     db.commit()
     append_activity(db, company.id, "MEMBER_REMOVED", _actor_name(user), "удалила сотрудника", member.email)
@@ -598,6 +623,18 @@ def create_case(payload: CaseItemIn, user: User = Depends(get_current_user), db:
     db.add(item)
     db.commit()
     db.refresh(item)
+    if item.status == "published":
+        enqueue_moderation_item(
+            db,
+            entity_type="case",
+            entity_id=str(item.id),
+            title=item.title,
+            company_name=company.name,
+            owner_id=str(user.id),
+            owner_name=_actor_name(user),
+            reason="CASE_PUBLISHED",
+            summary=item.description or None,
+        )
     append_activity(db, company.id, "CASE_CREATED", _actor_name(user), "добавила кейс", item.title)
     return _case_out(item)
 
@@ -613,6 +650,18 @@ def patch_case(case_id: int, payload: CaseItemIn, user: User = Depends(get_curre
             setattr(item, k, v)
     db.commit()
     db.refresh(item)
+    if item.status == "published":
+        enqueue_moderation_item(
+            db,
+            entity_type="case",
+            entity_id=str(item.id),
+            title=item.title,
+            company_name=company.name,
+            owner_id=str(user.id),
+            owner_name=_actor_name(user),
+            reason="CASE_PUBLISHED",
+            summary=item.description or None,
+        )
     return _case_out(item)
 
 
@@ -655,6 +704,17 @@ def add_document(payload: DocumentItemIn, user: User = Depends(get_current_user)
     db.add(item)
     db.commit()
     db.refresh(item)
+    enqueue_moderation_item(
+        db,
+        entity_type="document",
+        entity_id=str(item.id),
+        title=item.name,
+        company_name=company.name,
+        owner_id=str(user.id),
+        owner_name=_actor_name(user),
+        reason="DOCUMENT_UPLOADED",
+        summary=f"{item.doc_type or ''} {item.number or ''}".strip() or None,
+    )
     append_activity(db, company.id, "DOCUMENT_UPLOADED", _actor_name(user), "загрузила документ", item.name)
     return _doc_out(item)
 
@@ -756,6 +816,18 @@ def submit_verification(user: User = Depends(get_current_user), db: Session = De
     company = require_company(db, user)
     company.verification_status = "PENDING"
     db.commit()
+    enqueue_moderation_item(
+        db,
+        entity_type="company",
+        entity_id=str(company.id),
+        title=f"Верификация: {company.name}",
+        company_name=company.name,
+        owner_id=str(user.id),
+        owner_name=_actor_name(user),
+        reason="VERIFICATION_SUBMITTED",
+        summary=f"ИНН: {company.inn or '—'}, статус: {company.company_status or '—'}",
+        payload={"inn": company.inn, "company_status": company.company_status},
+    )
     return get_verification(user, db)
 
 
