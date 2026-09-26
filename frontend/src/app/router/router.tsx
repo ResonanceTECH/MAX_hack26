@@ -1,7 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
 import { AppLayout } from '@/app/layout/AppLayout'
-import { PermissionGuard } from '@/features/permissions'
+import { CompanyPermissionGuard, PermissionGuard } from '@/features/permissions'
 import { Permission } from '@/features/permissions/model/permissions'
 import { LoadingState } from '@/shared/ui'
 import { companyDetailsPath } from '@/shared/constants/routes'
@@ -152,6 +152,11 @@ const CompanyActivityPage = lazy(() =>
 const NotificationsPage = lazy(() =>
   import('@/pages/NotificationsPage/NotificationsPage').then((m) => ({
     default: m.NotificationsPage,
+  })),
+)
+const CompanyInvitationPage = lazy(() =>
+  import('@/pages/CompanyInvitationPage/CompanyInvitationPage').then((m) => ({
+    default: m.CompanyInvitationPage,
   })),
 )
 const NotFoundPage = lazy(() =>
@@ -309,6 +314,24 @@ function guarded(
   )
 }
 
+/** Company-scoped + marketplace mutations that respect CompanyMember.role.
+ * Outer PermissionGuard blocks MOD/PA (and other system roles without marketplace perms).
+ */
+function companyGuarded(
+  permission: Permission | Permission[],
+  element: ReactNode,
+  denyReason?: string,
+) {
+  const reason = denyReason ?? 'marketplace'
+  return withSuspense(
+    <PermissionGuard permission={permission} deniedReason={reason}>
+      <CompanyPermissionGuard permission={permission} deniedReason={reason}>
+        {element}
+      </CompanyPermissionGuard>
+    </PermissionGuard>,
+  )
+}
+
 function CompanyAliasRedirect() {
   const { id = '' } = useParams()
   return <Navigate to={companyDetailsPath(id)} replace />
@@ -319,54 +342,104 @@ export const router = createBrowserRouter([
     path: '/',
     element: <AppLayout />,
     children: [
-      { index: true, element: withSuspense(<HomePage />) },
+      { index: true, element: guarded(Permission.VIEW_OPPORTUNITIES, <HomePage />, 'marketplace') },
       { path: 'access-denied', element: withSuspense(<AccessDeniedPage />) },
       { path: 'profile', element: withSuspense(<ProfilePage />) },
 
-      { path: 'opportunities', element: withSuspense(<OpportunitiesPage />) },
+      {
+        path: 'opportunities',
+        element: guarded(Permission.VIEW_OPPORTUNITIES, <OpportunitiesPage />, 'marketplace'),
+      },
       {
         path: 'opportunities/create',
-        element: guarded(Permission.CREATE_OPPORTUNITY, <CreateOpportunityPage />),
+        element: companyGuarded(Permission.CREATE_OPPORTUNITY, <CreateOpportunityPage />),
       },
-      { path: 'opportunities/:id', element: withSuspense(<OpportunityDetailsPage />) },
-      { path: 'opportunities/:id/proposals', element: withSuspense(<ProposalsPage />) },
-      { path: 'opportunities/:id/compare', element: withSuspense(<ComparisonPage />) },
+      {
+        path: 'opportunities/:id',
+        element: guarded(Permission.VIEW_OPPORTUNITIES, <OpportunityDetailsPage />, 'marketplace'),
+      },
+      {
+        path: 'opportunities/:id/proposals',
+        element: guarded(Permission.VIEW_OPPORTUNITIES, <ProposalsPage />, 'marketplace'),
+      },
+      {
+        path: 'opportunities/:id/compare',
+        element: guarded(Permission.VIEW_OPPORTUNITIES, <ComparisonPage />, 'marketplace'),
+      },
       {
         path: 'opportunities/:id/propose',
-        element: guarded(Permission.CREATE_PROPOSAL, <CreateProposalPage />),
+        element: companyGuarded(Permission.CREATE_PROPOSAL, <CreateProposalPage />),
       },
       {
         path: 'proposals/create/:opportunityId',
-        element: guarded(Permission.CREATE_PROPOSAL, <CreateProposalPage />),
+        element: companyGuarded(Permission.CREATE_PROPOSAL, <CreateProposalPage />),
       },
-      { path: 'proposals/:id', element: withSuspense(<ProposalDetailsPage />) },
-      { path: 'deals/:id', element: withSuspense(<DealRoomPage />) },
-      { path: 'companies', element: withSuspense(<CompaniesPage />) },
-      { path: 'companies/:id', element: withSuspense(<CompanyDetailsPage />) },
+      {
+        path: 'proposals/:id',
+        element: guarded(Permission.VIEW_OPPORTUNITIES, <ProposalDetailsPage />, 'marketplace'),
+      },
+      {
+        path: 'deals/:id',
+        element: guarded(
+          [Permission.VIEW_DEALS, Permission.START_NEGOTIATION],
+          <DealRoomPage />,
+          'marketplace',
+        ),
+      },
+      {
+        path: 'companies',
+        element: guarded(Permission.VIEW_COMPANY_PROFILE, <CompaniesPage />, 'marketplace'),
+      },
+      {
+        path: 'companies/:id',
+        element: guarded(Permission.VIEW_COMPANY_PROFILE, <CompanyDetailsPage />, 'marketplace'),
+      },
       { path: 'company/:id', element: <CompanyAliasRedirect /> },
-      { path: 'my', element: withSuspense(<MyProcessesPage />) },
-      { path: 'my/requests', element: withSuspense(<MyRequestsPage />) },
-      { path: 'my/proposals', element: withSuspense(<MyProposalsPage />) },
+      {
+        path: 'my',
+        element: guarded(Permission.VIEW_OPPORTUNITIES, <MyProcessesPage />, 'marketplace'),
+      },
+      {
+        path: 'my/requests',
+        element: guarded(Permission.VIEW_OPPORTUNITIES, <MyRequestsPage />, 'marketplace'),
+      },
+      {
+        path: 'my/proposals',
+        element: guarded(Permission.VIEW_OPPORTUNITIES, <MyProposalsPage />, 'marketplace'),
+      },
       {
         path: 'my/shortlist',
-        element: guarded(Permission.MANAGE_SHORTLIST, <ShortlistPage />),
+        element: companyGuarded(Permission.MANAGE_SHORTLIST, <ShortlistPage />),
       },
-      { path: 'my/negotiations', element: withSuspense(<NegotiationsPage />) },
-      { path: 'favorites', element: withSuspense(<FavoritesPage />) },
-      { path: 'notifications', element: withSuspense(<NotificationsPage />) },
+      {
+        path: 'my/negotiations',
+        element: guarded(Permission.START_NEGOTIATION, <NegotiationsPage />, 'marketplace'),
+      },
+      {
+        path: 'favorites',
+        element: guarded(Permission.MANAGE_FAVORITES, <FavoritesPage />, 'marketplace'),
+      },
+      {
+        path: 'notifications',
+        element: guarded(Permission.VIEW_NOTIFICATIONS, <NotificationsPage />, 'marketplace'),
+      },
+      {
+        path: 'company-invitations/:token',
+        element: withSuspense(<CompanyInvitationPage />),
+      },
 
       {
         path: 'profile/company',
-        element: withSuspense(<CompanyManagementLayoutRoute />),
+        element: guarded(Permission.VIEW_COMPANY, <CompanyManagementLayoutRoute />, 'marketplace'),
         children: [
           { index: true, element: withSuspense(<CompanyProfileRoute />) },
           {
             path: 'edit',
-            element: guarded(Permission.EDIT_COMPANY, <CompanyEditPage />),
+            element: companyGuarded(Permission.EDIT_COMPANY, <CompanyEditPage />),
           },
           {
             path: 'team',
-            element: guarded(
+            element: companyGuarded(
               Permission.MANAGE_COMPANY_MEMBERS,
               <CompanyTeamPage />,
               'company_members',
@@ -374,7 +447,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'team/invite',
-            element: guarded(
+            element: companyGuarded(
               Permission.MANAGE_COMPANY_MEMBERS,
               <CompanyInviteMemberPage />,
               'company_members',
@@ -382,7 +455,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'team/:memberId',
-            element: guarded(
+            element: companyGuarded(
               Permission.MANAGE_COMPANY_MEMBERS,
               <CompanyMemberDetailPage />,
               'company_members',
@@ -390,58 +463,76 @@ export const router = createBrowserRouter([
           },
           {
             path: 'services',
-            element: guarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServicesPage />),
+            element: companyGuarded(
+              [Permission.VIEW_COMPANY_SERVICES, Permission.MANAGE_COMPANY_SERVICES],
+              <CompanyServicesPage />,
+            ),
           },
           {
             path: 'services/create',
-            element: guarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServiceCreatePage />),
+            element: companyGuarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServiceCreatePage />),
           },
           {
             path: 'services/:serviceId',
-            element: guarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServiceDetailPage />),
+            element: companyGuarded(
+              [Permission.VIEW_COMPANY_SERVICES, Permission.MANAGE_COMPANY_SERVICES],
+              <CompanyServiceDetailPage />,
+            ),
           },
           {
             path: 'services/:serviceId/edit',
-            element: guarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServiceEditPage />),
+            element: companyGuarded(Permission.MANAGE_COMPANY_SERVICES, <CompanyServiceEditPage />),
           },
           {
             path: 'cases',
-            element: guarded(Permission.MANAGE_COMPANY_CASES, <CompanyCasesPage />),
+            element: companyGuarded(
+              [Permission.VIEW_COMPANY_CASES, Permission.MANAGE_COMPANY_CASES],
+              <CompanyCasesPage />,
+            ),
           },
           {
             path: 'cases/create',
-            element: guarded(Permission.MANAGE_COMPANY_CASES, <CompanyCaseCreatePage />),
+            element: companyGuarded(Permission.MANAGE_COMPANY_CASES, <CompanyCaseCreatePage />),
           },
           {
             path: 'cases/:caseId',
-            element: guarded(Permission.MANAGE_COMPANY_CASES, <CompanyCaseDetailPage />),
+            element: companyGuarded(
+              [Permission.VIEW_COMPANY_CASES, Permission.MANAGE_COMPANY_CASES],
+              <CompanyCaseDetailPage />,
+            ),
           },
           {
             path: 'cases/:caseId/edit',
-            element: guarded(Permission.MANAGE_COMPANY_CASES, <CompanyCaseEditPage />),
+            element: companyGuarded(Permission.MANAGE_COMPANY_CASES, <CompanyCaseEditPage />),
           },
           {
             path: 'documents',
-            element: guarded(Permission.MANAGE_COMPANY_DOCUMENTS, <CompanyDocumentsPage />),
+            element: companyGuarded(
+              [Permission.VIEW_COMPANY_DOCUMENTS, Permission.MANAGE_COMPANY_DOCUMENTS],
+              <CompanyDocumentsPage />,
+            ),
           },
           {
             path: 'documents/upload',
-            element: guarded(Permission.MANAGE_COMPANY_DOCUMENTS, <CompanyDocumentUploadPage />),
+            element: companyGuarded(Permission.MANAGE_COMPANY_DOCUMENTS, <CompanyDocumentUploadPage />),
           },
           {
             path: 'documents/:documentId',
-            element: guarded(Permission.MANAGE_COMPANY_DOCUMENTS, <CompanyDocumentDetailPage />),
+            element: companyGuarded(
+              [Permission.VIEW_COMPANY_DOCUMENTS, Permission.MANAGE_COMPANY_DOCUMENTS],
+              <CompanyDocumentDetailPage />,
+            ),
           },
           {
             path: 'permissions',
-            element: guarded(
+            element: companyGuarded(
               [Permission.VIEW_COMPANY_PERMISSIONS, Permission.MANAGE_COMPANY_PERMISSIONS],
               <CompanyPermissionsPage />,
             ),
           },
           {
             path: 'settings',
-            element: guarded(
+            element: companyGuarded(
               Permission.MANAGE_COMPANY_SETTINGS,
               <CompanySettingsPage />,
               'company_settings',
@@ -449,11 +540,11 @@ export const router = createBrowserRouter([
           },
           {
             path: 'verification',
-            element: guarded(Permission.VIEW_COMPANY_VERIFICATION, <CompanyVerificationPage />),
+            element: companyGuarded(Permission.VIEW_COMPANY_VERIFICATION, <CompanyVerificationPage />),
           },
           {
             path: 'activity',
-            element: guarded(
+            element: companyGuarded(
               Permission.VIEW_COMPANY_ACTIVITY,
               <CompanyActivityPage />,
               'company_activity',
