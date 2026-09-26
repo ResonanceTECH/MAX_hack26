@@ -9,7 +9,7 @@ import { apiClient } from '@/shared/api/apiClient'
 import { isReal } from '@/shared/api/apiCapabilities'
 import { toApiError } from '@/shared/api/errors'
 import { delay } from '@/shared/lib/delay'
-import { CURRENT_COMPANY_ID, mockCompanyDocuments } from '@/shared/mocks'
+import { mockCompanyDocuments } from '@/shared/mocks'
 import { persistCompanyDocuments } from '@/shared/mocks/hydrateMocks'
 import { activityApi } from './activityApi'
 
@@ -93,7 +93,7 @@ function toDocBody(input: DocumentInput | DocumentMetadataUpdate) {
 }
 
 export const documentsApi = {
-  async list(companyId = CURRENT_COMPANY_ID): Promise<CompanyDocument[]> {
+  async list(companyId?: string): Promise<CompanyDocument[]> {
     if (isReal('documents')) {
       try {
         const { data } = await apiClient.get<DocumentDto[]>('/companies/me/documents')
@@ -103,12 +103,13 @@ export const documentsApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     return mockCompanyDocuments.filter((d) => d.companyId === companyId)
   },
 
-  async getById(id: string): Promise<CompanyDocument> {
+  async getById(id: string, companyId?: string): Promise<CompanyDocument> {
     if (isReal('documents')) {
-      const all = await documentsApi.list()
+      const all = await documentsApi.list(companyId)
       const doc = all.find((d) => d.id === id)
       if (!doc) throw new Error('Документ не найден')
       return doc
@@ -119,7 +120,7 @@ export const documentsApi = {
     return { ...doc }
   },
 
-  async add(input: DocumentInput, companyId = CURRENT_COMPANY_ID): Promise<CompanyDocument> {
+  async add(input: DocumentInput, companyId?: string): Promise<CompanyDocument> {
     if (isReal('documents')) {
       try {
         const { data } = await apiClient.post<DocumentDto>('/companies/me/documents', {
@@ -139,6 +140,7 @@ export const documentsApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     const now = new Date().toISOString()
     const doc: CompanyDocument = {
       id: `doc-${Date.now()}`,

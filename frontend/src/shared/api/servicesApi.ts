@@ -9,7 +9,7 @@ import { apiClient } from '@/shared/api/apiClient'
 import { isReal } from '@/shared/api/apiCapabilities'
 import { toApiError } from '@/shared/api/errors'
 import { delay } from '@/shared/lib/delay'
-import { CURRENT_COMPANY_ID, mockCompanyServices } from '@/shared/mocks'
+import { mockCompanyServices } from '@/shared/mocks'
 import { persistCompanyServices } from '@/shared/mocks/hydrateMocks'
 import { activityApi } from './activityApi'
 
@@ -92,7 +92,7 @@ function toServiceBody(input: ServiceInput) {
 }
 
 export const servicesApi = {
-  async list(companyId = CURRENT_COMPANY_ID): Promise<CompanyService[]> {
+  async list(companyId?: string): Promise<CompanyService[]> {
     if (isReal('services')) {
       try {
         const { data } = await apiClient.get<ServiceDto[]>('/companies/me/services')
@@ -102,10 +102,11 @@ export const servicesApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     return mockCompanyServices.filter((s) => s.companyId === companyId)
   },
 
-  async listPublic(companyId = CURRENT_COMPANY_ID): Promise<CompanyService[]> {
+  async listPublic(companyId: string): Promise<CompanyService[]> {
     if (isReal('services')) {
       try {
         const { data } = await apiClient.get<ServiceDto[]>(`/companies/${companyId}/services`)
@@ -118,9 +119,9 @@ export const servicesApi = {
     return mockCompanyServices.filter((s) => s.companyId === companyId && isServicePublic(s))
   },
 
-  async getById(id: string): Promise<CompanyService> {
+  async getById(id: string, companyId?: string): Promise<CompanyService> {
     if (isReal('services')) {
-      const all = await servicesApi.list()
+      const all = await servicesApi.list(companyId)
       const service = all.find((s) => s.id === id)
       if (!service) throw new Error('Услуга не найдена')
       return service
@@ -131,7 +132,7 @@ export const servicesApi = {
     return { ...service }
   },
 
-  async create(input: ServiceInput, companyId = CURRENT_COMPANY_ID): Promise<CompanyService> {
+  async create(input: ServiceInput, companyId?: string): Promise<CompanyService> {
     if (isReal('services')) {
       try {
         const { data } = await apiClient.post<ServiceDto>('/companies/me/services', toServiceBody(input))
@@ -141,6 +142,7 @@ export const servicesApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     const now = new Date().toISOString()
     const service: CompanyService = {
       id: `svc-${Date.now()}`,
@@ -204,12 +206,12 @@ export const servicesApi = {
   async archive(id: string): Promise<CompanyService> {
     if (isReal('services')) {
       try {
+        const existing = await servicesApi.getById(id).catch(() => null)
         await apiClient.delete(`/companies/me/services/${id}`)
-        const service = await servicesApi.getById(id).catch(() => null)
-        if (service) return { ...service, status: COMPANY_SERVICE_STATUS.ARCHIVED }
+        if (existing) return { ...existing, status: COMPANY_SERVICE_STATUS.ARCHIVED }
         return {
           id,
-          companyId: CURRENT_COMPANY_ID,
+          companyId: '',
           title: '',
           description: '',
           category: '',

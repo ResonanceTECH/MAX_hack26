@@ -9,7 +9,6 @@ import { toApiError } from '@/shared/api/errors'
 import { delay } from '@/shared/lib/delay'
 import { mockCompanyActivity } from '@/shared/mocks'
 import { persistCompanyActivity } from '@/shared/mocks/hydrateMocks'
-import { CURRENT_COMPANY_ID } from '@/shared/mocks/user'
 
 export interface ActivityFilter {
   companyId?: string
@@ -45,9 +44,12 @@ function mapActivity(dto: ActivityDto): CompanyActivityEvent {
 }
 
 function appendSync(event: AppendActivityInput): CompanyActivityEvent {
+  if (!event.companyId) {
+    throw new Error('companyId required for activity append')
+  }
   const item: CompanyActivityEvent = {
     id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    companyId: event.companyId ?? CURRENT_COMPANY_ID,
+    companyId: event.companyId,
     type: event.type,
     actorName: event.actorName,
     action: event.action,
@@ -74,7 +76,8 @@ export const activityApi = {
     }
     await delay()
     let items = [...mockCompanyActivity]
-    const companyId = filter?.companyId ?? CURRENT_COMPANY_ID
+    if (!filter?.companyId) throw new Error('companyId required in mock mode')
+    const companyId = filter.companyId
     items = items.filter((e) => e.companyId === companyId)
     if (filter?.type) items = items.filter((e) => e.type === filter.type)
     items.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -84,10 +87,11 @@ export const activityApi = {
 
   async append(event: AppendActivityInput): Promise<CompanyActivityEvent> {
     if (isReal('companies')) {
+      if (!event.companyId) throw new Error('companyId required')
       // BE activity is write-through from other mutations; local append is no-op for persistence
       return {
         id: `act-local-${Date.now()}`,
-        companyId: event.companyId ?? CURRENT_COMPANY_ID,
+        companyId: event.companyId,
         type: event.type,
         actorName: event.actorName,
         action: event.action,

@@ -6,7 +6,6 @@ import { toApiError } from '@/shared/api/errors'
 import { delay } from '@/shared/lib/delay'
 import { mockCompanySettings } from '@/shared/mocks'
 import { persistCompanySettings } from '@/shared/mocks/hydrateMocks'
-import { CURRENT_COMPANY_ID } from '@/shared/mocks/user'
 import { activityApi } from './activityApi'
 
 export type CompanySettingsPatch = Partial<{
@@ -37,7 +36,7 @@ function mapSettings(dto: SettingsDto): CompanySettings {
 }
 
 export const settingsApi = {
-  async get(companyId = CURRENT_COMPANY_ID): Promise<CompanySettings> {
+  async get(companyId?: string): Promise<CompanySettings> {
     if (isReal('settings')) {
       try {
         const { data } = await apiClient.get<SettingsDto>('/companies/me/settings')
@@ -47,13 +46,14 @@ export const settingsApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     if (mockCompanySettings.companyId !== companyId) {
       return { ...structuredClone(mockCompanySettings), companyId }
     }
     return structuredClone(mockCompanySettings)
   },
 
-  async update(patch: CompanySettingsPatch, companyId = CURRENT_COMPANY_ID): Promise<CompanySettings> {
+  async update(patch: CompanySettingsPatch, companyId?: string): Promise<CompanySettings> {
     if (isReal('settings')) {
       try {
         const { data } = await apiClient.patch<SettingsDto>('/companies/me/settings', patch)
@@ -63,6 +63,7 @@ export const settingsApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     if (patch.notifications) Object.assign(mockCompanySettings.notifications, patch.notifications)
     if (patch.visibility) Object.assign(mockCompanySettings.visibility, patch.visibility)
     if (patch.matching) Object.assign(mockCompanySettings.matching, patch.matching)

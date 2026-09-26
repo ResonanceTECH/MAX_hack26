@@ -1,5 +1,8 @@
-import type { SystemRole, User } from '@/entities/user'
-import { SYSTEM_ROLES, USER_STATUS } from '@/entities/user'
+import {
+  COMPANY_MEMBER_ROLES,
+  type CompanyMemberRole,
+} from '@/entities/company-member'
+import { SYSTEM_ROLES, USER_STATUS, type SystemRole, type User } from '@/entities/user'
 import type { UserDto } from '@/shared/api/dto/backend'
 
 /** Seed MAX user ids → frontend demo roles (DEV_MODE). */
@@ -10,7 +13,17 @@ export const DEV_ROLE_MAX_USER_IDS: Record<SystemRole, number> = {
   [SYSTEM_ROLES.MODERATOR]: 7777009,
 }
 
+export const DEV_PERSONA_MAX_USER_IDS = {
+  platform_admin: 7777001,
+  company_admin: 7777002,
+  business_user: 7777003,
+  moderator: 7777009,
+  manager: 7777010,
+  viewer: 7777011,
+} as const
+
 const ROLE_SET = new Set<string>(Object.values(SYSTEM_ROLES))
+const MEMBER_ROLE_SET = new Set<string>(Object.values(COMPANY_MEMBER_ROLES))
 
 export function mapUserDtoToModel(dto: UserDto): User {
   let role: SystemRole = SYSTEM_ROLES.BUSINESS_USER
@@ -27,6 +40,11 @@ export function mapUserDtoToModel(dto: UserDto): User {
       ? dto.status
       : USER_STATUS.ACTIVE
 
+  const companyMemberRole =
+    dto.member_role && MEMBER_ROLE_SET.has(dto.member_role)
+      ? (dto.member_role as CompanyMemberRole)
+      : null
+
   return {
     id: String(dto.id),
     maxUserId: String(dto.max_user_id),
@@ -37,6 +55,8 @@ export function mapUserDtoToModel(dto: UserDto): User {
     role,
     status,
     createdAt: dto.created_at,
+    companyMemberRole,
+    email: dto.email ?? null,
   }
 }
 

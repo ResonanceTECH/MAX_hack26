@@ -9,7 +9,7 @@ import type {
   RejectInput,
   RequestChangesInput,
 } from '@/entities/moderation'
-import { MODERATION_ACTION, MODERATION_STATUS } from '@/entities/moderation'
+import { MODERATION_ACTION, MODERATION_STATUS, VERSION_CONFLICT_MESSAGE } from '@/entities/moderation'
 import type { Escalation, EscalationReason } from '@/entities/escalation'
 import { ESCALATION_REASON, ESCALATION_STATUS } from '@/entities/escalation'
 import type { Report } from '@/entities/report'
@@ -24,6 +24,7 @@ import type { PlatformSettings } from '@/shared/mocks/platformSettings'
 import { mockPlatformSettings } from '@/shared/mocks/platformSettings'
 import { apiClient } from '@/shared/api/apiClient'
 import { toApiError } from '@/shared/api/errors'
+import { getModerationPriorityRank } from '@/features/moderation/model/businessRules'
 
 /** Local mirrors to avoid circular imports with *Api modules */
 type PlatformCompanyStatus = 'ACTIVE' | 'SUSPENDED' | 'BLOCKED' | 'ARCHIVED'
@@ -191,6 +192,8 @@ interface EscalationDto {
   status: string
   created_at: string
   resolved_at?: string | null
+  resolution?: string | null
+  admin_response?: string | null
 }
 
 interface AdminUserDto {
@@ -407,8 +410,8 @@ export function mapEscalation(dto: EscalationDto, extra?: Partial<Escalation>): 
     status: (dto.status as Escalation['status']) || ESCALATION_STATUS.OPEN,
     createdAt: dto.created_at,
     resolvedAt: dto.resolved_at ?? null,
-    resolution: null,
-    adminResponse: null,
+    resolution: dto.resolution ?? extra?.resolution ?? null,
+    adminResponse: dto.admin_response ?? extra?.adminResponse ?? null,
   }
 }
 
@@ -642,6 +645,49 @@ function decisionBody(input?: {
   }
 }
 
+function mapDecisionError(error: unknown): never {
+  const err = toApiError(error) as Error & { status?: number; code?: string }
+  const msg = err.message || ''
+  if (
+    err.status === 409 &&
+    (msg.includes('Версия') ||
+      msg.includes('устарела') ||
+      msg.includes('изменён') ||
+      err.code === 'conflict' ||
+      msg === 'Конфликт данных')
+  ) {
+    throw Object.assign(new Error(VERSION_CONFLICT_MESSAGE), {
+      status: 409,
+      code: 'version_conflict',
+    })
+  }
+  throw err
+}
+
+function sortQueueItems(
+  items: ModerationItem[],
+  sort: ModerationQueueFilters['sort'] = 'urgent',
+): ModerationItem[] {
+  const copy = [...items]
+  switch (sort) {
+    case 'oldest':
+      return copy.sort((a, b) => +new Date(a.submittedAt) - +new Date(b.submittedAt))
+    case 'newest':
+      return copy.sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt))
+    case 'priority':
+      return copy.sort(
+        (a, b) => getModerationPriorityRank(b.priority) - getModerationPriorityRank(a.priority),
+      )
+    case 'urgent':
+    default:
+      return copy.sort((a, b) => {
+        const pr = getModerationPriorityRank(b.priority) - getModerationPriorityRank(a.priority)
+        if (pr !== 0) return pr
+        return +new Date(a.submittedAt) - +new Date(b.submittedAt)
+      })
+  }
+}
+
 /* ── moderation / reports / escalations ───────────────────────────── */
 
 export const moderationReal = {
@@ -660,6 +706,8 @@ export const moderationReal = {
 
   async getQueue(filters?: ModerationQueueFilters): Promise<ModerationItem[]> {
     try {
+      // BE list endpoint only accepts `status`. Other UI filters that look like
+      // query params (search, hasReports, sort=reports, olderThan) are not sent.
       const status =
         filters?.status && filters.status !== 'all' && filters.status !== 'open'
           ? filters.status
@@ -668,19 +716,15 @@ export const moderationReal = {
         params: { status },
       })
       let items = data.map(mapModerationItem)
+      // Honest client-side narrowing of the fetched page (not BE query params)
       if (filters?.type && filters.type !== 'all') {
         items = items.filter((i) => i.entityType === filters.type)
       }
       if (filters?.priority && filters.priority !== 'all') {
         items = items.filter((i) => i.priority === filters.priority)
       }
-      if (filters?.query) {
-        const q = filters.query.toLowerCase()
-        items = items.filter((i) =>
-          `${i.title} ${i.companyName} ${i.ownerName}`.toLowerCase().includes(q),
-        )
-      }
-      return items
+      const sort = filters?.sort === 'reports' ? 'urgent' : filters?.sort
+      return sortQueueItems(items, sort)
     } catch (e) {
       throw toApiError(e)
     }
@@ -690,6 +734,15 @@ export const moderationReal = {
     try {
       const { data } = await apiClient.get<ModerationItemDto>(`/moderation/items/${id}`)
       return mapModerationItem(data)
+    } catch (e) {
+      throw toApiError(e)
+    }
+  },
+
+  async listMine(): Promise<ModerationItem[]> {
+    try {
+      const { data } = await apiClient.get<ModerationItemDto[]>('/moderation/mine')
+      return data.map(mapModerationItem)
     } catch (e) {
       throw toApiError(e)
     }
@@ -734,7 +787,7 @@ export const moderationReal = {
       )
       return mapModerationItem(data)
     } catch (e) {
-      throw toApiError(e)
+      mapDecisionError(e)
     }
   },
 
@@ -746,7 +799,7 @@ export const moderationReal = {
       )
       return mapModerationItem(data)
     } catch (e) {
-      throw toApiError(e)
+      mapDecisionError(e)
     }
   },
 
@@ -763,7 +816,7 @@ export const moderationReal = {
       )
       return mapModerationItem(data)
     } catch (e) {
-      throw toApiError(e)
+      mapDecisionError(e)
     }
   },
 
@@ -775,7 +828,7 @@ export const moderationReal = {
       )
       return mapModerationItem(data)
     } catch (e) {
-      throw toApiError(e)
+      mapDecisionError(e)
     }
   },
 
@@ -799,7 +852,7 @@ export const moderationReal = {
         }),
       }
     } catch (e) {
-      throw toApiError(e)
+      mapDecisionError(e)
     }
   },
 
@@ -971,6 +1024,21 @@ export const escalationsReal = {
   async getById(id: string): Promise<Escalation> {
     try {
       const { data } = await apiClient.get<EscalationDto>(`/escalations/${id}`)
+      return mapEscalation(data)
+    } catch (e) {
+      throw toApiError(e)
+    }
+  },
+
+  async resolve(
+    id: string,
+    input: { decision: string; reason: string; actor?: AdminActor },
+  ): Promise<Escalation> {
+    try {
+      const { data } = await apiClient.post<EscalationDto>(`/escalations/${id}/resolve`, {
+        decision: input.decision,
+        reason: input.reason,
+      })
       return mapEscalation(data)
     } catch (e) {
       throw toApiError(e)
@@ -1474,17 +1542,27 @@ export const platformSettingsReal = {
 export function createApiProxy<T extends object>(
   real: object,
   mock: T,
-  useReal: () => boolean,
+  shouldUseReal: () => boolean,
 ): T {
   return new Proxy(mock, {
     get(target, prop, receiver) {
-      if (
-        useReal() &&
-        prop in real &&
-        typeof (real as Record<string | symbol, unknown>)[prop] === 'function'
-      ) {
-        const fn = (real as Record<string | symbol, unknown>)[prop] as (...a: unknown[]) => unknown
-        return fn.bind(real)
+      if (shouldUseReal()) {
+        if (
+          prop in real &&
+          typeof (real as Record<string | symbol, unknown>)[prop] === 'function'
+        ) {
+          const fn = (real as Record<string | symbol, unknown>)[prop] as (...a: unknown[]) => unknown
+          return fn.bind(real)
+        }
+        const mockValue = Reflect.get(target, prop, receiver)
+        if (typeof mockValue === 'function') {
+          return () => {
+            throw new Error(
+              `API method "${String(prop)}" is not implemented in real mode (VITE_USE_MOCK_API=false)`,
+            )
+          }
+        }
+        return mockValue
       }
       const value = Reflect.get(target, prop, receiver)
       if (typeof value === 'function') return value.bind(target)

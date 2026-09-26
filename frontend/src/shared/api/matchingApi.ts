@@ -145,7 +145,7 @@ export const matchingApi = {
     if (isReal('matching')) {
       try {
         const { data } = await apiClient.get<FeedItemDto[]>('/me/recommendations')
-        return data.map(mapFeedItemToMatch)
+        return data.map((item) => mapFeedItemToMatch(item))
       } catch (error) {
         throw toApiError(error)
       }

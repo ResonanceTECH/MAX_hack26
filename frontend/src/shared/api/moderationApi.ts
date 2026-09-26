@@ -3,6 +3,7 @@ import {
   MODERATION_ACTION,
   MODERATION_ENTITY_TYPES,
   MODERATION_STATUS,
+  VERSION_CONFLICT_MESSAGE,
   type ApproveInput,
   type BlockInput,
   type EscalateInput,
@@ -63,7 +64,7 @@ function assertAllowed(result: { allowed: boolean; reason?: string }) {
 
 function assertVersion(item: ModerationItem, expectedVersion?: number) {
   if (expectedVersion != null && item.version !== expectedVersion) {
-    throw new Error('Объект был изменён. Обновите данные перед принятием решения.')
+    throw new Error(VERSION_CONFLICT_MESSAGE)
   }
 }
 
@@ -242,6 +243,17 @@ const mockModerationApi = {
     const item = getModerationItemById(id)
     if (!item) throw new Error('Объект не найден')
     return { ...item }
+  },
+
+  async listMine(): Promise<ModerationItem[]> {
+    await readDelay()
+    return mockModerationItems
+      .filter((i) =>
+        [MODERATION_STATUS.NEEDS_CHANGES, MODERATION_STATUS.PENDING, MODERATION_STATUS.IN_REVIEW, MODERATION_STATUS.REJECTED].includes(
+          i.status as typeof MODERATION_STATUS.NEEDS_CHANGES,
+        ),
+      )
+      .map((i) => ({ ...i }))
   },
 
   async getNextItem(afterId: string, filters?: ModerationQueueFilters): Promise<ModerationItem | null> {

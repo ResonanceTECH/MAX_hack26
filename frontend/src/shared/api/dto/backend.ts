@@ -8,6 +8,7 @@ export interface UserDto {
   username: string | null
   email?: string | null
   role?: string
+  member_role?: string | null
   is_admin: boolean
   status?: string
   created_at: string
@@ -146,6 +147,15 @@ export interface NotificationDto {
   ok: boolean
   is_read: boolean
   created_at: string
+  /** Present when backend sends typed admin/system notifications */
+  type?: string
+  payload?: {
+    type?: string
+    title?: string
+    href?: string
+    entityType?: string
+    entityId?: string
+  }
 }
 
 export interface FeedItemDto {

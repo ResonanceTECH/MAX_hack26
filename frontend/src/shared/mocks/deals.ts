@@ -17,6 +17,7 @@ export const mockDeals: Deal[] = [
     nextAction: 'Согласовать этапы оплаты',
     lastAction: 'Обсуждение условий',
     updatedAt: '2026-09-25T14:00:00.000Z',
+    files: [],
     events: [
       {
         id: 'e1',
@@ -56,6 +57,7 @@ export const mockDeals: Deal[] = [
     nextAction: 'Уточнить KPI по MQL',
     lastAction: 'Отправлен бриф',
     updatedAt: '2026-09-22T09:00:00.000Z',
+    files: [],
     events: [
       {
         id: 'e4',
@@ -88,6 +90,7 @@ export const mockDeals: Deal[] = [
     nextAction: 'Подписать NDA',
     lastAction: 'Согласована стоимость пилота',
     updatedAt: '2026-09-21T16:00:00.000Z',
+    files: [],
     events: [
       {
         id: 'e6',
@@ -120,6 +123,7 @@ export const mockDeals: Deal[] = [
     nextAction: 'Согласовать график рейсов',
     lastAction: 'Запрос уточнения по страховке',
     updatedAt: '2026-09-20T11:00:00.000Z',
+    files: [],
     events: [
       {
         id: 'e8',
@@ -145,6 +149,7 @@ export const mockDeals: Deal[] = [
     nextAction: 'Архивировать сделку',
     lastAction: 'Сделка закрыта',
     updatedAt: '2026-09-10T18:00:00.000Z',
+    files: [],
     events: [
       {
         id: 'e9',

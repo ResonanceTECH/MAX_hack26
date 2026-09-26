@@ -41,11 +41,11 @@ export function mapMatchDtoToModel(dto: MatchDto, opportunityId: string): Match 
   }
 }
 
-export function mapFeedItemToMatch(item: FeedItemDto): Match {
+export function mapFeedItemToMatch(item: FeedItemDto, companyId?: string): Match {
   return mapMatchDtoToModel(
     {
       id: item.match_id,
-      company_id: 0,
+      company_id: companyId ? Number(companyId) || 0 : 0,
       company_name: '',
       score: item.score,
       criteria: item.criteria,

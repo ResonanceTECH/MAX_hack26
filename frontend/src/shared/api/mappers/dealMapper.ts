@@ -1,8 +1,18 @@
-import type { Deal, DealStatus } from '@/entities/deal'
-import type { DealDto } from '@/shared/api/dto/backend'
+import type { Deal, DealFile, DealStatus } from '@/entities/deal'
+import type { DealDto, FileDto } from '@/shared/api/dto/backend'
 
 const STATUS_MAP: Record<string, DealStatus> = {
   negotiating: 'negotiation',
+}
+
+export function mapFileDtoToDealFile(dto: FileDto): DealFile {
+  return {
+    id: String(dto.id),
+    name: dto.name,
+    contentType: dto.content_type,
+    size: dto.size,
+    createdAt: dto.created_at,
+  }
 }
 
 export function mapDealDtoToModel(dto: DealDto): Deal {
@@ -31,5 +41,6 @@ export function mapDealDtoToModel(dto: DealDto): Deal {
         type: 'negotiation',
       },
     ],
+    files: (dto.files ?? []).map(mapFileDtoToDealFile),
   }
 }

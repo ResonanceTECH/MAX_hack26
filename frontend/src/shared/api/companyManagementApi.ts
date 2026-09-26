@@ -17,7 +17,6 @@ import {
   mockCompanyCases,
   mockCompanyDocuments,
   mockCompanyServices,
-  CURRENT_COMPANY_ID,
 } from '@/shared/mocks'
 import { persistCompanies } from '@/shared/mocks/hydrateMocks'
 import { activityApi } from './activityApi'
@@ -44,7 +43,7 @@ const DEFAULT_ACTOR = 'Анна Смирнова'
 const LOCKED_ON_VERIFIED = ['inn', 'ogrn', 'name'] as const
 
 export const companyManagementApi = {
-  async getCurrent(companyId = CURRENT_COMPANY_ID): Promise<Company> {
+  async getCurrent(companyId?: string): Promise<Company> {
     if (isReal('companies')) {
       try {
         const { data } = await apiClient.get<CompanyDto>('/companies/me')
@@ -54,12 +53,13 @@ export const companyManagementApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     const company = getCompanyById(companyId)
     if (!company) throw new Error('Компания не найдена')
     return { ...company }
   },
 
-  async getCompletion(companyId = CURRENT_COMPANY_ID): Promise<ProfileCompletionResult> {
+  async getCompletion(companyId?: string): Promise<ProfileCompletionResult> {
     if (isReal('companies')) {
       const company = await companyManagementApi.getCurrent(companyId)
       return calculateCompanyProfileCompletion(company, {
@@ -69,6 +69,7 @@ export const companyManagementApi = {
       })
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     const company = getCompanyById(companyId)
     if (!company) throw new Error('Компания не найдена')
     return calculateCompanyProfileCompletion(company, {

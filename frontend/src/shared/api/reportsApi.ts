@@ -1,6 +1,11 @@
-import type { Report, ResolveReportInput, ReportStatus } from '@/entities/report'
+import type {
+  Report,
+  ResolveReportInput,
+  ReportStatus,
+  CreateReportInput,
+} from '@/entities/report'
 import { REPORT_STATUS } from '@/entities/report'
-import { MODERATION_ACTION, MODERATION_STATUS } from '@/entities/moderation'
+import { MODERATION_ACTION, MODERATION_PRIORITY, MODERATION_STATUS } from '@/entities/moderation'
 import {
   canResolveReport,
   CURRENT_MODERATOR_ID,
@@ -20,6 +25,7 @@ import {
 } from '@/shared/mocks/hydrateMocks'
 import { isReal } from '@/shared/api/apiCapabilities'
 import { createApiProxy, reportsReal } from '@/shared/api/real/moderationAdmin'
+import { mockCurrentUser } from '@/shared/mocks/user'
 
 export interface ReportListFilters {
   status?: ReportStatus | 'all' | 'open_tab' | 'in_progress_tab' | 'closed_tab' | 'escalated_tab'
@@ -35,7 +41,51 @@ function decisionDelay() {
   return delay(400 + Math.floor(Math.random() * 400))
 }
 
+function conflictError(message: string): Error {
+  const err = new Error(message) as Error & { status: number }
+  err.status = 409
+  return err
+}
+
 const mockReportsApi = {
+  async create(input: CreateReportInput): Promise<Report> {
+    await decisionDelay()
+    const reporterId = mockCurrentUser.id
+    const openDuplicate = mockReports.find(
+      (r) =>
+        r.reporterId === reporterId &&
+        r.targetType === input.targetType &&
+        r.targetId === input.targetId &&
+        (r.status === REPORT_STATUS.OPEN || r.status === REPORT_STATUS.IN_PROGRESS),
+    )
+    if (openDuplicate) {
+      throw conflictError('Жалоба по этой сущности уже отправлена')
+    }
+
+    const report: Report = {
+      id: `report-${Date.now()}`,
+      reporterId,
+      reporterName: `${mockCurrentUser.firstName} ${mockCurrentUser.lastName.charAt(0)}.`,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      targetName: input.targetName,
+      type: input.type,
+      description: input.description,
+      status: REPORT_STATUS.OPEN,
+      priority: MODERATION_PRIORITY.NORMAL,
+      createdAt: new Date().toISOString(),
+      resolvedAt: null,
+      resolvedBy: null,
+      resolution: null,
+      resolutionCode: null,
+      assignedModeratorId: null,
+      relatedReportIds: [],
+    }
+    mockReports.unshift(report)
+    persistReports()
+    return { ...report }
+  },
+
   async getAll(filters?: ReportListFilters): Promise<Report[]> {
     await readDelay()
     let items = [...mockReports]
@@ -107,7 +157,12 @@ const mockReportsApi = {
     report.resolutionCode = input.resolutionCode
     report.resolution = input.comment ?? input.resolutionCode
 
-    if (input.applyAction && input.applyAction !== 'none' && report.targetType !== 'user') {
+    if (
+      input.applyAction &&
+      input.applyAction !== 'none' &&
+      report.targetType !== 'user' &&
+      report.targetType !== 'proposal'
+    ) {
       const item = getModerationItemByEntity(report.targetType, report.targetId)
       if (item && item.status !== MODERATION_STATUS.BLOCKED) {
         if (input.applyAction === 'block') item.status = MODERATION_STATUS.BLOCKED
@@ -122,7 +177,10 @@ const mockReportsApi = {
     mockModerationHistory.unshift({
       id: `hist-report-${Date.now()}`,
       moderationItemId: report.id,
-      entityType: report.targetType === 'user' ? 'company' : report.targetType,
+      entityType:
+        report.targetType === 'user' || report.targetType === 'proposal'
+          ? 'company'
+          : report.targetType,
       entityId: report.targetId,
       title: report.targetName,
       companyName: report.targetName,
@@ -155,7 +213,10 @@ const mockReportsApi = {
     mockEscalations.unshift({
       id: `esc-report-${Date.now()}`,
       moderationItemId: report.id,
-      entityType: report.targetType,
+      entityType:
+        report.targetType === 'user' || report.targetType === 'proposal'
+          ? 'company'
+          : report.targetType,
       entityId: report.targetId,
       title: report.targetName,
       companyName: report.targetName,

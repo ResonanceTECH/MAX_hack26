@@ -7,8 +7,12 @@ export {
   mockCurrentUser,
   mockUsers,
   CURRENT_COMPANY_ID,
+  WEBFORGE_COMPANY_ID,
+  MEBELPRO_COMPANY_ID,
   getMockUserByRole,
+  getMockUserByPersona,
   getHomePathForRole,
+  getHomePathForPersona,
 } from './user'
 export { mockShortlist, type ShortlistItem } from './shortlist'
 export { mockDeals, getDealById } from './deals'

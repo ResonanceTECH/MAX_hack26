@@ -9,7 +9,7 @@ import { apiClient } from '@/shared/api/apiClient'
 import { isReal } from '@/shared/api/apiCapabilities'
 import { toApiError } from '@/shared/api/errors'
 import { delay } from '@/shared/lib/delay'
-import { CURRENT_COMPANY_ID, mockCompanyCases } from '@/shared/mocks'
+import { mockCompanyCases } from '@/shared/mocks'
 import { persistCompanyCases } from '@/shared/mocks/hydrateMocks'
 import { activityApi } from './activityApi'
 
@@ -92,7 +92,7 @@ function toCaseBody(input: Partial<CaseInput>) {
 }
 
 export const casesApi = {
-  async list(companyId = CURRENT_COMPANY_ID): Promise<CompanyCase[]> {
+  async list(companyId?: string): Promise<CompanyCase[]> {
     if (isReal('cases')) {
       try {
         const { data } = await apiClient.get<CaseDto[]>('/companies/me/cases')
@@ -102,10 +102,11 @@ export const casesApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     return mockCompanyCases.filter((c) => c.companyId === companyId)
   },
 
-  async listPublic(companyId = CURRENT_COMPANY_ID): Promise<CompanyCase[]> {
+  async listPublic(companyId: string): Promise<CompanyCase[]> {
     if (isReal('cases')) {
       try {
         const { data } = await apiClient.get<CaseDto[]>(`/companies/${companyId}/cases`)
@@ -118,9 +119,9 @@ export const casesApi = {
     return mockCompanyCases.filter((c) => c.companyId === companyId && isCasePublic(c))
   },
 
-  async getById(id: string): Promise<CompanyCase> {
+  async getById(id: string, companyId?: string): Promise<CompanyCase> {
     if (isReal('cases')) {
-      const all = await casesApi.list()
+      const all = await casesApi.list(companyId)
       const item = all.find((c) => c.id === id)
       if (!item) throw new Error('Кейс не найден')
       return item
@@ -131,7 +132,7 @@ export const casesApi = {
     return { ...item }
   },
 
-  async create(input: CaseInput, companyId = CURRENT_COMPANY_ID): Promise<CompanyCase> {
+  async create(input: CaseInput, companyId?: string): Promise<CompanyCase> {
     if (isReal('cases')) {
       try {
         const { data } = await apiClient.post<CaseDto>('/companies/me/cases', toCaseBody(input))
@@ -141,6 +142,7 @@ export const casesApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     const item: CompanyCase = {
       id: `case-${Date.now()}`,
       companyId,

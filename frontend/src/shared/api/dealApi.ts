@@ -36,6 +36,7 @@ export const dealApi = {
     if (!deal) throw new Error('Сделка не найдена')
     return {
       ...deal,
+      files: deal.files ?? [],
       events: [...deal.events].sort((a, b) => +new Date(a.date) - +new Date(b.date)),
     }
   },
@@ -87,6 +88,7 @@ export const dealApi = {
       nextAction: 'Назначить созвон',
       lastAction: 'Начаты переговоры',
       updatedAt: new Date().toISOString(),
+      files: [],
       events: [
         {
           id: `ev-${Date.now()}`,

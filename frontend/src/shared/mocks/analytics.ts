@@ -85,7 +85,7 @@ export interface AnalyticsOverview {
   createdProposals: number
   shortlists: number
   negotiationsCount: number
-  isModelData: true
+  isModelData: boolean
 }
 
 function delta(value: number, previousPeriod: number): PeriodDelta {

@@ -1,10 +1,8 @@
 export type AdminNotificationType =
-  | 'CRITICAL_ESCALATION'
+  | 'NEW_ESCALATION'
   | 'MANY_REPORTS'
-  | 'SETTING_CHANGED'
+  | 'PLATFORM_SETTING_CHANGED'
   | 'FEATURE_FLAG_CHANGED'
-  | 'HIGH_QUEUE_AGE'
-  | 'SUSPICIOUS_ADMIN_ACTION'
 
 export interface AdminNotification {
   id: string
@@ -21,7 +19,7 @@ export interface AdminNotification {
 export const mockAdminNotifications: AdminNotification[] = [
   {
     id: 'an-1',
-    type: 'CRITICAL_ESCALATION',
+    type: 'NEW_ESCALATION',
     title: 'Критическая эскалация',
     body: 'Эскалация по компании BrandPulse требует решения Platform Admin',
     entityType: 'escalation',
@@ -54,7 +52,7 @@ export const mockAdminNotifications: AdminNotification[] = [
   },
   {
     id: 'an-4',
-    type: 'HIGH_QUEUE_AGE',
+    type: 'NEW_ESCALATION',
     title: 'Высокий возраст очереди',
     body: 'Средний возраст moderation queue превышает 24 часа',
     entityType: 'moderation',
@@ -64,7 +62,7 @@ export const mockAdminNotifications: AdminNotification[] = [
   },
   {
     id: 'an-5',
-    type: 'SETTING_CHANGED',
+    type: 'PLATFORM_SETTING_CHANGED',
     title: 'Настройка платформы изменена',
     body: 'matching.minScoreToShow обновлён',
     entityType: 'settings',
@@ -74,7 +72,7 @@ export const mockAdminNotifications: AdminNotification[] = [
   },
   {
     id: 'an-6',
-    type: 'SUSPICIOUS_ADMIN_ACTION',
+    type: 'PLATFORM_SETTING_CHANGED',
     title: 'Подозрительное админ-действие (mock)',
     body: 'Несколько блокировок пользователей за короткий период',
     entityType: 'audit',

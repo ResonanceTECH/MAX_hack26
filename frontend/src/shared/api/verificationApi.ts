@@ -3,7 +3,6 @@ import { isReal } from '@/shared/api/apiCapabilities'
 import { toApiError } from '@/shared/api/errors'
 import { delay } from '@/shared/lib/delay'
 import { mockCompanyVerification, type CompanyVerification } from '@/shared/mocks'
-import { CURRENT_COMPANY_ID } from '@/shared/mocks/user'
 
 interface VerificationDto {
   company_id: number
@@ -13,7 +12,7 @@ interface VerificationDto {
 }
 
 export const verificationApi = {
-  async get(companyId = CURRENT_COMPANY_ID): Promise<CompanyVerification> {
+  async get(companyId?: string): Promise<CompanyVerification> {
     if (isReal('verification')) {
       try {
         const { data } = await apiClient.get<VerificationDto>('/companies/me/verification')
@@ -28,10 +27,11 @@ export const verificationApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     return { ...structuredClone(mockCompanyVerification), companyId }
   },
 
-  async submit(): Promise<CompanyVerification> {
+  async submit(companyId?: string): Promise<CompanyVerification> {
     if (isReal('verification')) {
       try {
         const { data } = await apiClient.post<VerificationDto>('/companies/me/verification')
@@ -45,6 +45,6 @@ export const verificationApi = {
         throw toApiError(error)
       }
     }
-    return verificationApi.get()
+    return verificationApi.get(companyId)
   },
 }

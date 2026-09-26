@@ -34,11 +34,11 @@ export const mockCompanyMembers: CompanyMember[] = [
   },
   {
     id: 'member-3',
-    userId: 'user-maxim',
+    userId: 'user-igor-manager',
     companyId: CURRENT_COMPANY_ID,
-    firstName: 'Максим',
-    lastName: 'Орлов',
-    email: 'maxim.orlov@digital-lab.example',
+    firstName: 'Игорь',
+    lastName: 'Петров',
+    email: 'igor.petrov@digital-lab.example',
     role: COMPANY_MEMBER_ROLES.MANAGER,
     status: COMPANY_MEMBER_STATUS.ACTIVE,
     invitedAt: '2024-05-01T09:00:00.000Z',
@@ -60,11 +60,11 @@ export const mockCompanyMembers: CompanyMember[] = [
   },
   {
     id: 'member-5',
-    userId: 'user-maria-kotova',
+    userId: 'user-maria-viewer',
     companyId: CURRENT_COMPANY_ID,
     firstName: 'Мария',
-    lastName: 'Котова',
-    email: 'maria.kotova@digital-lab.example',
+    lastName: 'Козлова',
+    email: 'maria.kozlova@digital-lab.example',
     role: COMPANY_MEMBER_ROLES.VIEWER,
     status: COMPANY_MEMBER_STATUS.ACTIVE,
     invitedAt: '2024-09-01T10:00:00.000Z',
@@ -81,6 +81,7 @@ export const mockCompanyMembers: CompanyMember[] = [
     role: COMPANY_MEMBER_ROLES.VIEWER,
     status: COMPANY_MEMBER_STATUS.INVITED,
     invitedAt: '2025-09-10T14:00:00.000Z',
+    inviteToken: 'demo-invite-alexey',
   },
 ]
 

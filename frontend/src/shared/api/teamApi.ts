@@ -1,6 +1,7 @@
 import { COMPANY_ACTIVITY_TYPE } from '@/entities/company-activity'
 import {
   COMPANY_MEMBER_STATUS,
+  type CompanyInvitation,
   type CompanyMember,
   type CompanyMemberRole,
 } from '@/entities/company-member'
@@ -14,7 +15,7 @@ import { apiClient } from '@/shared/api/apiClient'
 import { isReal } from '@/shared/api/apiCapabilities'
 import { toApiError } from '@/shared/api/errors'
 import { delay } from '@/shared/lib/delay'
-import { CURRENT_COMPANY_ID, mockCompanyMembers } from '@/shared/mocks'
+import { getCompanyById, mockCompanyMembers } from '@/shared/mocks'
 import { persistCompanyMembers } from '@/shared/mocks/hydrateMocks'
 import { activityApi } from './activityApi'
 
@@ -77,7 +78,7 @@ export interface InviteMemberInput {
 }
 
 export const teamApi = {
-  async list(companyId = CURRENT_COMPANY_ID): Promise<CompanyMember[]> {
+  async list(companyId?: string): Promise<CompanyMember[]> {
     if (isReal('team')) {
       try {
         const { data } = await apiClient.get<MemberDto[]>('/companies/me/members')
@@ -87,12 +88,13 @@ export const teamApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     return companyMembers(companyId)
   },
 
-  async getById(memberId: string): Promise<CompanyMember> {
+  async getById(memberId: string, companyId?: string): Promise<CompanyMember> {
     if (isReal('team')) {
-      const members = await teamApi.list()
+      const members = await teamApi.list(companyId)
       const member = members.find((m) => m.id === memberId)
       if (!member) throw new TeamApiError('Сотрудник не найден')
       return member
@@ -103,7 +105,7 @@ export const teamApi = {
     return { ...member }
   },
 
-  async invite(input: InviteMemberInput, companyId = CURRENT_COMPANY_ID): Promise<CompanyMember> {
+  async invite(input: InviteMemberInput, companyId?: string): Promise<CompanyMember> {
     if (isReal('team')) {
       try {
         const { data } = await apiClient.post<MemberDto>('/companies/me/members', {
@@ -119,6 +121,7 @@ export const teamApi = {
       }
     }
     await delay()
+    if (!companyId) throw new Error('companyId required in mock mode')
     const email = input.email.trim().toLowerCase()
     const duplicate = mockCompanyMembers.find(
       (m) =>
@@ -140,6 +143,7 @@ export const teamApi = {
       role: input.role,
       status: COMPANY_MEMBER_STATUS.INVITED,
       invitedAt: new Date().toISOString(),
+      inviteToken: `inv-${Date.now()}`,
     }
     mockCompanyMembers.push(member)
     persistCompanyMembers()
@@ -232,5 +236,165 @@ export const teamApi = {
     assertAllowed(canRemoveMember(companyMembers(member.companyId), member))
     member.status = COMPANY_MEMBER_STATUS.DEACTIVATED
     persistCompanyMembers()
+  },
+
+  async resendInvite(memberId: string): Promise<CompanyMember> {
+    if (isReal('team')) {
+      try {
+        const { data } = await apiClient.post<MemberDto>(
+          `/companies/me/members/${memberId}/resend`,
+        )
+        return mapMember(data)
+      } catch (error) {
+        throw new TeamApiError(toApiError(error).message)
+      }
+    }
+    await delay()
+    const member = mockCompanyMembers.find((m) => m.id === memberId)
+    if (!member) throw new TeamApiError('Сотрудник не найден')
+    if (member.status !== COMPANY_MEMBER_STATUS.INVITED) {
+      throw new TeamApiError('Повторная отправка только для приглашённых')
+    }
+    member.invitedAt = new Date().toISOString()
+    persistCompanyMembers()
+    return { ...member }
+  },
+
+  async getInvitationByToken(token: string): Promise<CompanyInvitation> {
+    if (isReal('team')) {
+      try {
+        const { data } = await apiClient.get<{
+          token: string
+          company_id: number
+          company_name: string
+          role: string
+          invited_by: string
+          email: string
+          status: string
+          expires_at: string | null
+          first_name?: string
+          last_name?: string
+        }>(`/company-invitations/${token}`)
+        return {
+          token: data.token,
+          companyId: String(data.company_id),
+          companyName: data.company_name,
+          role: data.role as CompanyMemberRole,
+          invitedBy: data.invited_by,
+          email: data.email,
+          status: data.status as CompanyInvitation['status'],
+          expiresAt: data.expires_at,
+          firstName: data.first_name,
+          lastName: data.last_name,
+        }
+      } catch (error) {
+        throw new TeamApiError(toApiError(error).message)
+      }
+    }
+    await delay()
+    const member = mockCompanyMembers.find((m) => m.inviteToken === token)
+    if (!member) throw new TeamApiError('Приглашение не найдено')
+    const company = getCompanyById(member.companyId)
+    let status: CompanyInvitation['status'] = 'pending'
+    if (member.status === COMPANY_MEMBER_STATUS.ACTIVE) status = 'accepted'
+    else if (member.status === COMPANY_MEMBER_STATUS.DEACTIVATED) status = 'declined'
+    else if (member.status === COMPANY_MEMBER_STATUS.INVITED) {
+      const invitedAt = +new Date(member.invitedAt)
+      if (Date.now() - invitedAt > 1000 * 60 * 60 * 24 * 30) status = 'expired'
+    }
+    return {
+      token,
+      companyId: member.companyId,
+      companyName: company?.shortName ?? member.companyId,
+      role: member.role,
+      invitedBy: 'Анна Смирнова',
+      email: member.email,
+      status,
+      expiresAt: null,
+      firstName: member.firstName,
+      lastName: member.lastName,
+    }
+  },
+
+  async acceptInvitation(token: string): Promise<CompanyInvitation> {
+    if (isReal('team')) {
+      try {
+        const { data } = await apiClient.post<{
+          token: string
+          company_id: number
+          company_name: string
+          role: string
+          invited_by: string
+          email: string
+          status: string
+          expires_at: string | null
+        }>(`/company-invitations/${token}/accept`)
+        return {
+          token: data.token,
+          companyId: String(data.company_id),
+          companyName: data.company_name,
+          role: data.role as CompanyMemberRole,
+          invitedBy: data.invited_by,
+          email: data.email,
+          status: data.status as CompanyInvitation['status'],
+          expiresAt: data.expires_at,
+        }
+      } catch (error) {
+        throw new TeamApiError(toApiError(error).message)
+      }
+    }
+    await delay()
+    const invitation = await teamApi.getInvitationByToken(token)
+    if (invitation.status === 'expired') {
+      throw new TeamApiError('Срок действия приглашения истёк')
+    }
+    if (invitation.status !== 'pending') {
+      throw new TeamApiError('Приглашение уже обработано')
+    }
+    const member = mockCompanyMembers.find((m) => m.inviteToken === token)
+    if (!member) throw new TeamApiError('Приглашение не найдено')
+    member.status = COMPANY_MEMBER_STATUS.ACTIVE
+    member.joinedAt = new Date().toISOString()
+    persistCompanyMembers()
+    return { ...invitation, status: 'accepted' }
+  },
+
+  async declineInvitation(token: string): Promise<CompanyInvitation> {
+    if (isReal('team')) {
+      try {
+        const { data } = await apiClient.post<{
+          token: string
+          company_id: number
+          company_name: string
+          role: string
+          invited_by: string
+          email: string
+          status: string
+          expires_at: string | null
+        }>(`/company-invitations/${token}/decline`)
+        return {
+          token: data.token,
+          companyId: String(data.company_id),
+          companyName: data.company_name,
+          role: data.role as CompanyMemberRole,
+          invitedBy: data.invited_by,
+          email: data.email,
+          status: data.status as CompanyInvitation['status'],
+          expiresAt: data.expires_at,
+        }
+      } catch (error) {
+        throw new TeamApiError(toApiError(error).message)
+      }
+    }
+    await delay()
+    const invitation = await teamApi.getInvitationByToken(token)
+    if (invitation.status !== 'pending') {
+      throw new TeamApiError('Приглашение уже обработано')
+    }
+    const member = mockCompanyMembers.find((m) => m.inviteToken === token)
+    if (!member) throw new TeamApiError('Приглашение не найдено')
+    member.status = COMPANY_MEMBER_STATUS.DEACTIVATED
+    persistCompanyMembers()
+    return { ...invitation, status: 'declined' }
   },
 }

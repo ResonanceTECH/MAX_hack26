@@ -24,6 +24,7 @@ import {
   Activity01Icon,
   CheckmarkBadge01Icon,
   MoreHorizontalIcon,
+  Notification03Icon,
 } from '@/shared/ui/icons'
 
 export interface NavItem {
@@ -154,6 +155,12 @@ const PLATFORM_ADMIN_MOBILE: NavItem[] = [
 ]
 
 const PLATFORM_ADMIN_MOBILE_MORE: NavItem[] = [
+  {
+    to: ROUTES.ADMIN_NOTIFICATIONS,
+    label: 'Уведомления',
+    icon: Notification03Icon,
+    badgeKey: 'adminNotifications',
+  },
   { to: ROUTES.ADMIN_MODERATION, label: 'Модерация', icon: Shield01Icon },
   { to: ROUTES.ADMIN_DICTIONARIES, label: 'Справочники', icon: Layers01Icon },
   { to: ROUTES.ADMIN_ANALYTICS, label: 'Аналитика', icon: Analytics01Icon },

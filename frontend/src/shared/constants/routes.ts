@@ -68,6 +68,8 @@ export const ROUTES = {
   COMPANY_VERIFICATION: '/profile/company/verification',
   COMPANY_ACTIVITY: '/profile/company/activity',
 
+  COMPANY_INVITATION: '/company-invitations/:token',
+
   MODERATION: '/moderation',
   MODERATION_QUEUE: '/moderation/queue',
   MODERATION_QUEUE_COMPANIES: '/moderation/queue/companies',
@@ -199,4 +201,8 @@ export function companyCaseEditPath(caseId: string): string {
 
 export function companyDocumentPath(documentId: string): string {
   return `/profile/company/documents/${documentId}`
+}
+
+export function companyInvitationPath(token: string): string {
+  return `/company-invitations/${token}`
 }
