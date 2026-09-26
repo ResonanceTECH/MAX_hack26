@@ -28,9 +28,18 @@ _MIGRATIONS = [
     "ALTER TABLE companies ADD COLUMN IF NOT EXISTS registration_date DATE",
     "ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_status VARCHAR(100)",
     "ALTER TABLE companies ADD COLUMN IF NOT EXISTS verification_source VARCHAR(500)",
+    "ALTER TABLE companies ADD COLUMN IF NOT EXISTS platform_status VARCHAR(20) DEFAULT 'ACTIVE'",
+    "ALTER TABLE companies ADD COLUMN IF NOT EXISTS verification_status VARCHAR(32) DEFAULT 'NOT_VERIFIED'",
+    "ALTER TABLE companies ADD COLUMN IF NOT EXISTS settings_json JSONB DEFAULT '{}'::jsonb",
     "ALTER TABLE requests ADD COLUMN IF NOT EXISTS required_certificates JSON",
     "ALTER TABLE files ADD COLUMN IF NOT EXISTS opportunity_id INTEGER",
     "ALTER TABLE files ADD COLUMN IF NOT EXISTS deal_id INTEGER",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(32) DEFAULT 'BUSINESS_USER'",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255)",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ",
+    # backfill role from is_admin
+    "UPDATE users SET role = 'PLATFORM_ADMIN' WHERE is_admin = true AND (role IS NULL OR role = 'BUSINESS_USER')",
 ]
 
 

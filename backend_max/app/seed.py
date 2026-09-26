@@ -4,13 +4,30 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from .config import get_settings
+from .deps import sync_admin_flag
 from .matching import match_company
 from .models import Company, Request, RequestMatch, User
-from .services import publish_request
+from .roles import (
+    ROLE_BUSINESS_USER,
+    ROLE_COMPANY_ADMIN,
+    ROLE_MODERATOR,
+    ROLE_PLATFORM_ADMIN,
+    SEED_BUSINESS_USER,
+    SEED_COMPANY_ADMIN,
+    SEED_MODERATOR,
+    SEED_PLATFORM_ADMIN,
+)
+from .services import ensure_owner_member, publish_request
 from .structurizer import structure_request
 
 settings = get_settings()
 
+ROLE_BY_MAX_ID = {
+    SEED_PLATFORM_ADMIN: ROLE_PLATFORM_ADMIN,
+    SEED_COMPANY_ADMIN: ROLE_COMPANY_ADMIN,
+    SEED_BUSINESS_USER: ROLE_BUSINESS_USER,
+    SEED_MODERATOR: ROLE_MODERATOR,
+}
 DEMO_COMPANIES: list[dict] = [
     {
         "user": {"max_user_id": 7777001, "first_name": "Анна", "last_name": "Смирнова", "username": "anna_smirnova"},
@@ -184,16 +201,35 @@ def seed_demo(db: Session) -> None:
             user = User(**user_data)
             db.add(user)
             db.flush()
-        if user_data["max_user_id"] == 7777001:
-            user.is_admin = True
+        max_id = user_data["max_user_id"]
+        user.role = ROLE_BY_MAX_ID.get(max_id, ROLE_COMPANY_ADMIN)
+        sync_admin_flag(user)
         if company_name not in existing_company_names:
             company = Company(user_id=user.id, **entry["company"])
+            if entry["company"].get("is_verified"):
+                company.verification_status = "VERIFIED"
             db.add(company)
             db.flush()
             existing_company_names.add(company_name)
         else:
             company = db.query(Company).filter(Company.name == company_name).first()
         company_by_name[company_name] = company
+        ensure_owner_member(db, company, user)
+    # Moderator without company
+    mod = db.query(User).filter(User.max_user_id == SEED_MODERATOR).first()
+    if mod is None:
+        mod = User(
+            max_user_id=SEED_MODERATOR,
+            first_name="Мария",
+            last_name="Модератор",
+            username="moderator",
+            role=ROLE_MODERATOR,
+            is_admin=False,
+        )
+        db.add(mod)
+    else:
+        mod.role = ROLE_MODERATOR
+        sync_admin_flag(mod)
     db.commit()
 
     existing_titles = {title for (title,) in db.query(Request.title).all()}

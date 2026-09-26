@@ -13,12 +13,16 @@ from .routers import (
     admin,
     auth,
     companies,
+    company_workspace,
     deals,
     dictionaries,
+    favorites,
     feed,
     files,
     inbox,
+    moderation,
     opportunities,
+    platform_admin,
     proposals,
     share,
 )
@@ -74,6 +78,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(companies.router)
+app.include_router(company_workspace.router)
 app.include_router(opportunities.router)
 app.include_router(proposals.router)
 app.include_router(deals.router)
@@ -82,6 +87,9 @@ app.include_router(files.router)
 app.include_router(inbox.router)
 app.include_router(share.router)
 app.include_router(dictionaries.router)
+app.include_router(favorites.router)
+app.include_router(moderation.router)
+app.include_router(platform_admin.router)
 app.include_router(admin.router)
 
 

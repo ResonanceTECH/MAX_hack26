@@ -189,7 +189,17 @@ def publish_request(db: Session, request: Request) -> None:
 
 
 def get_company_for_user(db: Session, user: User) -> Company | None:
-    return db.query(Company).filter(Company.user_id == user.id).first()
+    owned = db.query(Company).filter(Company.user_id == user.id).first()
+    if owned is not None:
+        return owned
+    membership = (
+        db.query(CompanyMember)
+        .filter(CompanyMember.user_id == user.id, CompanyMember.status == "active")
+        .first()
+    )
+    if membership is None:
+        return None
+    return db.get(Company, membership.company_id)
 
 
 def require_company(db: Session, user: User) -> Company:
@@ -205,3 +215,84 @@ def require_company(db: Session, user: User) -> Company:
 def ensure_owns_request(user: User, company: Company, request: Request) -> None:
     if request.company_id != company.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Запрос принадлежит другой компании")
+
+
+def ensure_owner_member(db: Session, company: Company, user: User) -> None:
+    """Ensure owner row exists in company_members."""
+    from .models import CompanyMember, utcnow
+    from .roles import MEMBER_ROLE_ADMIN, MEMBER_STATUS_ACTIVE
+
+    existing = (
+        db.query(CompanyMember)
+        .filter(CompanyMember.company_id == company.id, CompanyMember.user_id == user.id)
+        .first()
+    )
+    if existing:
+        return
+    email = user.email or f"user{user.max_user_id}@b2b.local"
+    db.add(
+        CompanyMember(
+            company_id=company.id,
+            user_id=user.id,
+            first_name=user.first_name or "",
+            last_name=user.last_name or "",
+            email=email,
+            member_role=MEMBER_ROLE_ADMIN,
+            status=MEMBER_STATUS_ACTIVE,
+            joined_at=utcnow(),
+        )
+    )
+    db.commit()
+
+
+def append_activity(
+    db: Session,
+    company_id: int,
+    type_: str,
+    actor_name: str,
+    action: str,
+    entity_label: str | None = None,
+) -> None:
+    from .models import CompanyActivityEvent
+
+    db.add(
+        CompanyActivityEvent(
+            company_id=company_id,
+            type=type_,
+            actor_name=actor_name,
+            action=action,
+            entity_label=entity_label,
+        )
+    )
+    db.commit()
+
+
+def append_audit(
+    db: Session,
+    *,
+    actor: User,
+    action: str,
+    entity_type: str = "",
+    entity_id: str = "",
+    entity_name: str = "",
+    reason: str | None = None,
+    before: dict | None = None,
+    after: dict | None = None,
+) -> None:
+    from .models import AuditEvent
+
+    db.add(
+        AuditEvent(
+            actor_id=str(actor.id),
+            actor_name=f"{actor.first_name or ''} {actor.last_name or ''}".strip() or str(actor.id),
+            actor_role=getattr(actor, "role", "") or ("PLATFORM_ADMIN" if actor.is_admin else ""),
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            entity_name=entity_name,
+            reason=reason,
+            before=before,
+            after=after,
+        )
+    )
+    db.commit()

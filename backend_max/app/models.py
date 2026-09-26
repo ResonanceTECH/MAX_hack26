@@ -32,11 +32,20 @@ class User(Base):
     first_name: Mapped[str | None] = Column(String(255), nullable=True)
     last_name: Mapped[str | None] = Column(String(255), nullable=True)
     username: Mapped[str | None] = Column(String(255), nullable=True)
+    email: Mapped[str | None] = Column(String(255), nullable=True)
+    # BUSINESS_USER | COMPANY_ADMIN | MODERATOR | PLATFORM_ADMIN
+    role: Mapped[str] = Column(String(32), default="BUSINESS_USER", index=True)
+    # legacy flag — kept in sync with role == PLATFORM_ADMIN
     is_admin: Mapped[bool] = Column(Boolean, default=False)
+    status: Mapped[str] = Column(String(20), default="active", index=True)
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+    last_active_at: Mapped[datetime | None] = Column(DateTime(timezone=True), nullable=True)
 
     company: Mapped["Company | None"] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
+    memberships: Mapped[list["CompanyMember"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
     )
 
 
@@ -73,6 +82,11 @@ class Company(Base):
 
     rating: Mapped[float] = Column(Float, default=0.0)
     is_verified: Mapped[bool] = Column(Boolean, default=False)
+    # ACTIVE | SUSPENDED | BLOCKED | ARCHIVED
+    platform_status: Mapped[str] = Column(String(20), default="ACTIVE", index=True)
+    # NOT_VERIFIED | PENDING | VERIFIED | REJECTED | REQUIRES_UPDATE
+    verification_status: Mapped[str] = Column(String(32), default="NOT_VERIFIED", index=True)
+    settings_json: Mapped[dict] = Column(JSON, default=dict)
 
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = Column(
@@ -80,6 +94,9 @@ class Company(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="company")
+    members: Mapped[list["CompanyMember"]] = relationship(
+        back_populates="company", cascade="all, delete-orphan"
+    )
 
 
 class Request(Base):
@@ -205,3 +222,272 @@ class UploadedFile(Base):
     opportunity_id: Mapped[int | None] = Column(Integer, ForeignKey("requests.id"), nullable=True, index=True)
     deal_id: Mapped[int | None] = Column(Integer, ForeignKey("deals.id"), nullable=True, index=True)
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+
+
+class CompanyMember(Base):
+    """Team membership — company-scoped role separate from platform User.role."""
+
+    __tablename__ = "company_members"
+    __table_args__ = (UniqueConstraint("company_id", "email", name="uq_company_member_email"),)
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    company_id: Mapped[int] = Column(Integer, ForeignKey("companies.id"), index=True)
+    user_id: Mapped[int | None] = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    first_name: Mapped[str] = Column(String(255), default="")
+    last_name: Mapped[str] = Column(String(255), default="")
+    email: Mapped[str] = Column(String(255))
+    # COMPANY_ADMIN | MANAGER | VIEWER
+    member_role: Mapped[str] = Column(String(32), default="MANAGER")
+    # active | invited | suspended | deactivated
+    status: Mapped[str] = Column(String(20), default="invited", index=True)
+    invited_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+    joined_at: Mapped[datetime | None] = Column(DateTime(timezone=True), nullable=True)
+    last_active_at: Mapped[datetime | None] = Column(DateTime(timezone=True), nullable=True)
+
+    company: Mapped["Company"] = relationship(back_populates="members")
+    user: Mapped["User | None"] = relationship(back_populates="memberships")
+
+
+class Favorite(Base):
+    __tablename__ = "favorites"
+    __table_args__ = (
+        UniqueConstraint("user_id", "target_type", "target_id", name="uq_favorite_target"),
+    )
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    user_id: Mapped[int] = Column(Integer, ForeignKey("users.id"), index=True)
+    # company | opportunity
+    target_type: Mapped[str] = Column(String(32))
+    target_id: Mapped[int] = Column(Integer)
+    created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+
+
+class OpportunityInvite(Base):
+    __tablename__ = "opportunity_invites"
+    __table_args__ = (
+        UniqueConstraint("opportunity_id", "company_id", name="uq_opportunity_invite"),
+    )
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    opportunity_id: Mapped[int] = Column(Integer, ForeignKey("requests.id"), index=True)
+    company_id: Mapped[int] = Column(Integer, ForeignKey("companies.id"), index=True)
+    invited_by_user_id: Mapped[int] = Column(Integer, ForeignKey("users.id"))
+    created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+
+
+class CompanyServiceItem(Base):
+    __tablename__ = "company_services"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    company_id: Mapped[int] = Column(Integer, ForeignKey("companies.id"), index=True)
+    title: Mapped[str] = Column(String(500))
+    description: Mapped[str] = Column(Text, default="")
+    category: Mapped[str] = Column(String(255), default="")
+    status: Mapped[str] = Column(String(20), default="draft", index=True)
+    short_description: Mapped[str | None] = Column(Text, nullable=True)
+    price_min: Mapped[int | None] = Column(Integer, nullable=True)
+    price_max: Mapped[int | None] = Column(Integer, nullable=True)
+    currency: Mapped[str] = Column(String(8), default="RUB")
+    regions: Mapped[list] = Column(JSON, default=list)
+    remote: Mapped[bool] = Column(Boolean, default=False)
+    technologies: Mapped[list] = Column(JSON, default=list)
+    capabilities: Mapped[list] = Column(JSON, default=list)
+    target_industries: Mapped[list] = Column(JSON, default=list)
+    created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = Column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class CompanyCaseItem(Base):
+    __tablename__ = "company_cases"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    company_id: Mapped[int] = Column(Integer, ForeignKey("companies.id"), index=True)
+    title: Mapped[str] = Column(String(500))
+    industry: Mapped[str] = Column(String(255), default="")
+    description: Mapped[str] = Column(Text, default="")
+    result: Mapped[str] = Column(Text, default="")
+    technologies: Mapped[list] = Column(JSON, default=list)
+    status: Mapped[str] = Column(String(20), default="draft", index=True)
+    client_name: Mapped[str | None] = Column(String(255), nullable=True)
+    client_visible: Mapped[bool] = Column(Boolean, default=False)
+    solution: Mapped[str | None] = Column(Text, nullable=True)
+    start_date: Mapped[str | None] = Column(String(32), nullable=True)
+    end_date: Mapped[str | None] = Column(String(32), nullable=True)
+    cover_url: Mapped[str | None] = Column(String(500), nullable=True)
+    external_url: Mapped[str | None] = Column(String(500), nullable=True)
+    capabilities: Mapped[list] = Column(JSON, default=list)
+    created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = Column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class CompanyDocumentItem(Base):
+    __tablename__ = "company_documents"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    company_id: Mapped[int] = Column(Integer, ForeignKey("companies.id"), index=True)
+    name: Mapped[str] = Column(String(500))
+    doc_type: Mapped[str] = Column(String(100), default="")
+    file_name: Mapped[str] = Column(String(500), default="")
+    status: Mapped[str] = Column(String(32), default="Pending", index=True)
+    number: Mapped[str | None] = Column(String(100), nullable=True)
+    issuer: Mapped[str | None] = Column(String(255), nullable=True)
+    issued_at: Mapped[str | None] = Column(String(32), nullable=True)
+    expires_at: Mapped[str | None] = Column(String(32), nullable=True)
+    file_url: Mapped[str | None] = Column(String(500), nullable=True)
+    file_id: Mapped[int | None] = Column(Integer, ForeignKey("files.id"), nullable=True)
+    verification_source: Mapped[str] = Column(String(64), default="COMPANY_DATA")
+    uploaded_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = Column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class CompanyActivityEvent(Base):
+    __tablename__ = "company_activity"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    company_id: Mapped[int] = Column(Integer, ForeignKey("companies.id"), index=True)
+    type: Mapped[str] = Column(String(64))
+    actor_name: Mapped[str] = Column(String(255), default="")
+    action: Mapped[str] = Column(String(500), default="")
+    entity_label: Mapped[str | None] = Column(String(500), nullable=True)
+    created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+
+
+class ModerationItem(Base):
+    __tablename__ = "moderation_items"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    entity_type: Mapped[str] = Column(String(32), index=True)
+    entity_id: Mapped[str] = Column(String(64), index=True)
+    title: Mapped[str] = Column(String(500), default="")
+    owner_id: Mapped[str | None] = Column(String(64), nullable=True)
+    owner_name: Mapped[str | None] = Column(String(255), nullable=True)
+    company_name: Mapped[str | None] = Column(String(255), nullable=True)
+    status: Mapped[str] = Column(String(32), default="PENDING", index=True)
+    priority: Mapped[str] = Column(String(16), default="NORMAL")
+    reason: Mapped[str] = Column(String(64), default="NEW_OPPORTUNITY")
+    summary: Mapped[str | None] = Column(Text, nullable=True)
+    payload: Mapped[dict] = Column(JSON, default=dict)
+    checklist: Mapped[list] = Column(JSON, default=list)
+    related_report_ids: Mapped[list] = Column(JSON, default=list)
+    automated_flags: Mapped[list] = Column(JSON, default=list)
+    data_origin: Mapped[str] = Column(String(64), default="USER")
+    moderator_note: Mapped[str | None] = Column(Text, nullable=True)
+    assigned_moderator_id: Mapped[int | None] = Column(Integer, ForeignKey("users.id"), nullable=True)
+    assigned_moderator_name: Mapped[str | None] = Column(String(255), nullable=True)
+    reports_count: Mapped[int] = Column(Integer, default=0)
+    version: Mapped[int] = Column(Integer, default=1)
+    submitted_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+    created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = Column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class Report(Base):
+    __tablename__ = "reports"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    reporter_id: Mapped[int | None] = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reporter_name: Mapped[str] = Column(String(255), default="")
+    target_type: Mapped[str] = Column(String(32))
+    target_id: Mapped[str] = Column(String(64))
+    target_name: Mapped[str] = Column(String(500), default="")
+    report_type: Mapped[str] = Column(String(64), default="OTHER")
+    description: Mapped[str] = Column(Text, default="")
+    status: Mapped[str] = Column(String(32), default="OPEN", index=True)
+    priority: Mapped[str] = Column(String(16), default="NORMAL")
+    assigned_moderator_id: Mapped[int | None] = Column(Integer, ForeignKey("users.id"), nullable=True)
+    resolution: Mapped[str | None] = Column(Text, nullable=True)
+    resolution_code: Mapped[str | None] = Column(String(64), nullable=True)
+    resolved_by: Mapped[str | None] = Column(String(255), nullable=True)
+    resolved_at: Mapped[datetime | None] = Column(DateTime(timezone=True), nullable=True)
+    related_report_ids: Mapped[list] = Column(JSON, default=list)
+    created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+
+
+class Escalation(Base):
+    __tablename__ = "escalations"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    moderation_item_id: Mapped[int | None] = Column(Integer, ForeignKey("moderation_items.id"), nullable=True)
+    report_id: Mapped[int | None] = Column(Integer, ForeignKey("reports.id"), nullable=True)
+    title: Mapped[str] = Column(String(500), default="")
+    reason: Mapped[str] = Column(Text, default="")
+    status: Mapped[str] = Column(String(32), default="OPEN", index=True)
+    created_by_id: Mapped[int | None] = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+    resolved_at: Mapped[datetime | None] = Column(DateTime(timezone=True), nullable=True)
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    actor_id: Mapped[str | None] = Column(String(64), nullable=True)
+    actor_name: Mapped[str] = Column(String(255), default="")
+    actor_role: Mapped[str] = Column(String(64), default="")
+    action: Mapped[str] = Column(String(128))
+    entity_type: Mapped[str] = Column(String(64), default="")
+    entity_id: Mapped[str] = Column(String(64), default="")
+    entity_name: Mapped[str] = Column(String(500), default="")
+    reason: Mapped[str | None] = Column(Text, nullable=True)
+    before: Mapped[dict | None] = Column(JSON, nullable=True)
+    after: Mapped[dict | None] = Column(JSON, nullable=True)
+    details: Mapped[dict | None] = Column(JSON, nullable=True)
+    created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+
+
+class FeatureFlag(Base):
+    __tablename__ = "feature_flags"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    key: Mapped[str] = Column(String(128), unique=True, index=True)
+    name: Mapped[str] = Column(String(255), default="")
+    description: Mapped[str] = Column(Text, default="")
+    enabled: Mapped[bool] = Column(Boolean, default=False)
+    scope: Mapped[str] = Column(String(32), default="GLOBAL")
+    updated_by: Mapped[str | None] = Column(String(255), nullable=True)
+    updated_at: Mapped[datetime] = Column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class PlatformSettings(Base):
+    __tablename__ = "platform_settings"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    general: Mapped[dict] = Column(JSON, default=dict)
+    moderation: Mapped[dict] = Column(JSON, default=dict)
+    matching: Mapped[dict] = Column(JSON, default=dict)
+    notifications: Mapped[dict] = Column(JSON, default=dict)
+    maintenance: Mapped[dict] = Column(JSON, default=dict)
+    announcement: Mapped[dict] = Column(JSON, default=dict)
+    updated_at: Mapped[datetime] = Column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class DictionaryItem(Base):
+    __tablename__ = "dictionary_items"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    type: Mapped[str] = Column(String(64), index=True)
+    name: Mapped[str] = Column(String(255))
+    slug: Mapped[str] = Column(String(255), index=True)
+    parent_id: Mapped[int | None] = Column(Integer, ForeignKey("dictionary_items.id"), nullable=True)
+    aliases: Mapped[list] = Column(JSON, default=list)
+    status: Mapped[str] = Column(String(20), default="active", index=True)
+    sort_order: Mapped[int] = Column(Integer, default=0)
+    category: Mapped[str | None] = Column(String(255), nullable=True)
+    description: Mapped[str | None] = Column(Text, nullable=True)
+    usage_count: Mapped[int] = Column(Integer, default=0)
+    created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = Column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
