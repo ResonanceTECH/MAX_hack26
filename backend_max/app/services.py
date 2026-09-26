@@ -279,17 +279,23 @@ def enqueue_moderation_item(
 
 
 def get_company_for_user(db: Session, user: User) -> Company | None:
+    from .models import CompanyMember
+    from .roles import MEMBER_STATUS_ACTIVE
+
+    # Prefer active membership (Manager/Viewer on DigitalLab over any owned shell)
+    membership = (
+        db.query(CompanyMember)
+        .filter(CompanyMember.user_id == user.id, CompanyMember.status == MEMBER_STATUS_ACTIVE)
+        .first()
+    )
+    if membership is not None:
+        company = db.get(Company, membership.company_id)
+        if company is not None:
+            return company
     owned = db.query(Company).filter(Company.user_id == user.id).first()
     if owned is not None:
         return owned
-    membership = (
-        db.query(CompanyMember)
-        .filter(CompanyMember.user_id == user.id, CompanyMember.status == "active")
-        .first()
-    )
-    if membership is None:
-        return None
-    return db.get(Company, membership.company_id)
+    return None
 
 
 def require_company(db: Session, user: User) -> Company:
@@ -308,9 +314,15 @@ def ensure_owns_request(user: User, company: Company, request: Request) -> None:
 
 
 def ensure_owner_member(db: Session, company: Company, user: User) -> None:
-    """Ensure owner row exists in company_members."""
+    """Ensure owner row exists in company_members for COMPANY_ADMIN owners only.
+
+    BUSINESS_USER owners (e.g. WebForge) stay marketplace-only — no ADMIN membership.
+    """
     from .models import CompanyMember, utcnow
-    from .roles import MEMBER_ROLE_ADMIN, MEMBER_STATUS_ACTIVE
+    from .roles import MEMBER_ROLE_ADMIN, MEMBER_STATUS_ACTIVE, ROLE_COMPANY_ADMIN
+
+    if user.role != ROLE_COMPANY_ADMIN:
+        return
 
     existing = (
         db.query(CompanyMember)
@@ -318,6 +330,12 @@ def ensure_owner_member(db: Session, company: Company, user: User) -> None:
         .first()
     )
     if existing:
+        if existing.member_role != MEMBER_ROLE_ADMIN or existing.status != MEMBER_STATUS_ACTIVE:
+            existing.member_role = MEMBER_ROLE_ADMIN
+            existing.status = MEMBER_STATUS_ACTIVE
+            if existing.joined_at is None:
+                existing.joined_at = utcnow()
+            db.commit()
         return
     email = user.email or f"user{user.max_user_id}@b2b.local"
     db.add(

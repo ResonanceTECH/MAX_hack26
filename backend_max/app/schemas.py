@@ -31,6 +31,7 @@ class UserOut(BaseModel):
     created_at: datetime
     company_id: int | None = None
     last_active_at: datetime | None = None
+    member_role: str | None = None
 
 class AuthResponse(BaseModel):
     access_token: str
@@ -426,7 +427,13 @@ class OpportunityInviteOut(BaseModel):
     opportunity_title: str = ""
     company_id: int
     company_name: str = ""
+    inviting_company_id: int | None = None
+    inviting_company_name: str = ""
+    budget_min: int | None = None
+    budget_max: int | None = None
+    status: str = "PENDING"
     created_at: datetime
+    responded_at: datetime | None = None
 
 
 class OpportunityInviteIn(BaseModel):
@@ -458,6 +465,25 @@ class CompanyMemberInviteIn(BaseModel):
 class CompanyMemberPatchIn(BaseModel):
     role: str | None = None
     status: str | None = None
+
+
+class CompanyInvitationOut(BaseModel):
+    """Team invite details for FE accept flow (token-based)."""
+
+    token: str
+    company_id: int
+    company_name: str
+    role: str
+    invited_by: str = ""
+    email: str
+    status: str  # pending | accepted | declined | expired | cancelled
+    expires_at: datetime | None = None
+    first_name: str = ""
+    last_name: str = ""
+    message: str | None = None
+    # Compat / detail fields
+    id: int | None = None
+    invited_at: datetime | None = None
 
 
 class ServiceOut(BaseModel):
@@ -690,6 +716,11 @@ class ResolveReportIn(BaseModel):
     apply_action: str | None = "none"
 
 
+class ResolveEscalationIn(BaseModel):
+    decision: str
+    reason: str
+
+
 class EscalationOut(BaseModel):
     id: int
     moderation_item_id: int | None = None
@@ -699,6 +730,8 @@ class EscalationOut(BaseModel):
     status: str
     created_at: datetime
     resolved_at: datetime | None = None
+    resolution: str | None = None
+    admin_response: str | None = None
 
 
 class AuditEventOut(BaseModel):

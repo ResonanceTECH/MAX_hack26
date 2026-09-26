@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,14 @@ from .structurizer import structure_request
 from .seed_extras import seed_wave_a_extras
 
 settings = get_settings()
+
+
+def _coerce_company_payload(raw: dict) -> dict:
+    data = dict(raw)
+    reg = data.get("registration_date")
+    if isinstance(reg, str) and reg:
+        data["registration_date"] = date.fromisoformat(reg)
+    return data
 
 ROLE_BY_MAX_ID = {
     SEED_PLATFORM_ADMIN: ROLE_PLATFORM_ADMIN,
@@ -206,7 +215,7 @@ def seed_demo(db: Session) -> None:
         user.role = ROLE_BY_MAX_ID.get(max_id, ROLE_COMPANY_ADMIN)
         sync_admin_flag(user)
         if company_name not in existing_company_names:
-            company = Company(user_id=user.id, **entry["company"])
+            company = Company(user_id=user.id, **_coerce_company_payload(entry["company"]))
             if entry["company"].get("is_verified"):
                 company.verification_status = "VERIFIED"
             db.add(company)
@@ -214,6 +223,12 @@ def seed_demo(db: Session) -> None:
             existing_company_names.add(company_name)
         else:
             company = db.query(Company).filter(Company.name == company_name).first()
+            # Re-bind seed persona as owner when company name already exists
+            # (e.g. left over from tests that reused demo names).
+            if company is not None and company.user_id != user.id:
+                occupied = db.query(Company).filter(Company.user_id == user.id).first()
+                if occupied is None:
+                    company.user_id = user.id
         company_by_name[company_name] = company
         ensure_owner_member(db, company, user)
     # Moderator without company

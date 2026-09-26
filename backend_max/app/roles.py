@@ -30,3 +30,34 @@ SEED_PLATFORM_ADMIN = 7777001
 SEED_COMPANY_ADMIN = 7777002
 SEED_BUSINESS_USER = 7777003
 SEED_MODERATOR = 7777009
+SEED_MANAGER = 7777010
+SEED_VIEWER = 7777011
+SEED_PENDING_INVITE_TOKEN = "demo-invite-pending-digitallab"  # known token for FE demo
+
+# Invitation API status (mapped from CompanyMember.status)
+INVITE_STATUS_PENDING = "pending"
+INVITE_STATUS_ACCEPTED = "accepted"
+INVITE_STATUS_DECLINED = "declined"
+INVITE_STATUS_EXPIRED = "expired"
+INVITE_STATUS_CANCELLED = "cancelled"
+
+MEMBER_STATUS_DECLINED = "declined"
+
+# Report enums aligned with FE REPORT_TYPE
+REPORT_TYPES = {
+    "SPAM",
+    "FRAUD",
+    "FAKE_COMPANY",
+    "MISLEADING_INFORMATION",
+    "INAPPROPRIATE_CONTENT",
+    "DUPLICATE",
+    "OTHER",
+}
+REPORT_TARGET_TYPES = {
+    "company",
+    "opportunity",
+    "proposal",
+    "case",
+    "document",
+    "user",
+}

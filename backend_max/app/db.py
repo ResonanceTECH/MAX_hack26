@@ -38,6 +38,15 @@ _MIGRATIONS = [
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255)",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ",
+    "ALTER TABLE escalations ADD COLUMN IF NOT EXISTS resolution TEXT",
+    "ALTER TABLE escalations ADD COLUMN IF NOT EXISTS admin_response TEXT",
+    "ALTER TABLE opportunity_invites ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'PENDING'",
+    "ALTER TABLE opportunity_invites ADD COLUMN IF NOT EXISTS responded_at TIMESTAMPTZ",
+    "ALTER TABLE company_members ADD COLUMN IF NOT EXISTS invite_token VARCHAR(64)",
+    "ALTER TABLE company_members ADD COLUMN IF NOT EXISTS invited_by_user_id INTEGER",
+    "ALTER TABLE company_members ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ",
+    "ALTER TABLE company_members ADD COLUMN IF NOT EXISTS message TEXT",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_company_members_invite_token ON company_members (invite_token)",
     # backfill role from is_admin
     "UPDATE users SET role = 'PLATFORM_ADMIN' WHERE is_admin = true AND (role IS NULL OR role = 'BUSINESS_USER')",
 ]

@@ -45,7 +45,9 @@ class User(Base):
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
     memberships: Mapped[list["CompanyMember"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="CompanyMember.user_id",
     )
 
 
@@ -238,14 +240,21 @@ class CompanyMember(Base):
     email: Mapped[str] = Column(String(255))
     # COMPANY_ADMIN | MANAGER | VIEWER
     member_role: Mapped[str] = Column(String(32), default="MANAGER")
-    # active | invited | suspended | deactivated
+    # active | invited | suspended | deactivated | declined
     status: Mapped[str] = Column(String(20), default="invited", index=True)
     invited_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
     joined_at: Mapped[datetime | None] = Column(DateTime(timezone=True), nullable=True)
     last_active_at: Mapped[datetime | None] = Column(DateTime(timezone=True), nullable=True)
+    invite_token: Mapped[str | None] = Column(String(64), nullable=True, unique=True, index=True)
+    invited_by_user_id: Mapped[int | None] = Column(Integer, ForeignKey("users.id"), nullable=True)
+    expires_at: Mapped[datetime | None] = Column(DateTime(timezone=True), nullable=True)
+    message: Mapped[str | None] = Column(Text, nullable=True)
 
     company: Mapped["Company"] = relationship(back_populates="members")
-    user: Mapped["User | None"] = relationship(back_populates="memberships")
+    user: Mapped["User | None"] = relationship(
+        back_populates="memberships",
+        foreign_keys=[user_id],
+    )
 
 
 class Favorite(Base):
@@ -272,7 +281,10 @@ class OpportunityInvite(Base):
     opportunity_id: Mapped[int] = Column(Integer, ForeignKey("requests.id"), index=True)
     company_id: Mapped[int] = Column(Integer, ForeignKey("companies.id"), index=True)
     invited_by_user_id: Mapped[int] = Column(Integer, ForeignKey("users.id"))
+    # PENDING | ACCEPTED | DECLINED | EXPIRED
+    status: Mapped[str] = Column(String(20), default="PENDING", index=True)
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+    responded_at: Mapped[datetime | None] = Column(DateTime(timezone=True), nullable=True)
 
 
 class CompanyServiceItem(Base):
@@ -423,6 +435,8 @@ class Escalation(Base):
     created_by_id: Mapped[int | None] = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
     resolved_at: Mapped[datetime | None] = Column(DateTime(timezone=True), nullable=True)
+    resolution: Mapped[str | None] = Column(Text, nullable=True)
+    admin_response: Mapped[str | None] = Column(Text, nullable=True)
 
 
 class AuditEvent(Base):

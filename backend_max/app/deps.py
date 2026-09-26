@@ -6,10 +6,18 @@ from sqlalchemy.orm import Session
 from .config import Settings, get_settings
 from .db import get_db
 from .models import Company, CompanyMember, User
+from .permissions import (
+    BUSINESS_USER_PERMISSIONS,
+    COMPANY_ROLE_PERMISSIONS,
+    STAFF_ROLES,
+    company_role_has_permission,
+)
 from .roles import (
     MEMBER_ROLE_ADMIN,
     MEMBER_STATUS_ACTIVE,
     PLATFORM_ROLES,
+    ROLE_BUSINESS_USER,
+    ROLE_COMPANY_ADMIN,
     ROLE_MODERATOR,
     ROLE_PLATFORM_ADMIN,
 )
@@ -87,21 +95,74 @@ def get_membership(db: Session, user: User, company_id: int) -> CompanyMember | 
     )
 
 
-def require_company_admin_member(
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> tuple[User, Company]:
-    """Owner or active COMPANY_ADMIN membership."""
+def get_active_membership(db: Session, user: User) -> CompanyMember | None:
+    return (
+        db.query(CompanyMember)
+        .filter(
+            CompanyMember.user_id == user.id,
+            CompanyMember.status == MEMBER_STATUS_ACTIVE,
+        )
+        .first()
+    )
+
+
+def resolve_member_role(db: Session, user: User, company: Company) -> str | None:
+    """Effective company member role for RBAC.
+
+    - Active membership wins (MANAGER / VIEWER / COMPANY_ADMIN).
+    - Company owner with system COMPANY_ADMIN → COMPANY_ADMIN.
+    - Owner alone (e.g. WebForge BUSINESS_USER) is NOT company-admin.
+    - PLATFORM_ADMIN / MODERATOR never get company-manage via ownership.
+    """
+    if user.role in STAFF_ROLES or user.is_admin:
+        return None
+    member = get_membership(db, user, company.id)
+    if member is not None:
+        return member.member_role
+    if company.user_id == user.id and user.role == ROLE_COMPANY_ADMIN:
+        return MEMBER_ROLE_ADMIN
+    return None
+
+
+def user_has_company_permission(db: Session, user: User, company: Company, permission: str) -> bool:
+    if user.role in STAFF_ROLES or user.is_admin:
+        return False
+    member_role = resolve_member_role(db, user, company)
+    if member_role:
+        return company_role_has_permission(member_role, permission)
+    # BUSINESS_USER owner / no membership: marketplace-only
+    if user.role == ROLE_BUSINESS_USER:
+        return permission in BUSINESS_USER_PERMISSIONS
+    if user.role == ROLE_COMPANY_ADMIN:
+        # Company admin without resolved membership still has full CA perms for own company
+        if company.user_id == user.id:
+            return permission in COMPANY_ROLE_PERMISSIONS[MEMBER_ROLE_ADMIN]
+    return False
+
+
+def require_company_permission(db: Session, user: User, permission: str) -> Company:
+    """Resolve company for user and enforce company-scoped permission."""
     from .services import get_company_for_user
 
     company = get_company_for_user(db, user)
     if company is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нет профиля компании")
-    if company.user_id == user.id:
-        return user, company
-    if user.role == ROLE_PLATFORM_ADMIN or user.is_admin:
-        return user, company
-    member = get_membership(db, user, company.id)
-    if member is None or member.member_role != MEMBER_ROLE_ADMIN:
+    if not user_has_company_permission(db, user, company, permission):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Недостаточно прав")
+    return company
+
+
+def require_company_admin_member(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> tuple[User, Company]:
+    """Active COMPANY_ADMIN membership or owner with system COMPANY_ADMIN."""
+    from .permissions import PERM_MANAGE_COMPANY_MEMBERS
+    from .services import get_company_for_user
+
+    company = get_company_for_user(db, user)
+    if company is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нет профиля компании")
+    if not user_has_company_permission(db, user, company, PERM_MANAGE_COMPANY_MEMBERS):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Требуются права администратора компании")
     return user, company
