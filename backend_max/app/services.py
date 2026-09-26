@@ -184,6 +184,73 @@ def request_detail_out(request: Request, db: Session) -> RequestDetailOut:
     )
 
 
+def apply_moderation_decision(db: Session, entity_type: str, entity_id: str, decision: str) -> None:
+    from .models import CompanyCaseItem, CompanyDocumentItem
+
+    try:
+        entity_id_int = int(entity_id)
+    except (TypeError, ValueError):
+        return
+
+    if entity_type == "opportunity":
+        request = db.get(Request, entity_id_int)
+        if request is None:
+            return
+        if decision == "APPROVED":
+            if request.status != "published":
+                request.status = "published"
+                if request.published_at is None:
+                    request.published_at = datetime.now(timezone.utc)
+                if request.expires_at is None:
+                    request.expires_at = datetime.now(timezone.utc) + timedelta(
+                        days=request.proposals_deadline_days
+                    )
+        elif decision == "REJECTED":
+            request.status = "rejected"
+        elif decision == "NEEDS_CHANGES":
+            request.status = "needs_changes"
+        elif decision == "BLOCKED":
+            request.status = "blocked"
+        db.commit()
+        return
+
+    if entity_type == "case":
+        case = db.get(CompanyCaseItem, entity_id_int)
+        if case is None:
+            return
+        case.status = {
+            "APPROVED": "published",
+            "REJECTED": "hidden",
+            "NEEDS_CHANGES": "draft",
+            "BLOCKED": "archived",
+        }.get(decision, case.status)
+        db.commit()
+        return
+
+    if entity_type == "document":
+        doc = db.get(CompanyDocumentItem, entity_id_int)
+        if doc is None:
+            return
+        doc.status = {"APPROVED": "Verified", "REJECTED": "Rejected"}.get(decision, doc.status)
+        db.commit()
+        return
+
+    if entity_type == "company":
+        company = db.get(Company, entity_id_int)
+        if company is None:
+            return
+        if decision == "APPROVED":
+            company.is_verified = True
+            company.verification_status = "VERIFIED"
+        elif decision == "REJECTED":
+            company.verification_status = "REJECTED"
+        elif decision == "NEEDS_CHANGES":
+            company.verification_status = "REQUIRES_UPDATE"
+        elif decision == "BLOCKED":
+            company.platform_status = "BLOCKED"
+        db.commit()
+
+
 def publish_request(db: Session, request: Request) -> None:
     request.status = "published"
     request.published_at = datetime.now(timezone.utc)
@@ -260,6 +327,18 @@ def enqueue_moderation_item(
     status: str = "PENDING",
 ) -> None:
     from .models import ModerationItem
+
+    existing = (
+        db.query(ModerationItem)
+        .filter(
+            ModerationItem.entity_type == entity_type,
+            ModerationItem.entity_id == entity_id,
+            ModerationItem.status.in_(["PENDING", "IN_REVIEW", "NEEDS_CHANGES", "ESCALATED"]),
+        )
+        .first()
+    )
+    if existing is not None:
+        return
 
     db.add(
         ModerationItem(
