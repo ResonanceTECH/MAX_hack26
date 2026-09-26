@@ -8,7 +8,7 @@ from ..db import get_db
 from ..deps import get_current_user
 from ..models import Company, Proposal, Request, User
 from ..schemas import CompanyIn, CompanyOut, CompanyPatchIn, CompanyStatsOut
-from ..services import get_company_for_user, get_company_or_404, require_company
+from ..services import ensure_owner_member, get_company_for_user, get_company_or_404, require_company
 
 router = APIRouter(tags=["companies"])
 
@@ -65,6 +65,7 @@ def upsert_my_company(
             setattr(company, key, value)
     db.commit()
     db.refresh(company)
+    ensure_owner_member(db, company, user)
     return CompanyOut.model_validate(company)
 
 
