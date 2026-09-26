@@ -6,9 +6,13 @@ export interface UserDto {
   first_name: string | null
   last_name: string | null
   username: string | null
+  email?: string | null
+  role?: string
   is_admin: boolean
+  status?: string
   created_at: string
   company_id: number | null
+  last_active_at?: string | null
 }
 
 export interface AuthResponseDto {
