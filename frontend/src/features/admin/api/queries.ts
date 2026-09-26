@@ -396,11 +396,20 @@ export function useToggleFeatureFlag() {
   })
 }
 
-export function useAdminNotifications() {
+export function useAdminNotifications(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: adminKeys.notifications,
     queryFn: () => adminNotificationsApi.getAll(),
+    enabled: options?.enabled ?? true,
   })
+}
+
+export function useAdminUnreadCount() {
+  const role = useSessionStore((s) => s.role)
+  const enabled = role === SYSTEM_ROLES.PLATFORM_ADMIN
+  const query = useAdminNotifications({ enabled })
+  const unread = (query.data ?? []).filter((n) => !n.read).length
+  return { unread: enabled ? unread : 0, isLoading: query.isLoading }
 }
 
 export function useMarkAdminNotificationRead() {
@@ -448,28 +457,10 @@ export function useResolveEscalation() {
       reason: string
       decision: string
     }) => {
-      // reuse escalationsApi if it has resolve; otherwise mark via append through moderation path
-      if ('resolve' in escalationsApi && typeof escalationsApi.resolve === 'function') {
-        return (
-          escalationsApi as { resolve: (id: string, input: unknown) => Promise<unknown> }
-        ).resolve(id, { reason, decision, actor })
-      }
-      const { appendAudit, AUDIT_ACTIONS } = await import('@/shared/mocks/audit')
-      appendAudit({
-        actorId: actor.id,
-        actorName: actor.name,
-        role: actor.role,
-        action: AUDIT_ACTIONS.ESCALATION_RESOLVED,
-        entityType: 'escalation',
-        entityId: id,
-        entityName: `Escalation ${id}`,
-        reason,
-        after: { decision },
-      })
-      return { id, decision }
+      return escalationsApi.resolve(id, { reason, decision, actor })
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['escalations'] })
+      void qc.invalidateQueries({ queryKey: ['moderation'] })
       void qc.invalidateQueries({ queryKey: ['audit'] })
       void qc.invalidateQueries({ queryKey: adminKeys.dashboard })
     },

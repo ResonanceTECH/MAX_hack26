@@ -7,7 +7,7 @@ import type {
   RejectInput,
   RequestChangesInput,
 } from '@/entities/moderation'
-import type { ResolveReportInput } from '@/entities/report'
+import type { CreateReportInput, ResolveReportInput } from '@/entities/report'
 import type { HistoryFilters } from '@/shared/api/moderationHistoryApi'
 import type { ReportListFilters } from '@/shared/api/reportsApi'
 import { escalationsApi } from '@/shared/api/escalationsApi'
@@ -221,6 +221,13 @@ export function useEscalateModerationItem() {
   })
 }
 
+export function useMyModerationItems() {
+  return useQuery({
+    queryKey: [...moderationKeys.all, 'mine'] as const,
+    queryFn: () => moderationApi.listMine(),
+  })
+}
+
 export function useResubmitModerationItem() {
   const invalidate = useInvalidateModeration()
   return useMutation({
@@ -231,6 +238,14 @@ export function useResubmitModerationItem() {
       id: string
       patch: Record<string, string | number | boolean | null>
     }) => moderationApi.resubmit(id, patch),
+    onSuccess: invalidate,
+  })
+}
+
+export function useCreateReport() {
+  const invalidate = useInvalidateModeration()
+  return useMutation({
+    mutationFn: (input: CreateReportInput) => reportsApi.create(input),
     onSuccess: invalidate,
   })
 }

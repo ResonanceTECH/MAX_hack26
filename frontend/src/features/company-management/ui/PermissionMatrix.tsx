@@ -16,41 +16,27 @@ import {
   COMPANY_MEMBER_ROLES,
   type CompanyMemberRole,
 } from '@/entities/company-member'
+import {
+  COMPANY_PERMISSION_MATRIX_ROWS,
+  COMPANY_ROLE_PERMISSIONS,
+} from '@/features/permissions/model/companyRolePermissions'
 
-type Cell = 'full' | 'limited' | 'none'
-
-interface MatrixRow {
-  permission: string
-  admin: Cell
-  manager: Cell
-  viewer: Cell
-}
-
-const MATRIX: MatrixRow[] = [
-  { permission: 'Просмотр профиля компании', admin: 'full', manager: 'full', viewer: 'full' },
-  { permission: 'Редактирование профиля', admin: 'full', manager: 'limited', viewer: 'none' },
-  { permission: 'Управление командой', admin: 'full', manager: 'none', viewer: 'none' },
-  { permission: 'Управление услугами', admin: 'full', manager: 'full', viewer: 'none' },
-  { permission: 'Управление кейсами', admin: 'full', manager: 'full', viewer: 'none' },
-  { permission: 'Управление документами', admin: 'full', manager: 'limited', viewer: 'none' },
-  { permission: 'Настройка прав доступа', admin: 'full', manager: 'none', viewer: 'none' },
-  { permission: 'Публикация запросов', admin: 'full', manager: 'full', viewer: 'none' },
-  { permission: 'Отклики и shortlist', admin: 'full', manager: 'full', viewer: 'limited' },
-  { permission: 'Старт переговоров', admin: 'full', manager: 'full', viewer: 'none' },
-]
+type Cell = 'full' | 'none'
 
 const CELL_LABEL: Record<Cell, string> = {
   full: 'Полный',
-  limited: 'Ограниченный',
   none: 'Нет',
 }
 
-const ROLE_KEYS: { role: CompanyMemberRole; key: keyof Pick<MatrixRow, 'admin' | 'manager' | 'viewer'> }[] =
-  [
-    { role: COMPANY_MEMBER_ROLES.COMPANY_ADMIN, key: 'admin' },
-    { role: COMPANY_MEMBER_ROLES.MANAGER, key: 'manager' },
-    { role: COMPANY_MEMBER_ROLES.VIEWER, key: 'viewer' },
-  ]
+const ROLE_ORDER: CompanyMemberRole[] = [
+  COMPANY_MEMBER_ROLES.COMPANY_ADMIN,
+  COMPANY_MEMBER_ROLES.MANAGER,
+  COMPANY_MEMBER_ROLES.VIEWER,
+]
+
+function cellFor(role: CompanyMemberRole, permission: (typeof COMPANY_PERMISSION_MATRIX_ROWS)[number]['permission']): Cell {
+  return COMPANY_ROLE_PERMISSIONS[role].includes(permission) ? 'full' : 'none'
+}
 
 export function PermissionMatrix() {
   const theme = useTheme()
@@ -64,31 +50,30 @@ export function PermissionMatrix() {
           <TableHead>
             <TableRow>
               <TableCell>Право</TableCell>
-              <TableCell>{COMPANY_MEMBER_ROLE_LABELS.COMPANY_ADMIN}</TableCell>
-              <TableCell>{COMPANY_MEMBER_ROLE_LABELS.MANAGER}</TableCell>
-              <TableCell>{COMPANY_MEMBER_ROLE_LABELS.VIEWER}</TableCell>
+              {ROLE_ORDER.map((role) => (
+                <TableCell key={role}>{COMPANY_MEMBER_ROLE_LABELS[role]}</TableCell>
+              ))}
             </TableRow>
           </TableHead>
           <TableBody>
-            {MATRIX.map((row) => (
+            {COMPANY_PERMISSION_MATRIX_ROWS.map((row) => (
               <TableRow key={row.permission}>
-                <TableCell>{row.permission}</TableCell>
-                <TableCell>{CELL_LABEL[row.admin]}</TableCell>
-                <TableCell>{CELL_LABEL[row.manager]}</TableCell>
-                <TableCell>{CELL_LABEL[row.viewer]}</TableCell>
+                <TableCell>{row.label}</TableCell>
+                {ROLE_ORDER.map((role) => (
+                  <TableCell key={role}>{CELL_LABEL[cellFor(role, row.permission)]}</TableCell>
+                ))}
               </TableRow>
             ))}
           </TableBody>
         </Table>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-          Полный — все действия · Ограниченный — только просмотр или частичные действия · Нет —
-          запрещено
+          Полный — право есть · Нет — запрещено
         </Typography>
       </Box>
     )
   }
 
-  const active = ROLE_KEYS[roleTab]!
+  const activeRole = ROLE_ORDER[roleTab]!
 
   return (
     <Box>
@@ -98,12 +83,12 @@ export function PermissionMatrix() {
         variant="fullWidth"
         sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
       >
-        {ROLE_KEYS.map((r) => (
-          <Tab key={r.role} label={COMPANY_MEMBER_ROLE_LABELS[r.role]} />
+        {ROLE_ORDER.map((role) => (
+          <Tab key={role} label={COMPANY_MEMBER_ROLE_LABELS[role]} />
         ))}
       </Tabs>
       <Stack spacing={1}>
-        {MATRIX.map((row) => (
+        {COMPANY_PERMISSION_MATRIX_ROWS.map((row) => (
           <Box
             key={row.permission}
             sx={{
@@ -115,9 +100,9 @@ export function PermissionMatrix() {
               borderColor: 'divider',
             }}
           >
-            <Typography variant="body2">{row.permission}</Typography>
+            <Typography variant="body2">{row.label}</Typography>
             <Typography variant="body2" fontWeight={600} color="text.secondary">
-              {CELL_LABEL[row[active.key]]}
+              {CELL_LABEL[cellFor(activeRole, row.permission)]}
             </Typography>
           </Box>
         ))}

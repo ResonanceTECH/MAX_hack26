@@ -1,3 +1,4 @@
+import type { CompanyMemberRole } from '@/entities/company-member'
 import type { SystemRole } from '@/entities/user'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import type { Permission } from '../model/permissions'
@@ -5,7 +6,8 @@ import { hasAllPermissions, hasAnyPermission, hasPermission } from '../model/has
 
 export function usePermission(permission: Permission): boolean {
   const role = useSessionStore((s) => s.role)
-  return hasPermission(role, permission)
+  const companyMemberRole = useSessionStore((s) => s.companyMemberRole)
+  return hasPermission(role, permission, companyMemberRole)
 }
 
 export function usePermissions(): {
@@ -13,12 +15,15 @@ export function usePermissions(): {
   hasAny: (permissions: Permission[]) => boolean
   hasAll: (permissions: Permission[]) => boolean
   role: SystemRole | null
+  companyMemberRole: CompanyMemberRole | null
 } {
   const role = useSessionStore((s) => s.role)
+  const companyMemberRole = useSessionStore((s) => s.companyMemberRole)
   return {
     role,
-    has: (p: Permission) => hasPermission(role, p),
-    hasAny: (permissions: Permission[]) => hasAnyPermission(role, permissions),
-    hasAll: (permissions: Permission[]) => hasAllPermissions(role, permissions),
+    companyMemberRole,
+    has: (p: Permission) => hasPermission(role, p, companyMemberRole),
+    hasAny: (permissions: Permission[]) => hasAnyPermission(role, permissions, companyMemberRole),
+    hasAll: (permissions: Permission[]) => hasAllPermissions(role, permissions, companyMemberRole),
   }
 }

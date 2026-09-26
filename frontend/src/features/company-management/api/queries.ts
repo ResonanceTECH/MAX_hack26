@@ -102,6 +102,19 @@ export function useCompanyVerification(companyId: string | undefined) {
   })
 }
 
+export function useSubmitVerification(companyId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => verificationApi.submit(),
+    onSuccess: () => {
+      if (companyId) {
+        void qc.invalidateQueries({ queryKey: companyManagementKeys.verification(companyId) })
+        invalidateCompanyCore(qc, companyId)
+      }
+    },
+  })
+}
+
 export function useCompanyMembers(companyId: string | undefined) {
   return useQuery({
     queryKey: companyManagementKeys.members(companyId ?? ''),
@@ -186,6 +199,20 @@ export function useRemoveMember(companyId: string | undefined) {
     onSuccess: () => {
       if (companyId) {
         void qc.invalidateQueries({ queryKey: companyManagementKeys.members(companyId) })
+        invalidateCompanyCore(qc, companyId)
+      }
+    },
+  })
+}
+
+export function useResendMemberInvite(companyId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (memberId: string) => teamApi.resendInvite(memberId),
+    onSuccess: (_data, memberId) => {
+      if (companyId) {
+        void qc.invalidateQueries({ queryKey: companyManagementKeys.members(companyId) })
+        void qc.invalidateQueries({ queryKey: companyManagementKeys.member(memberId) })
         invalidateCompanyCore(qc, companyId)
       }
     },
