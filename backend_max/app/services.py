@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from .config import Settings, get_settings
 from .matching import match_company
-from .models import Company, Proposal, Request, RequestMatch, User
+from .models import Company, CompanyMember, Proposal, Request, RequestMatch, User
 from .notifications import notifier
 from .schemas import (
     CriterionOut,
@@ -128,11 +128,6 @@ def match_out(request_match: RequestMatch, db: Session) -> MatchOut:
 
 
 def recompute_matches(db: Session, request: Request, notify: bool = True) -> list[MatchOut]:
-    """Пересчитывает матчи запроса со всеми компаниями (кроме автора).
-
-    Возвращает топ рекомендаций для заказчика и параллельно создаёт
-    записи, из которых исполнители видят запрос в своей ленте.
-    """
     companies = db.query(Company).filter(Company.id != request.company_id).all()
     db.query(RequestMatch).filter(RequestMatch.request_id == request.id).delete()
 
@@ -190,7 +185,6 @@ def publish_request(db: Session, request: Request) -> None:
 
 
 def enqueue_moderation_for_request(db: Session, request: Request) -> None:
-    """Create a moderation queue item for a published opportunity (idempotent per entity)."""
     from .models import ModerationItem
 
     entity_id = str(request.id)
