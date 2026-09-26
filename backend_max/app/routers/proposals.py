@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import get_current_user
-from ..models import Company, Proposal, User
+from ..deps import get_current_user, require_company_permission
+from ..models import Company, CompanyCaseItem, Proposal, User
+from ..permissions import PERM_CREATE_PROPOSAL, PERM_MANAGE_SHORTLIST, STAFF_ROLES
 from ..notifications import notifier
 from ..schemas import ProposalIn, ProposalOut, ProposalStatusIn, ShortlistIn
 from ..services import (
@@ -23,6 +24,22 @@ router = APIRouter(tags=["proposals"])
 ALLOWED_STATUSES = {"shortlisted", "negotiating", "chosen", "rejected"}
 
 
+def _assert_case_belongs_to_company(db: Session, company: Company, case_ref: str | None) -> None:
+    if not case_ref or not str(case_ref).strip():
+        return
+    ref = str(case_ref).strip()
+    q = db.query(CompanyCaseItem).filter(CompanyCaseItem.company_id == company.id)
+    if ref.isdigit():
+        case = q.filter(CompanyCaseItem.id == int(ref)).first()
+    else:
+        case = q.filter(CompanyCaseItem.title == ref).first()
+    if case is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "case_ref должен ссылаться на кейс вашей компании",
+        )
+
+
 def _create_proposal_impl(
     opportunity_id: int,
     payload: ProposalIn,
@@ -30,10 +47,12 @@ def _create_proposal_impl(
     db: Session,
 ) -> ProposalOut:
     """Отклик исполнителя. Профиль компании подставляется автоматически."""
+    if user.role in STAFF_ROLES or user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Модераторы и админы платформы не откликаются")
     request = get_request_or_404(db, opportunity_id)
     if request.status != "published":
         raise HTTPException(status.HTTP_409_CONFLICT, "Приём предложений по запросу закрыт")
-    executor = require_company(db, user)
+    executor = require_company_permission(db, user, PERM_CREATE_PROPOSAL)
     if request.company_id == executor.id:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нельзя откликнуться на собственный запрос")
 
@@ -44,6 +63,8 @@ def _create_proposal_impl(
     )
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, "Вы уже отправили предложение по этому запросу")
+
+    _assert_case_belongs_to_company(db, executor, payload.case_ref)
 
     proposal = Proposal(
         request_id=request.id,
@@ -137,7 +158,7 @@ def get_proposal(
 
 
 def _toggle_shortlist_impl(proposal: Proposal, user: User, db: Session) -> ProposalOut:
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_MANAGE_SHORTLIST)
     request = get_request_or_404(db, proposal.request_id)
     ensure_owns_request(user, company, request)
     if proposal.status in {"shortlisted", "negotiating"}:
@@ -157,6 +178,7 @@ def toggle_shortlist(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ProposalOut:
+    require_company_permission(db, user, PERM_MANAGE_SHORTLIST)
     return _toggle_shortlist_impl(get_proposal_or_404(db, proposal_id), user, db)
 
 
@@ -168,6 +190,7 @@ def shortlist_by_opportunity(
     db: Session = Depends(get_db),
 ) -> ProposalOut:
     """Shortlist по потребности: укажите company_id или proposal_id."""
+    require_company_permission(db, user, PERM_MANAGE_SHORTLIST)
     request = get_request_or_404(db, opportunity_id)
     if payload.proposal_id is not None:
         proposal = get_proposal_or_404(db, payload.proposal_id)

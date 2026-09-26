@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings, get_settings
 from ..db import get_db
-from ..deps import get_current_user
+from ..deps import get_current_user, require_company_permission
 from ..models import Company, Deal, Proposal, Request, RequestMatch, UploadedFile, User
+from ..permissions import PERM_CREATE_OPPORTUNITY, STAFF_ROLES
 from ..schemas import (
     CompareOut,
     CompareRowOut,
@@ -72,7 +73,9 @@ def create_opportunity(
     Если publish=false — запрос сохраняется как draft (публикация отдельно:
     POST /opportunities/{id}/publish).
     """
-    company = require_company(db, user)
+    if user.role in STAFF_ROLES or user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Модераторы и админы платформы не публикуют запросы")
+    company = require_company_permission(db, user, PERM_CREATE_OPPORTUNITY)
 
     description = (payload.description or "").strip()
     if description and not payload.title:

@@ -7,6 +7,7 @@ from ..config import Settings, get_settings
 from ..db import get_db
 from ..deps import get_current_user, sync_admin_flag
 from ..models import User
+from ..deps import get_active_membership, resolve_member_role
 from ..roles import (
     ROLE_BUSINESS_USER,
     ROLE_COMPANY_ADMIN,
@@ -14,8 +15,10 @@ from ..roles import (
     ROLE_PLATFORM_ADMIN,
     SEED_BUSINESS_USER,
     SEED_COMPANY_ADMIN,
+    SEED_MANAGER,
     SEED_MODERATOR,
     SEED_PLATFORM_ADMIN,
+    SEED_VIEWER,
 )
 from ..schemas import AuthInitIn, AuthResponse, UserOut
 from ..security import (
@@ -34,16 +37,23 @@ DEV_ROLE_BY_MAX_ID = {
     SEED_COMPANY_ADMIN: ROLE_COMPANY_ADMIN,
     SEED_BUSINESS_USER: ROLE_BUSINESS_USER,
     SEED_MODERATOR: ROLE_MODERATOR,
+    SEED_MANAGER: ROLE_BUSINESS_USER,
+    SEED_VIEWER: ROLE_BUSINESS_USER,
 }
 
 
 def _user_out(user: User, db: Session) -> UserOut:
-    company_id = user.company.id if user.company else None
-    if company_id is None:
-        from ..services import get_company_for_user
+    from ..services import get_company_for_user
 
-        company = get_company_for_user(db, user)
-        company_id = company.id if company else None
+    company = get_company_for_user(db, user)
+    company_id = company.id if company else None
+    member_role = None
+    if company is not None:
+        member_role = resolve_member_role(db, user, company)
+        if member_role is None:
+            membership = get_active_membership(db, user)
+            if membership is not None and membership.company_id == company.id:
+                member_role = membership.member_role
     return UserOut(
         id=user.id,
         max_user_id=user.max_user_id,
@@ -57,6 +67,7 @@ def _user_out(user: User, db: Session) -> UserOut:
         created_at=user.created_at,
         company_id=company_id,
         last_active_at=user.last_active_at,
+        member_role=member_role,
     )
 
 

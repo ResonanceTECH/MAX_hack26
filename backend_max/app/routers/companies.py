@@ -5,8 +5,9 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import get_current_user
+from ..deps import get_current_user, user_has_company_permission
 from ..models import Company, Proposal, Request, User
+from ..permissions import PERM_EDIT_COMPANY
 from ..schemas import CompanyIn, CompanyOut, CompanyPatchIn, CompanyStatsOut
 from ..services import ensure_owner_member, get_company_for_user, get_company_or_404, require_company
 
@@ -61,6 +62,8 @@ def upsert_my_company(
         company = Company(user_id=user.id, **data)
         db.add(company)
     else:
+        if not user_has_company_permission(db, user, company, PERM_EDIT_COMPANY):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Недостаточно прав для редактирования компании")
         for key, value in data.items():
             setattr(company, key, value)
     db.commit()
@@ -93,8 +96,12 @@ def patch_company(
     db: Session = Depends(get_db),
 ) -> CompanyOut:
     company = get_company_or_404(db, company_id)
-    if company.user_id != user.id and not user.is_admin:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Редактировать можно только свою компанию")
+    my = get_company_for_user(db, user)
+    if my is None or my.id != company.id:
+        if not user.is_admin:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Редактировать можно только свою компанию")
+    elif not user_has_company_permission(db, user, company, PERM_EDIT_COMPANY):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Недостаточно прав для редактирования компании")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(company, key, value)
     db.commit()

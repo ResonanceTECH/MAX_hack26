@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import get_current_user, require_moderator
+from ..deps import get_current_user, require_moderator, require_platform_admin
 from ..models import Escalation, ModerationItem, Report, User, utcnow
 from ..schemas import (
     EscalationOut,
@@ -15,12 +15,27 @@ from ..schemas import (
     ModerationItemOut,
     ReportCreateIn,
     ReportOut,
+    ResolveEscalationIn,
     ResolveReportIn,
 )
 from ..services import append_audit
 
 router = APIRouter(tags=["moderation"])
 
+
+def _escalation_out(e: Escalation) -> EscalationOut:
+    return EscalationOut(
+        id=e.id,
+        moderation_item_id=e.moderation_item_id,
+        report_id=e.report_id,
+        title=e.title,
+        reason=e.reason,
+        status=e.status,
+        created_at=e.created_at,
+        resolved_at=e.resolved_at,
+        resolution=getattr(e, "resolution", None),
+        admin_response=getattr(e, "admin_response", None),
+    )
 
 def _item_out(item: ModerationItem) -> ModerationItemOut:
     return ModerationItemOut(
@@ -99,6 +114,22 @@ def dashboard(user: User = Depends(require_moderator), db: Session = Depends(get
         attention_items=[_item_out(i) for i in recent[:5]],
         recent_queue=[_item_out(i) for i in recent],
     )
+
+
+@router.get("/moderation/mine", response_model=list[ModerationItemOut])
+def my_moderation_items(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Owner-facing: items belonging to the current user that need attention."""
+    rows = (
+        db.query(ModerationItem)
+        .filter(
+            ModerationItem.owner_id == str(user.id),
+            ModerationItem.status.in_(["NEEDS_CHANGES", "PENDING", "IN_REVIEW", "REJECTED"]),
+        )
+        .order_by(ModerationItem.updated_at.desc())
+        .limit(100)
+        .all()
+    )
+    return [_item_out(i) for i in rows]
 
 
 @router.get("/moderation/queue", response_model=list[ModerationItemOut])
@@ -206,16 +237,7 @@ def escalate_item(item_id: int, payload: ModerationDecisionIn, user: User = Depe
     db.add(esc)
     db.commit()
     db.refresh(esc)
-    return EscalationOut(
-        id=esc.id,
-        moderation_item_id=esc.moderation_item_id,
-        report_id=esc.report_id,
-        title=esc.title,
-        reason=esc.reason,
-        status=esc.status,
-        created_at=esc.created_at,
-        resolved_at=esc.resolved_at,
-    )
+    return _escalation_out(esc)
 
 
 @router.get("/moderation/history", response_model=list[ModerationItemOut])
@@ -266,14 +288,42 @@ def create_report(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    from ..roles import REPORT_TARGET_TYPES, REPORT_TYPES
+
+    report_type = (payload.type or "OTHER").strip().upper()
+    if report_type == "MISLEADING":
+        report_type = "MISLEADING_INFORMATION"
+    if report_type not in REPORT_TYPES:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"type: {sorted(REPORT_TYPES)}",
+        )
+    target_type = (payload.target_type or "").strip().lower()
+    if target_type not in REPORT_TARGET_TYPES:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"target_type: {sorted(REPORT_TARGET_TYPES)}",
+        )
+    dup = (
+        db.query(Report)
+        .filter(
+            Report.reporter_id == user.id,
+            Report.target_type == target_type,
+            Report.target_id == payload.target_id,
+            Report.status.in_(["OPEN", "IN_PROGRESS"]),
+        )
+        .first()
+    )
+    if dup is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Жалоба на этот объект уже открыта")
     reporter_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or str(user.id)
     r = Report(
         reporter_id=user.id,
         reporter_name=reporter_name,
-        target_type=payload.target_type,
+        target_type=target_type,
         target_id=payload.target_id,
         target_name=payload.target_name or payload.target_id,
-        report_type=payload.type or "OTHER",
+        report_type=report_type,
         description=payload.description or "",
         status="OPEN",
         priority=payload.priority or "NORMAL",
@@ -349,25 +399,13 @@ def escalate_report(report_id: int, comment: str | None = None, user: User = Dep
     db.add(esc)
     db.commit()
     db.refresh(esc)
-    return EscalationOut(id=esc.id, moderation_item_id=None, report_id=esc.report_id, title=esc.title, reason=esc.reason, status=esc.status, created_at=esc.created_at, resolved_at=None)
+    return _escalation_out(esc)
 
 
 @router.get("/escalations", response_model=list[EscalationOut])
 def list_escalations(user: User = Depends(require_moderator), db: Session = Depends(get_db)):
     rows = db.query(Escalation).order_by(Escalation.created_at.desc()).limit(100).all()
-    return [
-        EscalationOut(
-            id=e.id,
-            moderation_item_id=e.moderation_item_id,
-            report_id=e.report_id,
-            title=e.title,
-            reason=e.reason,
-            status=e.status,
-            created_at=e.created_at,
-            resolved_at=e.resolved_at,
-        )
-        for e in rows
-    ]
+    return [_escalation_out(e) for e in rows]
 
 
 @router.get("/escalations/{escalation_id}", response_model=EscalationOut)
@@ -375,13 +413,37 @@ def get_escalation(escalation_id: int, user: User = Depends(require_moderator), 
     e = db.get(Escalation, escalation_id)
     if e is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Эскалация не найдена")
-    return EscalationOut(
-        id=e.id,
-        moderation_item_id=e.moderation_item_id,
-        report_id=e.report_id,
-        title=e.title,
-        reason=e.reason,
-        status=e.status,
-        created_at=e.created_at,
-        resolved_at=e.resolved_at,
+    return _escalation_out(e)
+
+
+@router.post("/escalations/{escalation_id}/resolve", response_model=EscalationOut)
+def resolve_escalation(
+    escalation_id: int,
+    payload: ResolveEscalationIn,
+    user: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    e = db.get(Escalation, escalation_id)
+    if e is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Эскалация не найдена")
+    if e.status == "RESOLVED":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Эскалация уже закрыта")
+    before = {"status": e.status}
+    e.status = "RESOLVED"
+    e.resolved_at = utcnow()
+    e.resolution = payload.decision
+    e.admin_response = payload.decision
+    db.commit()
+    db.refresh(e)
+    append_audit(
+        db,
+        actor=user,
+        action="ESCALATION_RESOLVED",
+        entity_type="escalation",
+        entity_id=str(e.id),
+        entity_name=e.title or f"Escalation {e.id}",
+        reason=payload.reason,
+        before=before,
+        after={"status": e.status, "decision": payload.decision},
     )
+    return _escalation_out(e)

@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import get_current_user
+from ..deps import (
+    get_current_user,
+    require_company_admin_member,
+    require_company_permission,
+)
 from ..models import (
     Company,
     CompanyActivityEvent,
@@ -21,11 +26,28 @@ from ..models import (
     User,
     utcnow,
 )
-from ..roles import MEMBER_ROLES, MEMBER_STATUS_ACTIVE, MEMBER_STATUS_INVITED
+from ..permissions import (
+    PERM_EDIT_COMPANY,
+    PERM_MANAGE_COMPANY_CASES,
+    PERM_MANAGE_COMPANY_DOCUMENTS,
+    PERM_MANAGE_COMPANY_SERVICES,
+    PERM_MANAGE_COMPANY_SETTINGS,
+)
+from ..roles import (
+    INVITE_STATUS_ACCEPTED,
+    INVITE_STATUS_DECLINED,
+    INVITE_STATUS_EXPIRED,
+    INVITE_STATUS_PENDING,
+    MEMBER_ROLES,
+    MEMBER_STATUS_ACTIVE,
+    MEMBER_STATUS_DEACTIVATED,
+    MEMBER_STATUS_INVITED,
+)
 from ..schemas import (
     ActivityOut,
     CaseItemIn,
     CaseItemOut,
+    CompanyInvitationOut,
     CompanyMemberInviteIn,
     CompanyMemberOut,
     CompanyMemberPatchIn,
@@ -75,6 +97,9 @@ DEFAULT_SETTINGS = {
     "archived": False,
 }
 
+TEAM_INVITE_TTL_DAYS = 14
+
+
 
 def _actor_name(user: User) -> str:
     return f"{user.first_name or ''} {user.last_name or ''}".strip() or f"user-{user.id}"
@@ -94,6 +119,99 @@ def _member_out(m: CompanyMember) -> CompanyMemberOut:
         joined_at=m.joined_at,
         last_active_at=m.last_active_at,
     )
+
+
+INVITE_TTL_DAYS = 30
+
+
+def _invite_effective_status(inv: OpportunityInvite, req: Request | None) -> str:
+    status = getattr(inv, "status", None) or "PENDING"
+    if status != "PENDING":
+        return status
+    now = datetime.now(timezone.utc)
+    if req and req.expires_at:
+        exp = req.expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < now:
+            return "EXPIRED"
+    created = inv.created_at
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    if (now - created).days >= INVITE_TTL_DAYS:
+        return "EXPIRED"
+    return "PENDING"
+
+
+def _opportunity_invite_out(db: Session, inv: OpportunityInvite) -> OpportunityInviteOut:
+    req = db.get(Request, inv.opportunity_id)
+    invited = db.get(Company, inv.company_id)
+    owner = db.get(Company, req.company_id) if req else None
+    return OpportunityInviteOut(
+        id=inv.id,
+        opportunity_id=inv.opportunity_id,
+        opportunity_title=req.title if req else "",
+        company_id=inv.company_id,
+        company_name=invited.name if invited else "",
+        inviting_company_id=owner.id if owner else None,
+        inviting_company_name=owner.name if owner else "",
+        budget_min=req.budget_min if req else None,
+        budget_max=req.budget_max if req else None,
+        status=_invite_effective_status(inv, req),
+        created_at=inv.created_at,
+        responded_at=getattr(inv, "responded_at", None),
+    )
+
+
+def _company_invitation_out(db: Session, m: CompanyMember) -> CompanyInvitationOut:
+    company = db.get(Company, m.company_id)
+    invited_by = ""
+    if m.invited_by_user_id:
+        by = db.get(User, m.invited_by_user_id)
+        if by:
+            invited_by = f"{by.first_name or ''} {by.last_name or ''}".strip() or str(by.id)
+    return CompanyInvitationOut(
+        token=m.invite_token or str(m.id),
+        company_id=m.company_id,
+        company_name=company.name if company else "",
+        role=m.member_role,
+        invited_by=invited_by,
+        email=m.email,
+        status=_invitation_api_status(m),
+        expires_at=m.expires_at,
+        first_name=m.first_name or "",
+        last_name=m.last_name or "",
+        message=m.message,
+        id=m.id,
+        invited_at=m.invited_at,
+    )
+
+
+def _invitation_api_status(m: CompanyMember) -> str:
+    if m.status == MEMBER_STATUS_ACTIVE:
+        return INVITE_STATUS_ACCEPTED
+    if m.status in {MEMBER_STATUS_DEACTIVATED, "declined"}:
+        return INVITE_STATUS_DECLINED
+    if m.status == "cancelled":
+        return "cancelled"
+    if m.status == MEMBER_STATUS_INVITED:
+        if m.expires_at:
+            exp = m.expires_at
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if exp < datetime.now(timezone.utc):
+                return INVITE_STATUS_EXPIRED
+        return INVITE_STATUS_PENDING
+    return m.status
+
+
+def _find_invitation(db: Session, token: str) -> CompanyMember | None:
+    member = db.query(CompanyMember).filter(CompanyMember.invite_token == token).first()
+    if member is not None:
+        return member
+    if token.isdigit():
+        return db.get(CompanyMember, int(token))
+    return None
 
 
 def _service_out(s: CompanyServiceItem) -> ServiceOut:
@@ -164,8 +282,6 @@ def _doc_out(d: CompanyDocumentItem) -> DocumentItemOut:
 @router.get("/companies/me/members", response_model=list[CompanyMemberOut])
 def list_members(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     company = require_company(db, user)
-    ensure_owner_member(db, company, company.user if hasattr(company, "user") else user)
-    # ensure owner of company has membership
     owner = db.get(User, company.user_id)
     if owner:
         ensure_owner_member(db, company, owner)
@@ -179,20 +295,19 @@ def invite_member(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    company = require_company(db, user)
-    if company.user_id != user.id and user.role not in {"COMPANY_ADMIN", "PLATFORM_ADMIN"} and not user.is_admin:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Только админ компании может приглашать")
+    _user, company = require_company_admin_member(user=user, db=db)
     if payload.role not in MEMBER_ROLES:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"role: {sorted(MEMBER_ROLES)}")
     email = payload.email.strip().lower()
     dup = (
         db.query(CompanyMember)
         .filter(CompanyMember.company_id == company.id, CompanyMember.email == email)
-        .filter(CompanyMember.status != "deactivated")
+        .filter(CompanyMember.status.notin_([MEMBER_STATUS_DEACTIVATED, "declined", "cancelled"]))
         .first()
     )
     if dup:
         raise HTTPException(status.HTTP_409_CONFLICT, "Сотрудник с таким email уже есть")
+    now = utcnow()
     member = CompanyMember(
         company_id=company.id,
         first_name=payload.first_name,
@@ -200,6 +315,11 @@ def invite_member(
         email=email,
         member_role=payload.role,
         status=MEMBER_STATUS_INVITED,
+        invite_token=str(uuid.uuid4()),
+        invited_by_user_id=user.id,
+        expires_at=now + timedelta(days=TEAM_INVITE_TTL_DAYS),
+        message=payload.message,
+        invited_at=now,
     )
     db.add(member)
     db.commit()
@@ -215,7 +335,7 @@ def patch_member(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    company = require_company(db, user)
+    _user, company = require_company_admin_member(user=user, db=db)
     member = db.get(CompanyMember, member_id)
     if member is None or member.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Сотрудник не найден")
@@ -237,16 +357,128 @@ def remove_member(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    company = require_company(db, user)
+    _user, company = require_company_admin_member(user=user, db=db)
     member = db.get(CompanyMember, member_id)
     if member is None or member.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Сотрудник не найден")
     if member.user_id == company.user_id:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нельзя удалить владельца")
-    member.status = "deactivated"
+    member.status = MEMBER_STATUS_DEACTIVATED
     db.commit()
     append_activity(db, company.id, "MEMBER_REMOVED", _actor_name(user), "удалила сотрудника", member.email)
     return {"deleted": True}
+
+
+@router.post("/companies/me/members/{member_id}/resend", response_model=CompanyMemberOut)
+def resend_member_invite(
+    member_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Company admin resends an outstanding team invite (bumps invited_at / expires_at)."""
+    _user, company = require_company_admin_member(user=user, db=db)
+    member = db.get(CompanyMember, member_id)
+    if member is None or member.company_id != company.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Сотрудник не найден")
+    if member.status != MEMBER_STATUS_INVITED:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Повторная отправка только для статуса invited")
+    now = utcnow()
+    member.invited_at = now
+    member.expires_at = now + timedelta(days=TEAM_INVITE_TTL_DAYS)
+    if not member.invite_token:
+        member.invite_token = str(uuid.uuid4())
+    db.commit()
+    db.refresh(member)
+    append_activity(db, company.id, "MEMBER_INVITED", _actor_name(user), "повторно отправила приглашение", member.email)
+    return _member_out(member)
+
+
+# ---------- company invitations (invitee accept/decline by token) ----------
+
+
+@router.get("/company-invitations/{token}", response_model=CompanyInvitationOut)
+def get_company_invitation(
+    token: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    member = _find_invitation(db, token)
+    if member is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Приглашение не найдено")
+    return _company_invitation_out(db, member)
+
+
+@router.post("/company-invitations/{token}/accept", response_model=CompanyInvitationOut)
+def accept_company_invitation(
+    token: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    member = _find_invitation(db, token)
+    if member is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Приглашение не найдено")
+    api_status = _invitation_api_status(member)
+    if api_status == INVITE_STATUS_EXPIRED:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Приглашение истекло")
+    if api_status != INVITE_STATUS_PENDING:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Приглашение уже обработано")
+    if member.user_id is not None and member.user_id != user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Приглашение уже привязано к другому пользователю")
+    existing = (
+        db.query(CompanyMember)
+        .filter(
+            CompanyMember.user_id == user.id,
+            CompanyMember.status == MEMBER_STATUS_ACTIVE,
+            CompanyMember.id != member.id,
+        )
+        .first()
+    )
+    if existing is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "У пользователя уже есть активное членство")
+    owned = db.query(Company).filter(Company.user_id == user.id).first()
+    if owned is not None and owned.id != member.company_id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "У пользователя уже есть компания")
+    member.user_id = user.id
+    member.status = MEMBER_STATUS_ACTIVE
+    member.joined_at = utcnow()
+    member.last_active_at = utcnow()
+    if not user.email:
+        user.email = member.email
+    if member.first_name and not user.first_name:
+        user.first_name = member.first_name
+    if member.last_name and not user.last_name:
+        user.last_name = member.last_name
+    db.commit()
+    db.refresh(member)
+    append_activity(
+        db,
+        member.company_id,
+        "MEMBER_JOINED",
+        _actor_name(user),
+        "приняла приглашение в команду",
+        f"{member.first_name} {member.last_name}",
+    )
+    return _company_invitation_out(db, member)
+
+
+@router.post("/company-invitations/{token}/decline", response_model=CompanyInvitationOut)
+def decline_company_invitation(
+    token: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    member = _find_invitation(db, token)
+    if member is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Приглашение не найдено")
+    api_status = _invitation_api_status(member)
+    if api_status == INVITE_STATUS_EXPIRED:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Приглашение истекло")
+    if api_status != INVITE_STATUS_PENDING:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Приглашение уже обработано")
+    member.status = MEMBER_STATUS_DEACTIVATED
+    db.commit()
+    db.refresh(member)
+    return _company_invitation_out(db, member)
 
 
 # ---------- services ----------
@@ -275,7 +507,7 @@ def create_service(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_MANAGE_COMPANY_SERVICES)
     data = payload.model_dump(exclude_unset=True)
     item = CompanyServiceItem(company_id=company.id, **{k: v for k, v in data.items() if v is not None or k in ("description", "title", "category")})
     if "status" not in data or data["status"] is None:
@@ -294,7 +526,7 @@ def patch_service(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_MANAGE_COMPANY_SERVICES)
     item = db.get(CompanyServiceItem, service_id)
     if item is None or item.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Услуга не найдена")
@@ -309,7 +541,7 @@ def patch_service(
 
 @router.delete("/companies/me/services/{service_id}", response_model=dict)
 def delete_service(service_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_MANAGE_COMPANY_SERVICES)
     item = db.get(CompanyServiceItem, service_id)
     if item is None or item.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Услуга не найдена")
@@ -339,7 +571,7 @@ def list_public_cases(company_id: int, db: Session = Depends(get_db)):
 
 @router.post("/companies/me/cases", response_model=CaseItemOut, status_code=201)
 def create_case(payload: CaseItemIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_MANAGE_COMPANY_CASES)
     data = payload.model_dump(exclude_unset=True)
     item = CompanyCaseItem(company_id=company.id, **{k: v for k, v in data.items() if v is not None or k in ("title", "description", "result", "industry")})
     db.add(item)
@@ -351,7 +583,7 @@ def create_case(payload: CaseItemIn, user: User = Depends(get_current_user), db:
 
 @router.patch("/companies/me/cases/{case_id}", response_model=CaseItemOut)
 def patch_case(case_id: int, payload: CaseItemIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_MANAGE_COMPANY_CASES)
     item = db.get(CompanyCaseItem, case_id)
     if item is None or item.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Кейс не найден")
@@ -365,7 +597,7 @@ def patch_case(case_id: int, payload: CaseItemIn, user: User = Depends(get_curre
 
 @router.delete("/companies/me/cases/{case_id}", response_model=dict)
 def delete_case(case_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_MANAGE_COMPANY_CASES)
     item = db.get(CompanyCaseItem, case_id)
     if item is None or item.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Кейс не найден")
@@ -385,7 +617,7 @@ def list_documents(user: User = Depends(get_current_user), db: Session = Depends
 
 @router.post("/companies/me/documents", response_model=DocumentItemOut, status_code=201)
 def add_document(payload: DocumentItemIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_MANAGE_COMPANY_DOCUMENTS)
     item = CompanyDocumentItem(
         company_id=company.id,
         name=payload.name,
@@ -408,7 +640,7 @@ def add_document(payload: DocumentItemIn, user: User = Depends(get_current_user)
 
 @router.patch("/companies/me/documents/{document_id}", response_model=DocumentItemOut)
 def patch_document(document_id: int, payload: DocumentItemIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_MANAGE_COMPANY_DOCUMENTS)
     item = db.get(CompanyDocumentItem, document_id)
     if item is None or item.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Документ не найден")
@@ -425,7 +657,7 @@ def patch_document(document_id: int, payload: DocumentItemIn, user: User = Depen
 
 @router.delete("/companies/me/documents/{document_id}", response_model=dict)
 def delete_document(document_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_MANAGE_COMPANY_DOCUMENTS)
     item = db.get(CompanyDocumentItem, document_id)
     if item is None or item.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Документ не найден")
@@ -460,7 +692,7 @@ def patch_settings(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_MANAGE_COMPANY_SETTINGS)
     current = dict(company.settings_json or {})
     if payload.notifications:
         current["notifications"] = {**(current.get("notifications") or {}), **payload.notifications}
@@ -500,7 +732,7 @@ def get_verification(user: User = Depends(get_current_user), db: Session = Depen
 
 @router.post("/companies/me/verification", response_model=CompanyVerificationOut)
 def submit_verification(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    company = require_company(db, user)
+    company = require_company_permission(db, user, PERM_EDIT_COMPANY)
     company.verification_status = "PENDING"
     db.commit()
     return get_verification(user, db)
@@ -540,20 +772,7 @@ def list_invites(opportunity_id: int, user: User = Depends(get_current_user), db
     if request.company_id != company.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Только автор запроса")
     rows = db.query(OpportunityInvite).filter(OpportunityInvite.opportunity_id == opportunity_id).all()
-    out = []
-    for inv in rows:
-        c = db.get(Company, inv.company_id)
-        out.append(
-            OpportunityInviteOut(
-                id=inv.id,
-                opportunity_id=inv.opportunity_id,
-                opportunity_title=request.title,
-                company_id=inv.company_id,
-                company_name=c.name if c else "",
-                created_at=inv.created_at,
-            )
-        )
-    return out
+    return [_opportunity_invite_out(db, inv) for inv in rows]
 
 
 @router.post("/opportunities/{opportunity_id}/invites", response_model=OpportunityInviteOut, status_code=201)
@@ -579,47 +798,75 @@ def create_invite(
         .first()
     )
     if existing:
-        return OpportunityInviteOut(
-            id=existing.id,
-            opportunity_id=existing.opportunity_id,
-            opportunity_title=request.title,
-            company_id=existing.company_id,
-            company_name=target.name,
-            created_at=existing.created_at,
-        )
+        return _opportunity_invite_out(db, existing)
     inv = OpportunityInvite(
         opportunity_id=opportunity_id,
         company_id=payload.company_id,
         invited_by_user_id=user.id,
+        status="PENDING",
     )
     db.add(inv)
     db.commit()
     db.refresh(inv)
-    return OpportunityInviteOut(
-        id=inv.id,
-        opportunity_id=inv.opportunity_id,
-        opportunity_title=request.title,
-        company_id=inv.company_id,
-        company_name=target.name,
-        created_at=inv.created_at,
-    )
+    return _opportunity_invite_out(db, inv)
 
 
 @router.get("/invites/mine", response_model=list[OpportunityInviteOut])
 def my_invites(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     company = require_company(db, user)
     rows = db.query(OpportunityInvite).filter(OpportunityInvite.company_id == company.id).all()
-    out = []
-    for inv in rows:
-        req = db.get(Request, inv.opportunity_id)
-        out.append(
-            OpportunityInviteOut(
-                id=inv.id,
-                opportunity_id=inv.opportunity_id,
-                opportunity_title=req.title if req else "",
-                company_id=inv.company_id,
-                company_name=company.name,
-                created_at=inv.created_at,
-            )
-        )
-    return out
+    return [_opportunity_invite_out(db, inv) for inv in rows]
+
+
+@router.post("/invites/{invite_id}/accept", response_model=OpportunityInviteOut)
+def accept_opportunity_invite(
+    invite_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    company = require_company(db, user)
+    inv = db.get(OpportunityInvite, invite_id)
+    if inv is None or inv.company_id != company.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Приглашение не найдено")
+    req = db.get(Request, inv.opportunity_id)
+    effective = _invite_effective_status(inv, req)
+    if effective == "EXPIRED":
+        if getattr(inv, "status", "PENDING") == "PENDING":
+            inv.status = "EXPIRED"
+            db.commit()
+            db.refresh(inv)
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Приглашение истекло")
+    if effective != "PENDING":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Приглашение уже обработано")
+    inv.status = "ACCEPTED"
+    inv.responded_at = utcnow()
+    db.commit()
+    db.refresh(inv)
+    return _opportunity_invite_out(db, inv)
+
+
+@router.post("/invites/{invite_id}/decline", response_model=OpportunityInviteOut)
+def decline_opportunity_invite(
+    invite_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    company = require_company(db, user)
+    inv = db.get(OpportunityInvite, invite_id)
+    if inv is None or inv.company_id != company.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Приглашение не найдено")
+    req = db.get(Request, inv.opportunity_id)
+    effective = _invite_effective_status(inv, req)
+    if effective == "EXPIRED":
+        if getattr(inv, "status", "PENDING") == "PENDING":
+            inv.status = "EXPIRED"
+            db.commit()
+            db.refresh(inv)
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Приглашение истекло")
+    if effective != "PENDING":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Приглашение уже обработано")
+    inv.status = "DECLINED"
+    inv.responded_at = utcnow()
+    db.commit()
+    db.refresh(inv)
+    return _opportunity_invite_out(db, inv)
