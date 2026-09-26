@@ -439,6 +439,20 @@ class Escalation(Base):
     admin_response: Mapped[str | None] = Column(Text, nullable=True)
 
 
+class ModerationDecision(Base):
+    __tablename__ = "moderation_decisions"
+
+    id: Mapped[int] = Column(Integer, primary_key=True)
+    item_id: Mapped[int] = Column(Integer, ForeignKey("moderation_items.id"), index=True)
+    moderator_id: Mapped[int | None] = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action: Mapped[str] = Column(String(32))  # APPROVED | REJECTED | BLOCKED | NEEDS_CHANGES
+    reason: Mapped[str | None] = Column(Text, nullable=True)
+    comment: Mapped[str | None] = Column(Text, nullable=True)
+    previous_status: Mapped[str] = Column(String(32), default="")
+    new_status: Mapped[str] = Column(String(32), default="")
+    created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
+
+
 class AuditEvent(Base):
     __tablename__ = "audit_events"
 
