@@ -21,6 +21,7 @@ const unsorted: Deal = {
   nextAction: 'Созвон',
   lastAction: 'Старт',
   updatedAt: '2026-09-25T14:00:00.000Z',
+  files: [],
   events: [
     {
       id: 'late',

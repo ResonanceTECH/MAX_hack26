@@ -20,12 +20,13 @@ import {
   useCompanyMember,
   useCompanyMembers,
   useRemoveMember,
+  useResendMemberInvite,
   useSuspendMember,
   useUpdateMemberRole,
 } from '@/features/company-management'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { TeamApiError } from '@/shared/api/teamApi'
-import { ROUTES } from '@/shared/constants/routes'
+import { companyInvitationPath, ROUTES } from '@/shared/constants/routes'
 import { formatDate } from '@/shared/lib/format'
 import {
   AppButton,
@@ -42,7 +43,7 @@ const ROLE_OPTIONS = Object.values(COMPANY_MEMBER_ROLES).map((role) => ({
   label: COMPANY_MEMBER_ROLE_LABELS[role],
 }))
 
-type ConfirmKind = 'suspend' | 'remove' | 'promote'
+type ConfirmKind = 'suspend' | 'remove' | 'promote' | 'cancelInvite'
 
 export function CompanyMemberDetailPage() {
   const { memberId = '' } = useParams()
@@ -54,6 +55,7 @@ export function CompanyMemberDetailPage() {
   const suspend = useSuspendMember(companyId)
   const activate = useActivateMember(companyId)
   const remove = useRemoveMember(companyId)
+  const resend = useResendMemberInvite(companyId)
   const showSuccess = useSnackbarStore((s) => s.showSuccess)
   const showError = useSnackbarStore((s) => s.showError)
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null)
@@ -100,9 +102,9 @@ export function CompanyMemberDetailPage() {
       if (confirm === 'suspend') {
         await suspend.mutateAsync(member.id)
         showSuccess('Доступ приостановлен')
-      } else if (confirm === 'remove') {
+      } else if (confirm === 'remove' || confirm === 'cancelInvite') {
         await remove.mutateAsync(member.id)
-        showSuccess('Сотрудник удалён')
+        showSuccess(confirm === 'cancelInvite' ? 'Приглашение отменено' : 'Сотрудник удалён')
         void navigate(ROUTES.PROFILE_COMPANY_TEAM)
       } else if (confirm === 'promote' && pendingRole) {
         await updateRole.mutateAsync({ memberId: member.id, role: pendingRole })
@@ -119,6 +121,8 @@ export function CompanyMemberDetailPage() {
 
   const isSuspended = member.status === COMPANY_MEMBER_STATUS.SUSPENDED
   const isDeactivated = member.status === COMPANY_MEMBER_STATUS.DEACTIVATED
+  const isInvited = member.status === COMPANY_MEMBER_STATUS.INVITED
+  const inviteLink = `${window.location.origin}${companyInvitationPath(member.id)}`
 
   return (
     <Box>
@@ -144,24 +148,67 @@ export function CompanyMemberDetailPage() {
           {member.lastActiveAt ? ` · Активность: ${formatDate(member.lastActiveAt)}` : ''}
         </Typography>
 
-        {!isDeactivated ? (
+        {isInvited ? (
+          <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+            Ссылка-приглашение: {inviteLink}
+          </Typography>
+        ) : null}
+
+        {!isDeactivated && !isInvited ? (
           <AppSelect
             label="Роль"
             options={ROLE_OPTIONS}
             value={member.role}
             onChange={(value) => void handleRoleChange(value as CompanyMemberRole)}
-            disabled={guards?.remove.allowed === false && member.role === COMPANY_MEMBER_ROLES.COMPANY_ADMIN}
+            disabled={
+              guards?.remove.allowed === false && member.role === COMPANY_MEMBER_ROLES.COMPANY_ADMIN
+            }
           />
         ) : null}
 
         {guards?.remove.allowed === false ? (
-          <EmptyState
-            title="Последний администратор"
-            description={guards.remove.reason}
-          />
+          <EmptyState title="Последний администратор" description={guards.remove.reason} />
         ) : null}
 
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {isInvited ? (
+            <>
+              <AppButton
+                variant="contained"
+                loading={resend.isPending}
+                onClick={() =>
+                  void resend
+                    .mutateAsync(member.id)
+                    .then(() => showSuccess('Приглашение отправлено повторно'))
+                    .catch((err) =>
+                      showError(
+                        err instanceof TeamApiError ? err.message : 'Не удалось отправить',
+                      ),
+                    )
+                }
+              >
+                Отправить повторно
+              </AppButton>
+              <AppButton
+                color="error"
+                variant="outlined"
+                onClick={() => setConfirm('cancelInvite')}
+              >
+                Отменить приглашение
+              </AppButton>
+              <AppButton
+                variant="text"
+                onClick={() => {
+                  void navigator.clipboard.writeText(inviteLink).then(
+                    () => showSuccess('Ссылка скопирована'),
+                    () => showError('Не удалось скопировать'),
+                  )
+                }}
+              >
+                Копировать ссылку
+              </AppButton>
+            </>
+          ) : null}
           {isSuspended && !isDeactivated ? (
             <AppButton
               variant="outlined"
@@ -173,7 +220,7 @@ export function CompanyMemberDetailPage() {
               Восстановить доступ
             </AppButton>
           ) : null}
-          {!isSuspended && !isDeactivated ? (
+          {!isSuspended && !isDeactivated && !isInvited ? (
             <AppButton
               color="warning"
               disabled={!guards?.suspend.allowed}
@@ -182,7 +229,7 @@ export function CompanyMemberDetailPage() {
               Приостановить доступ
             </AppButton>
           ) : null}
-          {!isDeactivated ? (
+          {!isDeactivated && !isInvited ? (
             <AppButton
               color="error"
               disabled={!guards?.remove.allowed}
@@ -199,9 +246,11 @@ export function CompanyMemberDetailPage() {
         title={
           confirm === 'remove'
             ? 'Удалить сотрудника?'
-            : confirm === 'promote'
-              ? 'Назначить администратором?'
-              : 'Приостановить доступ?'
+            : confirm === 'cancelInvite'
+              ? 'Отменить приглашение?'
+              : confirm === 'promote'
+                ? 'Назначить администратором?'
+                : 'Приостановить доступ?'
         }
         description={
           confirm === 'promote'
@@ -209,7 +258,13 @@ export function CompanyMemberDetailPage() {
             : `${member.firstName} ${member.lastName} (${member.email})`
         }
         confirmLabel={
-          confirm === 'remove' ? 'Удалить' : confirm === 'promote' ? 'Назначить' : 'Приостановить'
+          confirm === 'remove'
+            ? 'Удалить'
+            : confirm === 'cancelInvite'
+              ? 'Отменить'
+              : confirm === 'promote'
+                ? 'Назначить'
+                : 'Приостановить'
         }
         destructive={confirm !== 'promote'}
         loading={suspend.isPending || remove.isPending || updateRole.isPending}

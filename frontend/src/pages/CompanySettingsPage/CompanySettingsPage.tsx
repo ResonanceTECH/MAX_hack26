@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import Stack from '@mui/material/Stack'
@@ -21,6 +22,9 @@ import {
   PageHeader,
   Section,
 } from '@/shared/ui'
+
+const MVP_RUNTIME_NOTE =
+  'Настройка сохраняется, но в текущем MVP ещё не влияет на runtime.'
 
 function SettingSwitch({
   label,
@@ -92,6 +96,9 @@ export function CompanySettingsPage() {
   return (
     <Box>
       <PageHeader title="Настройки" subtitle="Параметры компании" />
+      <Alert severity="warning" sx={{ mb: 2, maxWidth: 560 }}>
+        {MVP_RUNTIME_NOTE}
+      </Alert>
 
       <Stack spacing={3} maxWidth={560}>
         <Section title="Уведомления">

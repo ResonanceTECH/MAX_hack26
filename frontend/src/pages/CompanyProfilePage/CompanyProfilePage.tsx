@@ -6,7 +6,8 @@ import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import { Permission } from '@/features/permissions'
-import { usePermissions } from '@/features/permissions/hooks/usePermission'
+import { useCompanyPermissions } from '@/features/permissions/hooks/useCompanyPermission'
+import { NeedsChangesList } from '@/features/moderation/ui/NeedsChangesBanner'
 import { companyDetailsPath, ROUTES } from '@/shared/constants/routes'
 import { formatCurrency } from '@/shared/lib/format'
 import { AppButton, EmptyState, LoadingState, PageHeader, Tag, VerifiedBadge } from '@/shared/ui'
@@ -25,7 +26,7 @@ export function CompanyProfilePage() {
   const user = useSessionStore((s) => s.user)
   const company = useSessionStore((s) => s.company)
   const isLoading = useSessionStore((s) => s.isLoading)
-  const { has } = usePermissions()
+  const { has } = useCompanyPermissions()
   const canManageCompany =
     has(Permission.EDIT_COMPANY) || has(Permission.MANAGE_COMPANY_MEMBERS)
 
@@ -48,6 +49,7 @@ export function CompanyProfilePage() {
   return (
     <Box>
       <PageHeader title="Профиль компании" subtitle="Рабочий профиль в B2B Match" />
+      <NeedsChangesList />
       <Stack spacing={2}>
         <Stack direction="row" spacing={2} alignItems="center">
           <Avatar sx={{ width: 64, height: 64, bgcolor: 'primary.main' }}>

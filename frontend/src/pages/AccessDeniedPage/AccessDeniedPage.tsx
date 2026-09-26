@@ -36,6 +36,13 @@ const REASON_COPY: Record<string, { title: string; description: string; cta: str
       cta: 'Вернуться к модерации',
       href: ROUTES.MODERATION,
     },
+    marketplace: {
+      title: 'Нет доступа',
+      description:
+        'Раздел marketplace недоступен для модераторов и администраторов платформы.',
+      cta: 'Вернуться в профиль',
+      href: ROUTES.PROFILE,
+    },
   }
 
 export function AccessDeniedPage() {

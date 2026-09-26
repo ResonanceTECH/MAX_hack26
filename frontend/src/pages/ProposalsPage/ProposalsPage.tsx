@@ -4,6 +4,8 @@ import Stack from '@mui/material/Stack'
 import { useOpportunity } from '@/entities/opportunity/api/queries'
 import { useProposals, useRejectProposal, useShortlistProposal } from '@/entities/proposal/api/queries'
 import { useMatches } from '@/entities/match/api/queries'
+import { Permission } from '@/features/permissions/model/permissions'
+import { useCompanyPermission } from '@/features/permissions/hooks/useCompanyPermission'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '@/shared/ui'
 import { ProposalCard } from '@/widgets/ProposalCard/ProposalCard'
@@ -16,6 +18,7 @@ export function ProposalsPage() {
   const shortlistMutation = useShortlistProposal()
   const rejectMutation = useRejectProposal()
   const showSuccess = useSnackbarStore((s) => s.showSuccess)
+  const canManageShortlist = useCompanyPermission(Permission.MANAGE_SHORTLIST)
 
   if (opportunity.isLoading || proposals.isLoading) return <LoadingState variant="page" />
   if (opportunity.isError || proposals.isError) {
@@ -44,13 +47,21 @@ export function ProposalsPage() {
               key={proposal.id}
               proposal={proposal}
               match={matches.data?.find((m) => m.companyId === proposal.company.id)}
-              onShortlist={async (pid) => {
-                await shortlistMutation.mutateAsync(pid)
-                showSuccess('Добавлено в shortlist')
-              }}
-              onReject={async (pid) => {
-                await rejectMutation.mutateAsync(pid)
-              }}
+              onShortlist={
+                canManageShortlist
+                  ? async (pid) => {
+                      await shortlistMutation.mutateAsync(pid)
+                      showSuccess('Добавлено в shortlist')
+                    }
+                  : undefined
+              }
+              onReject={
+                canManageShortlist
+                  ? async (pid) => {
+                      await rejectMutation.mutateAsync(pid)
+                    }
+                  : undefined
+              }
             />
           ))}
         </Stack>

@@ -1,10 +1,10 @@
-import { usePermission } from '@/features/permissions'
+import { useCompanyPermission } from '@/features/permissions'
 import { Permission } from '@/features/permissions/model/permissions'
 import { CompanyAdminOverviewPage } from '@/pages/CompanyAdminOverviewPage/CompanyAdminOverviewPage'
 import { CompanyProfilePage } from '@/pages/CompanyProfilePage/CompanyProfilePage'
 
-/** Company Admin sees management overview; Business User sees read-only profile */
+/** Company Admin (companyRole) sees management overview; others see read-only profile */
 export function CompanyProfileRoute() {
-  const canManage = usePermission(Permission.EDIT_COMPANY)
+  const canManage = useCompanyPermission(Permission.EDIT_COMPANY)
   return canManage ? <CompanyAdminOverviewPage /> : <CompanyProfilePage />
 }

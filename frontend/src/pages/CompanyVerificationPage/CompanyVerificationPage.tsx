@@ -5,7 +5,11 @@ import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { Link as RouterLink } from 'react-router-dom'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
-import { useCompanyVerification } from '@/features/company-management'
+import {
+  useCompanyVerification,
+  useSubmitVerification,
+} from '@/features/company-management'
+import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { ROUTES } from '@/shared/constants/routes'
 import { formatDate } from '@/shared/lib/format'
 import {
@@ -36,13 +40,29 @@ const SOURCE_LABELS: Record<string, string> = {
   PLATFORM_VERIFIED: 'Проверено платформой',
 }
 
+const CAN_SUBMIT = new Set(['NOT_VERIFIED', 'REJECTED', 'REQUIRES_UPDATE'])
+
 export function CompanyVerificationPage() {
   const company = useSessionStore((s) => s.company)
   const { data, isLoading, isError, refetch } = useCompanyVerification(company?.id)
+  const submit = useSubmitVerification(company?.id)
+  const showSuccess = useSnackbarStore((s) => s.showSuccess)
+  const showError = useSnackbarStore((s) => s.showError)
 
   if (isLoading) return <LoadingState variant="page" />
   if (isError || !data) return <ErrorState onRetry={() => void refetch()} />
   if (!company) return <LoadingState variant="page" />
+
+  const canSubmit = CAN_SUBMIT.has(data.status)
+
+  const handleSubmit = async () => {
+    try {
+      await submit.mutateAsync()
+      showSuccess('Отправлено на проверку')
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Не удалось отправить')
+    }
+  }
 
   return (
     <Box>
@@ -50,15 +70,28 @@ export function CompanyVerificationPage() {
         title="Верификация"
         subtitle="Статус проверки компании"
         actions={
-          <AppButton component={RouterLink} to={ROUTES.COMPANY_DOCUMENTS} variant="contained">
-            Документы
-          </AppButton>
+          <Stack direction="row" spacing={1}>
+            {canSubmit ? (
+              <AppButton
+                variant="contained"
+                loading={submit.isPending}
+                onClick={() => void handleSubmit()}
+              >
+                Отправить на проверку
+              </AppButton>
+            ) : null}
+            <AppButton component={RouterLink} to={ROUTES.COMPANY_DOCUMENTS} variant="outlined">
+              Документы
+            </AppButton>
+          </Stack>
         }
       />
 
-      <Alert severity="info" sx={{ mb: 2, maxWidth: 640 }}>
-        Демонстрационный статус / MODEL_DATA — часть блоков заполнена модельными данными.
-      </Alert>
+      {data.status === 'PENDING' ? (
+        <Alert severity="info" sx={{ mb: 2, maxWidth: 640 }}>
+          Заявка на проверке. Мы уведомим вас о результате.
+        </Alert>
+      ) : null}
 
       <Stack spacing={2} maxWidth={640}>
         <Stack direction="row" spacing={1} alignItems="center">
@@ -68,7 +101,15 @@ export function CompanyVerificationPage() {
 
         <Chip
           label={OVERALL_LABELS[data.status] ?? data.status}
-          color={data.status === 'VERIFIED' ? 'success' : 'warning'}
+          color={
+            data.status === 'VERIFIED'
+              ? 'success'
+              : data.status === 'PENDING'
+                ? 'warning'
+                : data.status === 'REJECTED'
+                  ? 'error'
+                  : 'default'
+          }
           sx={{ alignSelf: 'flex-start' }}
         />
 

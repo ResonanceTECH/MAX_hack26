@@ -14,7 +14,7 @@ import {
   useInviteMember,
 } from '@/features/company-management'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
-import { ROUTES } from '@/shared/constants/routes'
+import { companyInvitationPath, companyTeamMemberPath, ROUTES } from '@/shared/constants/routes'
 import { AppButton, AppInput, AppSelect, AppTextarea, PageHeader } from '@/shared/ui'
 
 const ROLE_OPTIONS = [
@@ -46,9 +46,10 @@ export function CompanyInviteMemberPage() {
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      await invite.mutateAsync(values)
-      showSuccess('Приглашение отправлено')
-      void navigate(ROUTES.PROFILE_COMPANY_TEAM)
+      const member = await invite.mutateAsync(values)
+      const link = `${window.location.origin}${companyInvitationPath(member.id)}`
+      showSuccess(`Приглашение отправлено. Ссылка: ${link}`)
+      void navigate(companyTeamMemberPath(member.id))
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Ошибка приглашения')
     }

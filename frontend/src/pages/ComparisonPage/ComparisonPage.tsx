@@ -14,6 +14,8 @@ import Typography from '@mui/material/Typography'
 import { useOpportunity } from '@/entities/opportunity/api/queries'
 import { useProposals, useShortlistProposal } from '@/entities/proposal/api/queries'
 import { useMatches } from '@/entities/match/api/queries'
+import { Permission } from '@/features/permissions/model/permissions'
+import { useCompanyPermission } from '@/features/permissions/hooks/useCompanyPermission'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { proposalDetailsPath } from '@/shared/constants/routes'
 import { formatCurrency } from '@/shared/lib/format'
@@ -27,6 +29,7 @@ export function ComparisonPage() {
   const matches = useMatches(id)
   const shortlistMutation = useShortlistProposal()
   const showSuccess = useSnackbarStore((s) => s.showSuccess)
+  const canManageShortlist = useCompanyPermission(Permission.MANAGE_SHORTLIST)
 
   const all = proposals.data ?? []
   const preselected = searchParams.getAll('p')
@@ -213,18 +216,20 @@ export function ComparisonPage() {
                 {rows.map((p) => (
                   <TableCell key={p.id} align="center">
                     <Stack spacing={1} alignItems="center">
-                      <AppButton
-                        size="small"
-                        variant="contained"
-                        loading={shortlistMutation.isPending}
-                        onClick={() =>
-                          shortlistMutation.mutate(p.id, {
-                            onSuccess: () => showSuccess('Добавлено в shortlist'),
-                          })
-                        }
-                      >
-                        В shortlist
-                      </AppButton>
+                      {canManageShortlist ? (
+                        <AppButton
+                          size="small"
+                          variant="contained"
+                          loading={shortlistMutation.isPending}
+                          onClick={() =>
+                            shortlistMutation.mutate(p.id, {
+                              onSuccess: () => showSuccess('Добавлено в shortlist'),
+                            })
+                          }
+                        >
+                          В shortlist
+                        </AppButton>
+                      ) : null}
                       <AppButton
                         size="small"
                         component={RouterLink}

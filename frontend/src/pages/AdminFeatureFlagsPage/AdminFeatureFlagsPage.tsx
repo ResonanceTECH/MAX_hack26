@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -26,6 +27,9 @@ import {
   LoadingState,
   PageHeader,
 } from '@/shared/ui'
+
+const MVP_RUNTIME_NOTE =
+  'Настройка сохраняется, но в текущем MVP ещё не влияет на runtime.'
 
 export function AdminFeatureFlagsPage() {
   const query = useFeatureFlags()
@@ -65,6 +69,9 @@ export function AdminFeatureFlagsPage() {
         title="Feature flags"
         subtitle="Переключение требует причину и пишется в audit"
       />
+      <Alert severity="warning" sx={{ mb: 2 }}>
+        {MVP_RUNTIME_NOTE}
+      </Alert>
       {query.isLoading ? <LoadingState variant="list" /> : null}
       {query.isError ? <ErrorState onRetry={() => void query.refetch()} /> : null}
       {!query.isLoading && (query.data?.length ?? 0) === 0 ? (
@@ -126,7 +133,7 @@ export function AdminFeatureFlagsPage() {
             ? `${target.enabled ? 'Включить' : 'Выключить'} «${target.flag.key}»?`
             : ''
         }
-        description="Причина обязательна. Изменение попадёт в audit log."
+        description={`${MVP_RUNTIME_NOTE} Причина обязательна. Изменение попадёт в audit log.`}
         confirmLabel="Подтвердить"
         loading={toggle.isPending}
         onClose={() => setTarget(null)}

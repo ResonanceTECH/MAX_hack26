@@ -19,7 +19,6 @@ import {
   useModerationRelatedData,
   useRejectModerationItem,
   useRequestModerationChanges,
-  useResubmitModerationItem,
 } from '@/features/moderation/api/queries'
 import {
   canApproveItem,
@@ -71,6 +70,7 @@ import {
   PageHeader,
 } from '@/shared/ui'
 import { ESCALATION_REASON } from '@/entities/escalation'
+import { VERSION_CONFLICT_MESSAGE } from '@/entities/moderation'
 
 export function ModerationDetailPage() {
   const params = useParams()
@@ -99,7 +99,6 @@ export function ModerationDetailPage() {
   const block = useBlockModerationItem()
   const escalate = useEscalateModerationItem()
   const assign = useAssignModerationItem()
-  const resubmit = useResubmitModerationItem()
 
   const showSuccess = useSnackbarStore((s) => s.showSuccess)
   const showError = useSnackbarStore((s) => s.showError)
@@ -150,8 +149,19 @@ export function ModerationDetailPage() {
   }
 
   const handleError = (err: unknown) => {
-    const msg = err instanceof Error ? err.message : 'Не удалось сохранить решение'
-    if (msg.includes('изменён')) setConflict(true)
+    const e = err as Error & { status?: number; code?: string }
+    const msg = e instanceof Error ? e.message : 'Не удалось сохранить решение'
+    const isConflict =
+      e?.status === 409 ||
+      e?.code === 'version_conflict' ||
+      e?.code === 'conflict' ||
+      msg.includes('изменён') ||
+      msg.includes('Версия устарела')
+    if (isConflict) {
+      setConflict(true)
+      showError(VERSION_CONFLICT_MESSAGE)
+      return
+    }
     showError(msg)
   }
 
@@ -209,7 +219,7 @@ export function ModerationDetailPage() {
             </AppButton>
           }
         >
-          Объект был изменён. Обновите данные перед принятием решения.
+          Объект был изменён другим пользователем. Обновите данные.
         </Alert>
       ) : null}
 
@@ -392,7 +402,8 @@ export function ModerationDetailPage() {
                     ))}
                     {(related.data?.history.length ?? 0) === 0 ? (
                       <Typography variant="body2" color="text.secondary">
-                        История по объекту пуста.
+                        Полный журнал решений по объекту пока недоступен на backend. Показан
+                        только текущий статус.
                       </Typography>
                     ) : null}
                   </Stack>
@@ -426,22 +437,10 @@ export function ModerationDetailPage() {
             ) : null}
 
             {item.status === 'NEEDS_CHANGES' ? (
-              <AppButton
-                variant="outlined"
-                onClick={() =>
-                  void resubmit
-                    .mutateAsync({
-                      id: item.id,
-                      patch: {
-                        description: `${String(item.payload.description ?? '')} (исправлено владельцем)`,
-                      },
-                    })
-                    .then(() => showSuccess('Владелец отправил исправления'))
-                    .catch(handleError)
-                }
-              >
-                Владелец исправил и отправил снова
-              </AppButton>
+              <Alert severity="info">
+                Ожидается исправление владельцем. Повторная отправка выполняется из кабинета
+                владельца объекта.
+              </Alert>
             ) : null}
 
             <AppButton component={RouterLink} to={ROUTES.MODERATION_QUEUE} variant="text">

@@ -7,6 +7,20 @@ import { useNotificationsStore } from '@/features/notifications/model/notificati
 import { mockNotifications } from '@/shared/mocks'
 import { renderWithProviders } from '@/test/render'
 
+vi.mock('@/shared/api/inviteApi', () => ({
+  OPPORTUNITY_INVITE_STATUS: {
+    PENDING: 'PENDING',
+    ACCEPTED: 'ACCEPTED',
+    DECLINED: 'DECLINED',
+    EXPIRED: 'EXPIRED',
+  },
+  inviteApi: {
+    getAll: vi.fn(async () => []),
+    accept: vi.fn(),
+    decline: vi.fn(),
+  },
+}))
+
 const fetchAll = vi.fn(async () => undefined)
 
 describe('Notification item', () => {

@@ -19,6 +19,7 @@ import { useMatch } from '@/entities/match/api/queries'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import { useMyOpportunities } from '@/entities/opportunity/api/queries'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
+import { EntityActionsMenu } from '@/features/reports'
 import { COMPANY_DOCUMENT_STATUS } from '@/entities/company-document'
 import { isDocumentExpired } from '@/features/company-management'
 import { casesApi } from '@/shared/api/casesApi'
@@ -31,10 +32,8 @@ import {
   AppIcon,
   CompanyAvatar,
   ErrorState,
-  FavoriteButton,
   LoadingState,
   MatchExplanationFromMatch,
-  ShareButton,
   Tag,
   VerifiedBadge,
 } from '@/shared/ui'
@@ -118,8 +117,16 @@ export function CompanyDetailsPage() {
               {data.shortName}
             </Typography>
             <VerifiedBadge verified={data.verified} />
-            <FavoriteButton type="company" targetId={data.id} />
-            <ShareButton title={data.shortName} text={data.description} />
+            {companyId !== data.id ? (
+              <EntityActionsMenu
+                targetType="company"
+                targetId={data.id}
+                targetName={data.shortName}
+                shareTitle={data.shortName}
+                shareText={data.description}
+                favoriteType="company"
+              />
+            ) : null}
           </Stack>
           <Typography variant="body2" color="text.secondary">
             {data.name}

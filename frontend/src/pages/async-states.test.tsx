@@ -8,6 +8,20 @@ import { NotificationsPage } from '@/pages/NotificationsPage/NotificationsPage'
 import { useNotificationsStore } from '@/features/notifications/model/notificationsStore'
 import { renderRouted, renderWithProviders } from '@/test/render'
 
+vi.mock('@/shared/api/inviteApi', () => ({
+  OPPORTUNITY_INVITE_STATUS: {
+    PENDING: 'PENDING',
+    ACCEPTED: 'ACCEPTED',
+    DECLINED: 'DECLINED',
+    EXPIRED: 'EXPIRED',
+  },
+  inviteApi: {
+    getAll: vi.fn(async () => []),
+    accept: vi.fn(),
+    decline: vi.fn(),
+  },
+}))
+
 const opportunityQuery = vi.hoisted(() => ({
   current: {
     data: [] as unknown[],
@@ -178,7 +192,7 @@ describe('async states', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Не удалось загрузить данные')
   })
 
-  it('notifications loading, empty, and error', () => {
+  it('notifications loading, empty, and error', async () => {
     const fetchAll = vi.fn(async () => undefined)
     useNotificationsStore.setState({ items: [], isLoading: true, error: null, fetchAll })
     const loading = renderWithProviders(<NotificationsPage />)
@@ -187,7 +201,7 @@ describe('async states', () => {
 
     useNotificationsStore.setState({ items: [], isLoading: false, error: null, fetchAll })
     const empty = renderWithProviders(<NotificationsPage />)
-    expect(screen.getByText('Нет уведомлений')).toBeInTheDocument()
+    expect(await screen.findByText('Нет уведомлений')).toBeInTheDocument()
     empty.unmount()
 
     useNotificationsStore.setState({

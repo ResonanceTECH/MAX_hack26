@@ -13,8 +13,11 @@ import { useMyProposals } from '@/entities/proposal/api/queries'
 import { useDeals } from '@/entities/deal/api/queries'
 import { useAllMatches } from '@/entities/match/api/queries'
 import { useShortlist } from '@/entities/shortlist/api/queries'
+import { Permission } from '@/features/permissions/model/permissions'
+import { useCompanyPermission } from '@/features/permissions/hooks/useCompanyPermission'
 import { useDismissedRecommendationsStore } from '@/features/recommendations/model/dismissedStore'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
+import { isReal } from '@/shared/api/apiCapabilities'
 import {
   opportunityComparePath,
   opportunityProposalsPath,
@@ -71,6 +74,7 @@ export function HomePage() {
   const restore = useDismissedRecommendationsStore((s) => s.restore)
   const showInfo = useSnackbarStore((s) => s.showInfo)
   const companyId = useSessionStore((s) => s.company?.id)
+  const canCreateOpportunity = useCompanyPermission(Permission.CREATE_OPPORTUNITY)
   const recommended = useRecommendedOpportunities(companyId)
   const mineQuery = useMyOpportunities(companyId)
   const proposalsQuery = useMyProposals(companyId)
@@ -78,44 +82,71 @@ export function HomePage() {
   const matchesQuery = useAllMatches()
   const shortlistQuery = useShortlist()
 
+  const quickActions = useMemo(
+    () =>
+      QUICK_ACTIONS.filter(
+        (a) => a.to !== ROUTES.OPPORTUNITY_CREATE || canCreateOpportunity,
+      ),
+    [canCreateOpportunity],
+  )
+
   const forYou = useMemo(() => {
     const items = recommended.data ?? []
-    return items
+    const matches = matchesQuery.data ?? []
+    const realMode = isReal('matching') || isReal('opportunities')
+
+    const rows = items
       .filter((opp) => opp.company.id !== companyId && !dismissedIds.includes(opp.id))
-      .slice(0, 3)
-      .map((opp) => ({
-        opportunity: opp,
-        match: matchesQuery.data?.find(
-          (m) => m.opportunityId === opp.id && m.companyId === companyId,
-        ) ?? {
-          id: `synth-${opp.id}`,
-          opportunityId: opp.id,
-          companyId: companyId ?? '',
-          score: 88 + (opp.title.length % 10),
-          reasons: [
-            {
-              label: 'Подходит отрасль',
-              type: 'industry' as const,
-              matched: true,
-              description: 'Отрасль совпадает с профилем компании',
-            },
-            {
-              label: 'Совпадает стек',
-              type: 'technology' as const,
-              matched: true,
-              description: 'Есть пересечение по технологиям',
-            },
-            {
-              label: 'Бюджет соответствует',
-              type: 'budget' as const,
-              matched: true,
-              description: 'Бюджет в диапазоне проектов компании',
-            },
-          ],
-          missingRequirements: [],
-          status: 'suggested' as const,
-        },
-      }))
+      .map((opp) => {
+        const match = matches.find((m) => {
+          if (m.opportunityId !== opp.id) return false
+          // Feed matches may omit/zero company_id — treat as current company in real mode
+          if (realMode) {
+            return !m.companyId || m.companyId === '0' || m.companyId === companyId
+          }
+          return m.companyId === companyId
+        })
+
+        if (realMode) {
+          if (!match) return null
+          return { opportunity: opp, match }
+        }
+
+        return {
+          opportunity: opp,
+          match: match ?? {
+            id: `synth-${opp.id}`,
+            opportunityId: opp.id,
+            companyId: companyId ?? '',
+            score: 88 + (opp.title.length % 10),
+            reasons: [
+              {
+                label: 'Подходит отрасль',
+                type: 'industry' as const,
+                matched: true,
+                description: 'Отрасль совпадает с профилем компании',
+              },
+              {
+                label: 'Совпадает стек',
+                type: 'technology' as const,
+                matched: true,
+                description: 'Есть пересечение по технологиям',
+              },
+              {
+                label: 'Бюджет соответствует',
+                type: 'budget' as const,
+                matched: true,
+                description: 'Бюджет в диапазоне проектов компании',
+              },
+            ],
+            missingRequirements: [],
+            status: 'suggested' as const,
+          },
+        }
+      })
+      .filter((row): row is NonNullable<typeof row> => row != null)
+
+    return rows.slice(0, 3)
   }, [recommended.data, companyId, dismissedIds, matchesQuery.data])
 
   const myActive = (mineQuery.data ?? [])
@@ -125,7 +156,10 @@ export function HomePage() {
     .slice(0, 3)
 
   const isLoading =
-    recommended.isLoading || mineQuery.isLoading || proposalsQuery.isLoading
+    recommended.isLoading ||
+    mineQuery.isLoading ||
+    proposalsQuery.isLoading ||
+    ((isReal('matching') || isReal('opportunities')) && matchesQuery.isLoading)
   const isError = recommended.isError || mineQuery.isError || proposalsQuery.isError
 
   if (isLoading) return <LoadingState variant="page" rows={4} />
@@ -173,7 +207,7 @@ export function HomePage() {
       </Stack>
 
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 4 }}>
-        {QUICK_ACTIONS.map((action) => (
+        {quickActions.map((action) => (
           <Chip
             key={action.label}
             component={RouterLink}
@@ -233,10 +267,14 @@ export function HomePage() {
           <EmptyState
             title="У вас пока нет запросов"
             description="Создайте первый запрос — и начните собирать предложения."
-            actionLabel="Создать"
-            onAction={() => {
-              void navigate(ROUTES.OPPORTUNITY_CREATE)
-            }}
+            actionLabel={canCreateOpportunity ? 'Создать' : undefined}
+            onAction={
+              canCreateOpportunity
+                ? () => {
+                    void navigate(ROUTES.OPPORTUNITY_CREATE)
+                  }
+                : undefined
+            }
           />
         ) : (
           <Stack spacing={2}>

@@ -1,16 +1,22 @@
 import { useState } from 'react'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import Box from '@mui/material/Box'
+import List from '@mui/material/List'
+import ListItem from '@mui/material/ListItem'
+import ListItemText from '@mui/material/ListItemText'
 import Stack from '@mui/material/Stack'
 import Tab from '@mui/material/Tab'
 import Tabs from '@mui/material/Tabs'
 import Typography from '@mui/material/Typography'
-import type { DealEvent } from '@/entities/deal'
+import type { DealEvent, DealFile } from '@/entities/deal'
 import { useDeal } from '@/entities/deal/api/queries'
 import { useOpportunity } from '@/entities/opportunity/api/queries'
 import { useProposal } from '@/entities/proposal/api/queries'
+import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
+import { apiClient } from '@/shared/api/apiClient'
 import { proposalDetailsPath } from '@/shared/constants/routes'
 import { formatDate, formatRelativeDate } from '@/shared/lib/format'
+import { getMaxBridge } from '@/shared/lib/max'
 import {
   AppButton,
   AppIcon,
@@ -26,6 +32,7 @@ import {
   Bookmark02Icon,
   BubbleChatIcon,
   CheckmarkCircle01Icon,
+  File02Icon,
   Message01Icon,
   SentIcon,
 } from '@/shared/ui/icons'
@@ -49,12 +56,30 @@ function eventIcon(type: DealEvent['type']) {
   }
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Б`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`
+}
+
+async function downloadDealFile(file: DealFile): Promise<void> {
+  const { data } = await apiClient.get<Blob>(`/files/${file.id}`, { responseType: 'blob' })
+  const url = URL.createObjectURL(data)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = file.name
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
 export function DealRoomPage() {
   const { id = '' } = useParams()
   const [tab, setTab] = useState(0)
   const dealQuery = useDeal(id)
   const opportunityQuery = useOpportunity(dealQuery.data?.opportunityId ?? '')
   const proposalQuery = useProposal(dealQuery.data?.proposalId ?? '')
+  const showInfo = useSnackbarStore((s) => s.showInfo)
+  const showError = useSnackbarStore((s) => s.showError)
 
   if (dealQuery.isLoading) return <LoadingState variant="page" />
   if (dealQuery.isError || !dealQuery.data) {
@@ -64,6 +89,7 @@ export function DealRoomPage() {
   const deal = dealQuery.data
   const buyerName = opportunityQuery.data?.company.shortName ?? 'Заказчик'
   const headerTitle = `${deal.companyName} × ${buyerName}`
+  const files = deal.files ?? []
 
   return (
     <Box>
@@ -115,7 +141,25 @@ export function DealRoomPage() {
           <AppButton
             variant="contained"
             onClick={() => {
-              window.alert('Mock: чат в MAX откроется в мессенджере')
+              void (async () => {
+                try {
+                  const bridge = getMaxBridge()
+                  const result = await bridge.openChat({
+                    dealId: deal.id,
+                    title: headerTitle,
+                    url: window.location.href,
+                  })
+                  if (result.mode === 'clipboard') {
+                    showInfo('Ссылка на сделку скопирована — откройте чат в MAX')
+                  } else if (result.mode === 'share') {
+                    showInfo('Поделитесь ссылкой в MAX, чтобы продолжить чат')
+                  } else if (result.mode === 'noop') {
+                    showInfo('Чат MAX недоступен в этом окружении')
+                  }
+                } catch (err) {
+                  showError(err instanceof Error ? err.message : 'Не удалось открыть чат')
+                }
+              })()
             }}
           >
             Открыть чат в MAX
@@ -159,10 +203,42 @@ export function DealRoomPage() {
       ) : null}
 
       {tab === 2 ? (
-        <EmptyState
-          title="Файлов пока нет"
-          description="Договоры, NDA и приложения появятся здесь после интеграции с хранилищем."
-        />
+        files.length === 0 ? (
+          <EmptyState
+            title="Файлов пока нет"
+            description="Договоры, NDA и приложения появятся здесь, когда стороны загрузят их в сделку."
+          />
+        ) : (
+          <List disablePadding>
+            {files.map((file) => (
+              <ListItem
+                key={file.id}
+                divider
+                secondaryAction={
+                  <AppButton
+                    size="small"
+                    variant="outlined"
+                    onClick={() => {
+                      void downloadDealFile(file).catch((err: unknown) => {
+                        showError(err instanceof Error ? err.message : 'Не удалось скачать файл')
+                      })
+                    }}
+                  >
+                    Скачать
+                  </AppButton>
+                }
+                sx={{ px: 0 }}
+              >
+                <AppIcon icon={File02Icon} size={22} color="text.secondary" aria-hidden />
+                <ListItemText
+                  sx={{ ml: 1.5 }}
+                  primary={file.name}
+                  secondary={`${formatFileSize(file.size)} · ${formatDate(file.createdAt)}`}
+                />
+              </ListItem>
+            ))}
+          </List>
+        )
       ) : null}
 
       {tab === 3 ? (

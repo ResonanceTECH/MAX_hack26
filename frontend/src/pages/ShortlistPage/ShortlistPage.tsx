@@ -79,10 +79,10 @@ export function ShortlistPage({ embedded }: ShortlistPageProps) {
       {grouped.length === 0 ? (
         <EmptyState
           title="В shortlist пока никого нет"
-          description="Добавляйте наиболее интересные предложения, чтобы сравнить финалистов."
-          actionLabel="К возможностям"
+          description="Добавьте подходящие предложения по вашим запросам, чтобы сравнить финалистов."
+          actionLabel="Мои запросы"
           onAction={() => {
-            void navigate(ROUTES.OPPORTUNITIES)
+            void navigate(ROUTES.MY_REQUESTS)
           }}
         />
       ) : (

@@ -5,7 +5,10 @@ import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useMatch } from '@/entities/match/api/queries'
 import { useProposal, useRejectProposal, useShortlistProposal } from '@/entities/proposal/api/queries'
+import { Permission } from '@/features/permissions/model/permissions'
+import { useCompanyPermission } from '@/features/permissions/hooks/useCompanyPermission'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
+import { EntityActionsMenu } from '@/features/reports'
 import { companyDetailsPath } from '@/shared/constants/routes'
 import { formatDate } from '@/shared/lib/format'
 import {
@@ -17,7 +20,6 @@ import {
   MoneyValue,
   PageHeader,
   Section,
-  ShareButton,
   StatusChip,
   Tag,
   VerifiedBadge,
@@ -30,12 +32,14 @@ export function ProposalDetailsPage() {
   const shortlistMutation = useShortlistProposal()
   const rejectMutation = useRejectProposal()
   const showSuccess = useSnackbarStore((s) => s.showSuccess)
+  const canManageShortlist = useCompanyPermission(Permission.MANAGE_SHORTLIST)
 
   if (isLoading) return <LoadingState variant="page" />
   if (isError || !data) return <ErrorState onRetry={() => void refetch()} />
 
   const match = matchQuery.data
   const actionsDisabled =
+    !canManageShortlist ||
     data.status === 'rejected' ||
     data.status === 'shortlisted' ||
     shortlistMutation.isPending ||
@@ -64,10 +68,13 @@ export function ProposalDetailsPage() {
             {data.company.region}
           </Typography>
         </Box>
-        <ShareButton
-          title={`Предложение ${data.company.shortName}`}
-          text={data.description}
-          url={window.location.href}
+        <EntityActionsMenu
+          targetType="proposal"
+          targetId={data.id}
+          targetName={data.company.shortName}
+          shareTitle={`Предложение ${data.company.shortName}`}
+          shareText={data.description}
+          hideFavorite
         />
       </Stack>
 
@@ -123,70 +130,74 @@ export function ProposalDetailsPage() {
         Профиль компании
       </AppButton>
 
-      <Paper
-        elevation={0}
-        sx={{
-          display: { xs: 'flex', md: 'none' },
-          position: 'fixed',
-          left: 0,
-          right: 0,
-          bottom: 'calc(64px + env(safe-area-inset-bottom))',
-          zIndex: 10,
-          p: 2,
-          gap: 1,
-          borderTop: 1,
-          borderColor: 'divider',
-          bgcolor: 'background.paper',
-        }}
-      >
-        <AppButton
-          fullWidth
-          variant="contained"
-          loading={shortlistMutation.isPending}
-          disabled={actionsDisabled}
-          onClick={() =>
-            shortlistMutation.mutate(id, {
-              onSuccess: () => showSuccess('Добавлено в shortlist'),
-            })
-          }
+      {canManageShortlist ? (
+        <Paper
+          elevation={0}
+          sx={{
+            display: { xs: 'flex', md: 'none' },
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 'calc(64px + env(safe-area-inset-bottom))',
+            zIndex: 10,
+            p: 2,
+            gap: 1,
+            borderTop: 1,
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+          }}
         >
-          В shortlist
-        </AppButton>
-        <AppButton
-          fullWidth
-          variant="outlined"
-          color="error"
-          loading={rejectMutation.isPending}
-          disabled={actionsDisabled}
-          onClick={() => rejectMutation.mutate(id)}
-        >
-          Отклонить
-        </AppButton>
-      </Paper>
+          <AppButton
+            fullWidth
+            variant="contained"
+            loading={shortlistMutation.isPending}
+            disabled={actionsDisabled}
+            onClick={() =>
+              shortlistMutation.mutate(id, {
+                onSuccess: () => showSuccess('Добавлено в shortlist'),
+              })
+            }
+          >
+            В shortlist
+          </AppButton>
+          <AppButton
+            fullWidth
+            variant="outlined"
+            color="error"
+            loading={rejectMutation.isPending}
+            disabled={actionsDisabled}
+            onClick={() => rejectMutation.mutate(id)}
+          >
+            Отклонить
+          </AppButton>
+        </Paper>
+      ) : null}
 
-      <Stack direction="row" spacing={1.5} sx={{ display: { xs: 'none', md: 'flex' } }}>
-        <AppButton
-          variant="contained"
-          loading={shortlistMutation.isPending}
-          disabled={actionsDisabled}
-          onClick={() =>
-            shortlistMutation.mutate(id, {
-              onSuccess: () => showSuccess('Добавлено в shortlist'),
-            })
-          }
-        >
-          В shortlist
-        </AppButton>
-        <AppButton
-          variant="outlined"
-          color="error"
-          loading={rejectMutation.isPending}
-          disabled={actionsDisabled}
-          onClick={() => rejectMutation.mutate(id)}
-        >
-          Отклонить
-        </AppButton>
-      </Stack>
+      {canManageShortlist ? (
+        <Stack direction="row" spacing={1.5} sx={{ display: { xs: 'none', md: 'flex' } }}>
+          <AppButton
+            variant="contained"
+            loading={shortlistMutation.isPending}
+            disabled={actionsDisabled}
+            onClick={() =>
+              shortlistMutation.mutate(id, {
+                onSuccess: () => showSuccess('Добавлено в shortlist'),
+              })
+            }
+          >
+            В shortlist
+          </AppButton>
+          <AppButton
+            variant="outlined"
+            color="error"
+            loading={rejectMutation.isPending}
+            disabled={actionsDisabled}
+            onClick={() => rejectMutation.mutate(id)}
+          >
+            Отклонить
+          </AppButton>
+        </Stack>
+      ) : null}
     </Box>
   )
 }

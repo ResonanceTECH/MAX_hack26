@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -29,6 +30,9 @@ import {
   LoadingState,
   PageHeader,
 } from '@/shared/ui'
+
+const MVP_RUNTIME_NOTE =
+  'Настройка сохраняется, но в текущем MVP ещё не влияет на runtime.'
 
 export function AdminSettingsPage() {
   const query = usePlatformSettings()
@@ -146,6 +150,9 @@ export function AdminSettingsPage() {
   return (
     <Box>
       <PageHeader title="Настройки платформы" subtitle="Критические изменения — только с явным Save" />
+      <Alert severity="warning" sx={{ mb: 2 }}>
+        {MVP_RUNTIME_NOTE}
+      </Alert>
 
       <Stack spacing={2}>
         <Card variant="outlined">

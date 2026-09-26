@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -12,6 +13,7 @@ import {
   MODERATION_ACTION_LABELS,
   MODERATION_TYPE_LABELS,
 } from '@/features/moderation/model/labels'
+import { isSyntheticModerationHistory } from '@/shared/api/moderationHistoryApi'
 import { formatDate } from '@/shared/lib/format'
 import { EmptyState, ErrorState, LoadingState, PageHeader, SearchInput } from '@/shared/ui'
 
@@ -28,6 +30,7 @@ export function ModerationHistoryPage() {
     [query, action, entityType],
   )
   const historyQuery = useModerationHistory(filters)
+  const synthetic = isSyntheticModerationHistory()
 
   return (
     <Box>
@@ -35,6 +38,12 @@ export function ModerationHistoryPage() {
         title="История решений"
         subtitle="Read-only журнал модерационных действий"
       />
+      {synthetic ? (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Полный decision log на backend пока недоступен. Показаны закрытые объекты очереди с
+          последним статусом (не полный журнал action/actor/reason по каждому решению).
+        </Alert>
+      ) : null}
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
         <Box sx={{ flex: 1, maxWidth: 420 }}>
           <SearchInput value={query} onChange={setQuery} placeholder="Поиск по объекту или модератору" />

@@ -12,6 +12,7 @@ import Tabs from '@mui/material/Tabs'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import type { ModerationEntityType } from '@/entities/moderation'
+import { ESCALATION_REASON } from '@/entities/escalation'
 import {
   useAssignModerationItem,
   useEscalateModerationItem,
@@ -22,8 +23,17 @@ import { ESCALATION_REASON_LABELS } from '@/features/moderation/model/labels'
 import { EscalateDialog } from '@/features/moderation/ui/DecisionDialogs'
 import { ModerationQueueCard } from '@/features/moderation/ui/ModerationQueueCard'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
-import { ESCALATION_REASON } from '@/entities/escalation'
-import { AppButton, EmptyState, ErrorState, FilterDrawer, LoadingState, PageHeader, SearchInput, AppIcon } from '@/shared/ui'
+import { isReal } from '@/shared/api/apiCapabilities'
+import {
+  AppButton,
+  EmptyState,
+  ErrorState,
+  FilterDrawer,
+  LoadingState,
+  PageHeader,
+  SearchInput,
+  AppIcon,
+} from '@/shared/ui'
 import { FilterHorizontalIcon } from '@/shared/ui/icons'
 import { ROUTES } from '@/shared/constants/routes'
 
@@ -51,6 +61,8 @@ export function ModerationQueuePage() {
   const showError = useSnackbarStore((s) => s.showError)
   const assign = useAssignModerationItem()
   const escalate = useEscalateModerationItem()
+  /** BE `/moderation/queue` only accepts `status` — hide unsupported controls in real mode */
+  const realMode = isReal('moderation')
 
   const store = useQueueFiltersStore()
   const [filterOpen, setFilterOpen] = useState(false)
@@ -64,23 +76,33 @@ export function ModerationQueuePage() {
   }, [queueType])
 
   useEffect(() => {
+    if (!realMode) return
+    store.setQuery('')
+    store.setHasReports(false)
+    store.setOlderThanHours(null)
+    if (store.sort === 'reports') store.setSort('urgent')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot sanitize for real queue
+  }, [realMode])
+
+  useEffect(() => {
+    if (realMode) return
     const t = window.setTimeout(() => store.setQuery(queryLocal), 300)
     return () => window.clearTimeout(t)
-  }, [queryLocal, store])
+  }, [queryLocal, store, realMode])
 
   const filters = useMemo(
     () => ({
       type: store.type,
       status: store.status,
       priority: store.priority,
-      query: store.query || undefined,
-      reason: store.reason,
-      hasReports: store.hasReports || undefined,
-      olderThanHours: store.olderThanHours ?? undefined,
-      sort: store.sort,
-      source: store.source,
+      query: realMode ? undefined : store.query || undefined,
+      reason: realMode ? undefined : store.reason,
+      hasReports: realMode ? undefined : store.hasReports || undefined,
+      olderThanHours: realMode ? undefined : (store.olderThanHours ?? undefined),
+      sort: realMode && store.sort === 'reports' ? ('urgent' as const) : store.sort,
+      source: realMode ? undefined : store.source,
     }),
-    [store],
+    [store, realMode],
   )
 
   const queueQuery = useModerationQueue(filters)
@@ -121,25 +143,27 @@ export function ModerationQueuePage() {
       </Tabs>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
-        <Box sx={{ flex: 1, maxWidth: 480 }}>
-          <SearchInput
-            value={queryLocal}
-            onChange={setQueryLocal}
-            placeholder="Поиск по названию, компании, ИНН или ID"
-          />
-        </Box>
+        {!realMode ? (
+          <Box sx={{ flex: 1, maxWidth: 480 }}>
+            <SearchInput
+              value={queryLocal}
+              onChange={setQueryLocal}
+              placeholder="Поиск по названию, компании, ИНН или ID"
+            />
+          </Box>
+        ) : null}
         <TextField
           select
           size="small"
           label="Сортировка"
-          value={store.sort}
+          value={realMode && store.sort === 'reports' ? 'urgent' : store.sort}
           onChange={(e) => store.setSort(e.target.value as typeof store.sort)}
           sx={{ minWidth: 200 }}
         >
           <MenuItem value="urgent">Сначала срочные</MenuItem>
           <MenuItem value="oldest">Сначала старые</MenuItem>
           <MenuItem value="newest">Сначала новые</MenuItem>
-          <MenuItem value="reports">По количеству жалоб</MenuItem>
+          {!realMode ? <MenuItem value="reports">По количеству жалоб</MenuItem> : null}
           <MenuItem value="priority">По приоритету</MenuItem>
         </TextField>
       </Stack>
@@ -202,24 +226,33 @@ export function ModerationQueuePage() {
           <MenuItem value="HIGH">Высокий</MenuItem>
           <MenuItem value="CRITICAL">Критический</MenuItem>
         </TextField>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={store.hasReports}
-              onChange={(_, v) => store.setHasReports(v)}
+        {!realMode ? (
+          <>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={store.hasReports}
+                  onChange={(_, v) => store.setHasReports(v)}
+                />
+              }
+              label="Только с жалобами"
             />
-          }
-          label="Только с жалобами"
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={store.olderThanHours === 12}
-              onChange={(_, v) => store.setOlderThanHours(v ? 12 : null)}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={store.olderThanHours === 12}
+                  onChange={(_, v) => store.setOlderThanHours(v ? 12 : null)}
+                />
+              }
+              label="Старше 12 часов"
             />
-          }
-          label="Старше 12 часов"
-        />
+          </>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            Поиск, фильтр по жалобам и сортировка по числу жалоб временно скрыты — backend queue
+            принимает только status.
+          </Typography>
+        )}
         <Typography variant="body2" color="text.secondary">
           Активных фильтров: {activeFilters}
         </Typography>
@@ -236,12 +269,14 @@ export function ModerationQueuePage() {
         onClose={() => setEscalateId(null)}
         onSubmit={async (values) => {
           if (!escalateId) return
+          const target = items.find((i) => i.id === escalateId)
           try {
             await escalate.mutateAsync({
               id: escalateId,
               input: {
                 reasonCode: values.reasonCode || ESCALATION_REASON.OTHER,
                 comment: values.comment,
+                expectedVersion: target?.version,
               },
             })
             showSuccess('Случай передан администратору')

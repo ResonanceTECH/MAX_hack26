@@ -6,6 +6,10 @@ import Typography from '@mui/material/Typography'
 import { useOpportunity } from '@/entities/opportunity/api/queries'
 import { useMatch } from '@/entities/match/api/queries'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
+import { Permission } from '@/features/permissions/model/permissions'
+import { useCompanyPermission } from '@/features/permissions/hooks/useCompanyPermission'
+import { EntityActionsMenu } from '@/features/reports'
+import { NeedsChangesBanner } from '@/features/moderation/ui/NeedsChangesBanner'
 import {
   companyDetailsPath,
   opportunityProposePath,
@@ -20,11 +24,9 @@ import {
   CompanyAvatar,
   DeadlineLabel,
   ErrorState,
-  FavoriteButton,
   LoadingState,
   MatchExplanation,
   PageHeader,
-  ShareButton,
   StatusChip,
   Tag,
   VerifiedBadge,
@@ -34,6 +36,7 @@ import { CheckmarkCircle01Icon, AlertCircleIcon, Location01Icon } from '@/shared
 export function OpportunityDetailsPage() {
   const { id = '' } = useParams()
   const companyId = useSessionStore((s) => s.company?.id)
+  const canCreateProposal = useCompanyPermission(Permission.CREATE_PROPOSAL)
   const { data, isLoading, isError, refetch } = useOpportunity(id)
   const matchQuery = useMatch(id, companyId ?? '')
 
@@ -43,7 +46,7 @@ export function OpportunityDetailsPage() {
   const isOwn = data.company.id === companyId
   const isExpired = data.status === 'expired'
   const isClosed = data.status === 'closed'
-  const canPropose = !isOwn && !isExpired && !isClosed
+  const canPropose = canCreateProposal && !isOwn && !isExpired && !isClosed
   const match = matchQuery.data
 
   const requiredMatched = data.requiredRequirements.map((req) => ({
@@ -56,14 +59,23 @@ export function OpportunityDetailsPage() {
 
   return (
     <Box sx={{ pb: { xs: 12, md: 2 } }}>
+      {isOwn ? <NeedsChangesBanner entityType="opportunity" entityId={data.id} /> : null}
       <PageHeader
         title={data.title}
         subtitle={`Опубликовано ${formatDate(data.createdAt)}`}
         actions={
           <Stack direction="row" spacing={0.5} alignItems="center">
             <StatusChip status={data.status} />
-            <FavoriteButton type="opportunity" targetId={data.id} />
-            <ShareButton title={data.title} text={data.description} />
+            {!isOwn ? (
+              <EntityActionsMenu
+                targetType="opportunity"
+                targetId={data.id}
+                targetName={data.title}
+                shareTitle={data.title}
+                shareText={data.description}
+                favoriteType="opportunity"
+              />
+            ) : null}
           </Stack>
         }
       />

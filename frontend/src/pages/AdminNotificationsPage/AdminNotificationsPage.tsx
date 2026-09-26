@@ -22,12 +22,10 @@ import {
 } from '@/shared/ui'
 
 const TYPE_LABELS: Record<string, string> = {
-  CRITICAL_ESCALATION: 'Эскалация',
+  NEW_ESCALATION: 'Эскалация',
   MANY_REPORTS: 'Жалобы',
-  SETTING_CHANGED: 'Настройки',
+  PLATFORM_SETTING_CHANGED: 'Настройки',
   FEATURE_FLAG_CHANGED: 'Feature flag',
-  HIGH_QUEUE_AGE: 'Очередь',
-  SUSPICIOUS_ADMIN_ACTION: 'Подозрительно',
 }
 
 export function AdminNotificationsPage() {

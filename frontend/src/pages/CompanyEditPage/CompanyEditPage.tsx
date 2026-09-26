@@ -15,6 +15,7 @@ import {
   useUpdateCompanyProfile,
 } from '@/features/company-management'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
+import { NeedsChangesBanner } from '@/features/moderation/ui/NeedsChangesBanner'
 import { ROUTES } from '@/shared/constants/routes'
 import {
   AppButton,
@@ -128,6 +129,8 @@ export function CompanyEditPage() {
           </AppButton>
         }
       />
+
+      <NeedsChangesBanner entityType="company" entityId={company.id} />
 
       <Stack component="form" spacing={3} onSubmit={onSubmit} maxWidth={640}>
         <Section title="Юридические данные">

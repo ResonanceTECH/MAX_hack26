@@ -13,6 +13,7 @@ import {
   useUpdateCase,
 } from '@/features/company-management'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
+import { NeedsChangesBanner } from '@/features/moderation/ui/NeedsChangesBanner'
 import { companyCaseEditPath, ROUTES } from '@/shared/constants/routes'
 import {
   AppButton,
@@ -60,6 +61,7 @@ export function CompanyCaseDetailPage() {
 
   return (
     <Box>
+      <NeedsChangesBanner entityType="case" entityId={data.id} />
       <PageHeader
         title={data.title}
         subtitle={data.industry}
