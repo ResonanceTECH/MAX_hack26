@@ -18,5 +18,8 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     restoreMocks: true,
     fileParallelism: false,
+    env: {
+      VITE_USE_MOCK_API: 'true',
+    },
   },
 })

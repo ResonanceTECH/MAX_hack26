@@ -27,6 +27,7 @@ export default defineConfig({
       '/notifications': backend,
       '/favorites': backend,
       '/invites': backend,
+      '/company-invitations': backend,
       '/moderation': backend,
       '/reports': backend,
       '/escalations': backend,
