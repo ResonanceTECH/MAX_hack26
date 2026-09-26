@@ -1,4 +1,4 @@
-# Backend Gaps (updated after Phase 0–4 implementation + FE wire)
+# Backend Gaps (updated — Wave A)
 
 ## Done on BE (new)
 
@@ -15,24 +15,40 @@
 | Verification | `/companies/me/verification` |
 | Activity | `/companies/me/activity` |
 | Moderation | `/moderation/*`, `/reports*`, `/escalations*` |
+| Report create | `POST /reports` (any auth user) |
+| Resubmit | `POST /moderation/items/{id}/resubmit` |
+| Enqueue | `publish_request` → `ModerationItem` |
 | Platform admin | `/admin/users*`, `/admin/companies*`, `/admin/dictionaries*`, `/admin/analytics/overview`, `/admin/audit`, `/admin/feature-flags*`, `/admin/settings` |
 
-## FE wiring status (`VITE_USE_MOCK_API=false`)
+## Wave A seed extras (`seed_extras.py`)
+
+After core seed: dictionaries, DigitalLab workspace (services/cases/docs/members/activity),
+proposals+deals+favorites+invites+notifications, moderation queue/reports/escalations/audit.
+
+## FE wiring status (`VITE_USE_MOCK_API=false` — **default**)
 
 | Domain | Capability | Wired |
 |---|---|---|
 | auth/companies/opportunities/proposals/matching/deals/notifications/shortlist | real | yes |
 | favorites / team / services / settings / verification | real | yes |
 | invites | via opportunities real | yes |
-| cases / documents / activity | real | yes (`casesApi`/`documentsApi`/`activityApi`) |
-| moderation / reports / escalations | real | yes (`moderationApi`/`reportsApi`/`escalationsApi` → `/moderation/*`) |
-| admin users/companies / dictionaries / analytics / audit / settings / flags | real | yes (`/admin/*` via `shared/api/real/moderationAdmin.ts`) |
+| cases / documents / activity | real | yes |
+| moderation / reports / escalations / history | real | yes |
+| moderator/admin notifications | real via `/notifications` | yes |
+| admin users/companies / dictionaries / analytics / audit / settings / flags | real | yes |
 
-Mocks stay when `VITE_USE_MOCK_API=true` (proxy switches per domain).
+Mocks only if `VITE_USE_MOCK_API=true` (tests/legacy). Runtime no longer calls `hydrateMocks()`.
 
-## Remaining
+## Smoke
 
-1. Live smoke with Docker + seed (`7777001` admin, `7777009` moderator).
-2. Caddyfile: add proxies for `/favorites*`, `/admin*`, `/moderation*`, `/reports*`, `/escalations*`, `/invites*` if using Caddy HTTPS entry.
-3. Analytics FE maps BE overview counts → richer `AnalyticsOverview` shape (deltas/funnel filled with zeros / flat metrics).
-4. Admin company detail nested lists (employees/cases/docs) empty from BE list DTO until dedicated endpoints exist.
+```bash
+python backend_max/scripts/smoke_wave_a.py
+# or BASE_URL=http://localhost:8000 ...
+```
+
+## Remaining (Wave B+)
+
+1. Real MAX Bridge adapter (`initData` + `shareMaxContent`) — still `MockMaxBridgeAdapter`.
+2. Delete `frontend/src/shared/mocks/*` entirely (branches remain behind flag for unit tests).
+3. Member RBAC enforce (MANAGER/VIEWER).
+4. Invite accept flows.
