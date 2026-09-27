@@ -408,28 +408,40 @@ def structure_with_llm(description: str, settings: Settings) -> dict | None:
     """
     if not (settings.llm_api_url and settings.llm_api_key):
         return None
+    categories = ", ".join(CATEGORIES.keys())
     prompt = (
-        "Ты — ассистент, который превращает свободное описание бизнес-потребности "
-        "в структурированный JSON. Верни ТОЛЬКО JSON без markdown со строго такими "
-        "ключами: title (короткий заголовок), category, subcategory (или null), "
-        "requirements (массив строк), budget_min (int, рублей, или null), "
-        "budget_max (int, рублей, или null), deadline_days (int, или null), "
-        "regions (массив строк). Описание: " + description
+        "Ты — ассистент B2B Match. Преврати свободное описание бизнес-потребности "
+        "в структурированный JSON. Верни ТОЛЬКО валидный JSON без markdown.\n"
+        "Ключи: title (короткий заголовок на русском), category "
+        f"(одна из: {categories}), subcategory (строка или null), "
+        "requirements (массив технологий/компетенций, строки), "
+        "budget_min (int рубли или null), budget_max (int рубли или null), "
+        "deadline_days (int дней или null), regions (массив городов/регионов РФ).\n"
+        "Описание:\n" + description
     )
     try:
         response = requests.post(
             settings.llm_api_url.rstrip("/") + "/chat/completions",
-            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+            headers={
+                "Authorization": f"Bearer {settings.llm_api_key}",
+                "HTTP-Referer": "https://b2b-match.local",
+                "X-Title": "B2B Match Smart Request Builder",
+            },
             json={
                 "model": settings.llm_model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1,
             },
-            timeout=30,
+            timeout=45,
         )
         response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"]
-        content = content.strip().removeprefix("```json").removesuffix("```").strip()
+        content = content.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        # иногда модель оборачивает JSON в текст — вытащим первый объект
+        if not content.startswith("{"):
+            start, end = content.find("{"), content.rfind("}")
+            if start >= 0 and end > start:
+                content = content[start : end + 1]
         parsed = json.loads(content)
         return {
             "title": str(parsed.get("title") or ""),
@@ -441,7 +453,7 @@ def structure_with_llm(description: str, settings: Settings) -> dict | None:
             "budget_max": _int(str(parsed["budget_max"])) if parsed.get("budget_max") else None,
             "deadline_days": int(parsed["deadline_days"]) if parsed.get("deadline_days") else None,
             "regions": [str(r) for r in parsed.get("regions") or []],
-            "extracted": {"source": "llm"},
+            "extracted": {"source": "llm", "model": settings.llm_model},
         }
     except Exception:
         return None

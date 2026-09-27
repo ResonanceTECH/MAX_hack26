@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { OPPORTUNITY_TYPES } from '@/entities/opportunity'
+import { apiClient } from '@/shared/api/apiClient'
 import { delay } from '@/shared/lib/delay'
 
 export const opportunityFormSchema = z.object({
@@ -35,29 +36,127 @@ export interface ParsedOpportunityDraft {
   executionHint: string
 }
 
-/** Mock AI structuring — replace with real service later */
-export async function parseOpportunityText(text: string): Promise<ParsedOpportunityDraft> {
-  await delay(600)
-  const lower = text.toLowerCase()
+/** Backend CATEGORIES → labels формы создания запроса */
+const CATEGORY_TO_UI: Record<string, string> = {
+  'IT-разработка': 'Разработка ПО',
+  'Маркетинг и реклама': 'Маркетинг и реклама',
+  Логистика: 'Логистика',
+  Производство: 'Производство',
+  'Строительство и ремонт': 'Производство',
+  'Бухгалтерия и финансы': 'Консалтинг',
+  Дизайн: 'Консалтинг',
+}
 
+interface StructuredRequestDto {
+  title: string
+  category: string
+  subcategory?: string | null
+  requirements?: string[]
+  budget_min?: number | null
+  budget_max?: number | null
+  deadline_days?: number | null
+  regions?: string[]
+  extracted?: { source?: string }
+}
+
+function mapApiToDraft(data: StructuredRequestDto, rawText: string): ParsedOpportunityDraft {
+  const technologies = (data.requirements ?? []).map(String).filter(Boolean)
+  const days = data.deadline_days
+  let executionHint = 'Срок не указан'
+  if (days != null) {
+    if (days >= 30 && days % 30 === 0) executionHint = `${days / 30} мес.`
+    else if (days >= 7 && days % 7 === 0) executionHint = `${days / 7} нед.`
+    else executionHint = `${days} дн.`
+  }
+
+  const backendCategory = data.category || ''
+  const category = CATEGORY_TO_UI[backendCategory] ?? backendCategory ?? 'Разработка ПО'
+  const region = data.regions?.[0] || 'Москва'
+
+  return {
+    title: (data.title || rawText.slice(0, 80)).trim() || 'Новый запрос',
+    description: rawText,
+    category,
+    industries: guessIndustries(rawText, category, backendCategory),
+    technologies: technologies.length ? technologies : guessTechnologies(rawText),
+    budgetMin: data.budget_min ?? null,
+    budgetMax: data.budget_max ?? null,
+    region,
+    remoteAllowed: /удал[её]н|remote|вся россия/i.test(rawText + ' ' + region),
+    executionHint,
+  }
+}
+
+function guessIndustries(text: string, category: string, backendCategory = ''): string[] {
+  const lower = `${text} ${category} ${backendCategory}`.toLowerCase()
+  const industries: string[] = []
+
+  if (/медицин|клиник|health|лаборатор/.test(lower)) industries.push('Healthcare')
+  if (/ритейл|магазин|торгов|e-?commerce/.test(lower)) industries.push('Retail')
+  if (/логист|доставк|фулфилмент|склад/.test(lower)) industries.push('Logistics')
+  if (/маркет|smm|реклам|seo|бренд/.test(lower)) industries.push('Marketing')
+  if (/ремонт|строител|отделк|обои|квартир|офис|монтаж|фасад/.test(lower)) {
+    industries.push('Manufacturing')
+  }
+  if (/производств|мебел|полиграф|упаковк/.test(lower) && !industries.includes('Manufacturing')) {
+    industries.push('Manufacturing')
+  }
+
+  if (industries.length === 0) {
+    if (category.includes('Логистик') || backendCategory.includes('Логистик')) {
+      industries.push('Logistics')
+    } else if (category.includes('Маркетинг') || backendCategory.includes('Маркетинг')) {
+      industries.push('Marketing')
+    } else if (
+      category.includes('Производ') ||
+      backendCategory.includes('Производ') ||
+      backendCategory.includes('Строительство')
+    ) {
+      industries.push('Manufacturing')
+    } else if (category.includes('Разработка') || backendCategory.includes('IT')) {
+      industries.push('IT')
+    } else {
+      // неизвестная категория — не подставляем IT «по умолчанию»
+      industries.push('Manufacturing')
+    }
+  }
+  return industries
+}
+
+function guessTechnologies(text: string): string[] {
+  const lower = text.toLowerCase()
   const technologies: string[] = []
   if (lower.includes('react')) technologies.push('React')
   if (lower.includes('1с') || lower.includes('1c')) technologies.push('1С')
   if (lower.includes('typescript')) technologies.push('TypeScript')
   if (lower.includes('python')) technologies.push('Python')
+  return technologies
+}
+
+/** Локальный фолбэк, если LLM/API недоступны (тесты, офлайн). */
+export async function parseOpportunityTextLocal(text: string): Promise<ParsedOpportunityDraft> {
+  await delay(200)
+  const lower = text.toLowerCase()
+  const technologies = guessTechnologies(text)
 
   let category = 'Разработка ПО'
-  if (lower.includes('постав')) category = 'Поставка оборудования'
-  if (lower.includes('логист')) category = 'Логистика'
-  if (lower.includes('маркет')) category = 'Маркетинг и реклама'
-
-  const industries: string[] = []
-  if (lower.includes('медицин') || lower.includes('клиник') || lower.includes('health')) {
-    industries.push('Healthcare')
+  let backendCategory = 'IT-разработка'
+  if (lower.includes('постав')) {
+    category = 'Поставка оборудования'
+    backendCategory = 'Производство'
   }
-  if (lower.includes('ритейл') || lower.includes('магазин')) industries.push('Retail')
-  if (lower.includes('логист')) industries.push('Logistics')
-  if (industries.length === 0) industries.push('IT')
+  if (lower.includes('логист')) {
+    category = 'Логистика'
+    backendCategory = 'Логистика'
+  }
+  if (lower.includes('маркет')) {
+    category = 'Маркетинг и реклама'
+    backendCategory = 'Маркетинг и реклама'
+  }
+  if (/ремонт|строител|отделк|обои|квартир/.test(lower)) {
+    category = 'Производство'
+    backendCategory = 'Строительство и ремонт'
+  }
 
   let budgetMax: number | null = null
   const budgetMatch = text.match(/(\d[\d\s]*)\s*(тыс|тысяч|млн)?/i)
@@ -70,17 +169,37 @@ export async function parseOpportunityText(text: string): Promise<ParsedOpportun
   }
   if (lower.includes('500') && budgetMax == null) budgetMax = 500000
 
+  const industries = guessIndustries(text, category, backendCategory)
+  const tech =
+    technologies.length > 0
+      ? technologies
+      : industries.includes('IT')
+        ? ['React']
+        : []
+
   return {
     title: text.slice(0, 80).trim() || 'Новый запрос',
     description: text,
     category,
     industries,
-    technologies: technologies.length ? technologies : ['React'],
+    technologies: tech,
     budgetMin: budgetMax ? Math.round(budgetMax * 0.7) : null,
     budgetMax,
     region: 'Москва',
-    remoteAllowed: true,
+    remoteAllowed: industries.includes('IT'),
     executionHint: '2 месяца',
+  }
+}
+
+/** Smart Request Builder: бэкенд LLM (/api/ai/parse-opportunity), иначе локальный фолбэк. */
+export async function parseOpportunityText(text: string): Promise<ParsedOpportunityDraft> {
+  try {
+    const { data } = await apiClient.post<StructuredRequestDto>('/ai/parse-opportunity', {
+      description: text,
+    })
+    return mapApiToDraft(data, text)
+  } catch {
+    return parseOpportunityTextLocal(text)
   }
 }
 

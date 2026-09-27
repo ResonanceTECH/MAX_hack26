@@ -59,9 +59,13 @@ class Settings:
         self.min_match_score = _env_int("MIN_MATCH_SCORE", 60)
         self.top_matches = _env_int("TOP_MATCHES", 5)
         self.admin_user_ids = [int(i) for i in _env_list("MAX_ADMIN_USER_IDS") if i.isdigit()]
-        self.llm_api_url = os.getenv("LLM_API_URL", "")
-        self.llm_api_key = os.getenv("LLM_API_KEY", "")
-        self.llm_model = os.getenv("LLM_MODEL", "")
+        self.llm_api_key = os.getenv("LLM_API_KEY", "") or os.getenv("OPENROUTER_API_KEY", "")
+        self.llm_api_url = os.getenv("LLM_API_URL", "") or (
+            "https://openrouter.ai/api/v1" if self.llm_api_key else ""
+        )
+        self.llm_model = os.getenv("LLM_MODEL", "") or (
+            "nvidia/nemotron-3-super-120b-a12b:free" if self.llm_api_key else ""
+        )
         self.files_dir = os.getenv("FILES_DIR", "./data/files")
 
 
