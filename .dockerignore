@@ -1,0 +1,17 @@
+.git
+.venv
+**/__pycache__
+**/node_modules
+frontend/dist
+frontend/e2e
+frontend/playwright-report
+frontend/test-results
+data
+*.pyc
+.env
+.env.*
+!.env.example
+agent-transcripts
+.cursor
+**/.pytest_cache
+**/coverage
