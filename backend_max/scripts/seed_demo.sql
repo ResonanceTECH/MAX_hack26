@@ -190,17 +190,18 @@ JOIN companies c ON c.name = v.by_company
 WHERE NOT EXISTS (SELECT 1 FROM requests r WHERE r.title = v.title);
 
 -- ---------- матчи (фиксированные score для демо UI) ----------
+-- criteria schema: {key, label, passed, detail} — как Criterion.as_dict()
 INSERT INTO request_matches (request_id, company_id, score, criteria, created_at)
 SELECT r.id, c.id, m.score, m.criteria::json, NOW()
 FROM (VALUES
   ('Разработка интернет-магазина мебели', 'DigitalLab', 95,
-   '[{"name":"competencies","matched":true,"weight":40},{"name":"budget","matched":true,"weight":25},{"name":"region","matched":true,"weight":20},{"name":"term","matched":true,"weight":15}]'),
+   '[{"key":"requirements","label":"Компетенции и требования","passed":true,"detail":"react, 1с, интернет-магазин"},{"key":"budget","label":"Бюджет","passed":true,"detail":"бюджет в диапазоне компании"},{"key":"region","label":"География","passed":true,"detail":"Москва"},{"key":"deadline","label":"Сроки","passed":true,"detail":"срок укладывается в max_term_days"}]'),
   ('Разработка интернет-магазина мебели', 'WebForge', 82,
-   '[{"name":"competencies","matched":true,"weight":40},{"name":"budget","matched":true,"weight":25},{"name":"region","matched":true,"weight":20}]'),
+   '[{"key":"requirements","label":"Компетенции и требования","passed":true,"detail":"react, интернет-магазин"},{"key":"budget","label":"Бюджет","passed":true,"detail":"бюджет в диапазоне компании"},{"key":"region","label":"География","passed":true,"detail":"Вся Россия"}]'),
   ('SMM и контекстная реклама для типографии', 'МаркетЛаб', 93,
-   '[{"name":"competencies","matched":true,"weight":40},{"name":"budget","matched":true,"weight":25},{"name":"region","matched":false,"weight":20}]'),
+   '[{"key":"requirements","label":"Компетенции и требования","passed":true,"detail":"smm, контекстная реклама"},{"key":"budget","label":"Бюджет","passed":true,"detail":"бюджет в диапазоне компании"},{"key":"region","label":"География","passed":false,"detail":"регион Самара не в профиле"}]'),
   ('Поставка упаковки и полиграфии', 'ПечатьЦентр', 88,
-   '[{"name":"competencies","matched":true,"weight":40},{"name":"budget","matched":true,"weight":25}]')
+   '[{"key":"requirements","label":"Компетенции и требования","passed":true,"detail":"упаковка, полиграфия"},{"key":"budget","label":"Бюджет","passed":true,"detail":"бюджет в диапазоне компании"}]')
 ) AS m(request_title, company_name, score, criteria)
 JOIN requests r ON r.title = m.request_title
 JOIN companies c ON c.name = m.company_name
@@ -208,6 +209,23 @@ WHERE NOT EXISTS (
   SELECT 1 FROM request_matches rm
   WHERE rm.request_id = r.id AND rm.company_id = c.id
 );
+
+-- починить уже залитые кривые criteria (name/matched → key/label/passed/detail)
+UPDATE request_matches rm
+SET criteria = m.criteria::json
+FROM (VALUES
+  ('Разработка интернет-магазина мебели', 'DigitalLab',
+   '[{"key":"requirements","label":"Компетенции и требования","passed":true,"detail":"react, 1с, интернет-магазин"},{"key":"budget","label":"Бюджет","passed":true,"detail":"бюджет в диапазоне компании"},{"key":"region","label":"География","passed":true,"detail":"Москва"},{"key":"deadline","label":"Сроки","passed":true,"detail":"срок укладывается в max_term_days"}]'),
+  ('Разработка интернет-магазина мебели', 'WebForge',
+   '[{"key":"requirements","label":"Компетенции и требования","passed":true,"detail":"react, интернет-магазин"},{"key":"budget","label":"Бюджет","passed":true,"detail":"бюджет в диапазоне компании"},{"key":"region","label":"География","passed":true,"detail":"Вся Россия"}]'),
+  ('SMM и контекстная реклама для типографии', 'МаркетЛаб',
+   '[{"key":"requirements","label":"Компетенции и требования","passed":true,"detail":"smm, контекстная реклама"},{"key":"budget","label":"Бюджет","passed":true,"detail":"бюджет в диапазоне компании"},{"key":"region","label":"География","passed":false,"detail":"регион Самара не в профиле"}]'),
+  ('Поставка упаковки и полиграфии', 'ПечатьЦентр',
+   '[{"key":"requirements","label":"Компетенции и требования","passed":true,"detail":"упаковка, полиграфия"},{"key":"budget","label":"Бюджет","passed":true,"detail":"бюджет в диапазоне компании"}]')
+) AS m(request_title, company_name, criteria)
+JOIN requests r ON r.title = m.request_title
+JOIN companies c ON c.name = m.company_name
+WHERE rm.request_id = r.id AND rm.company_id = c.id;
 
 -- ---------- отклик (пример) ----------
 INSERT INTO proposals (
