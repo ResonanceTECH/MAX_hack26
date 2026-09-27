@@ -46,7 +46,7 @@ def req(method: str, path: str, token: str | None = None, body: dict | None = No
 def auth(max_user_id: int) -> str:
     status, data = req(
         "POST",
-        "/auth/max",
+        "/api/auth/max",
         body={"dev_max_user_id": max_user_id, "dev_first_name": "Smoke", "dev_last_name": "Test"},
     )
     if status != 200 or not data or "access_token" not in data:
@@ -70,48 +70,48 @@ def main() -> None:
     ok("seed", status in (200, 201), f"status={status}")
 
     # Platform admin
-    status, users = req("GET", "/admin/users", token=admin_tok)
+    status, users = req("GET", "/api/admin/users", token=admin_tok)
     ok("admin users", status == 200 and isinstance(users, list) and len(users) >= 4, f"n={len(users) if isinstance(users, list) else users}")
-    status, companies = req("GET", "/admin/companies", token=admin_tok)
+    status, companies = req("GET", "/api/admin/companies", token=admin_tok)
     ok("admin companies", status == 200 and isinstance(companies, list) and len(companies) >= 1)
-    status, analytics = req("GET", "/admin/analytics/overview", token=admin_tok)
+    status, analytics = req("GET", "/api/admin/analytics/overview", token=admin_tok)
     ok(
         "admin analytics",
         status == 200 and isinstance(analytics, dict) and analytics.get("is_model_data") is False,
         str(analytics),
     )
-    status, dicts = req("GET", "/admin/dictionaries", token=admin_tok)
+    status, dicts = req("GET", "/api/admin/dictionaries", token=admin_tok)
     ok("admin dictionaries", status == 200 and isinstance(dicts, list) and len(dicts) > 0, f"n={len(dicts) if isinstance(dicts, list) else dicts}")
 
     # Company admin workspace
     ca = auth(ROLES["COMPANY_ADMIN"])
-    status, services = req("GET", "/companies/me/services", token=ca)
+    status, services = req("GET", "/api/companies/me/services", token=ca)
     ok("company services", status == 200 and isinstance(services, list) and len(services) >= 1, f"n={len(services) if isinstance(services, list) else services}")
-    status, cases = req("GET", "/companies/me/cases", token=ca)
+    status, cases = req("GET", "/api/companies/me/cases", token=ca)
     ok("company cases", status == 200 and isinstance(cases, list) and len(cases) >= 1)
-    status, proposals = req("GET", "/proposals/mine", token=ca)
+    status, proposals = req("GET", "/api/proposals/mine", token=ca)
     ok("company proposals", status == 200 and isinstance(proposals, list) and len(proposals) >= 1, f"n={len(proposals) if isinstance(proposals, list) else proposals}")
 
     # Business user
     bu = auth(ROLES["BUSINESS_USER"])
-    status, favs = req("GET", "/favorites", token=bu)
+    status, favs = req("GET", "/api/favorites", token=bu)
     ok("business favorites", status == 200 and isinstance(favs, list))
-    status, recs = req("GET", "/me/recommendations", token=bu)
+    status, recs = req("GET", "/api/me/recommendations", token=bu)
     ok("business recommendations", status == 200 and isinstance(recs, list))
 
     # Moderator
     mod = auth(ROLES["MODERATOR"])
-    status, queue = req("GET", "/moderation/queue", token=mod)
+    status, queue = req("GET", "/api/moderation/queue", token=mod)
     ok("moderation queue", status == 200 and isinstance(queue, list) and len(queue) >= 1, f"n={len(queue) if isinstance(queue, list) else queue}")
-    status, reports = req("GET", "/reports", token=mod)
+    status, reports = req("GET", "/api/reports", token=mod)
     ok("reports", status == 200 and isinstance(reports, list) and len(reports) >= 1, f"n={len(reports) if isinstance(reports, list) else reports}")
-    status, esc = req("GET", "/escalations", token=mod)
+    status, esc = req("GET", "/api/escalations", token=mod)
     ok("escalations", status == 200 and isinstance(esc, list) and len(esc) >= 1)
 
     # Create report as business user
     status, created = req(
         "POST",
-        "/reports",
+        "/api/reports",
         token=bu,
         body={
             "target_type": "company",

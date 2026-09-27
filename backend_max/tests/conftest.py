@@ -86,12 +86,51 @@ def _database():
     Base.metadata.drop_all(bind=db_mod.engine)
 
 
+class _ApiPrefixedClient:
+    """TestClient wrapper: business paths get /api prefix; /health and /api/* untouched."""
+
+    _META_PREFIXES = ("/docs", "/redoc", "/openapi.json")
+    _META_EXACT = {"/", "/health"}
+
+    def __init__(self, client: TestClient):
+        self._client = client
+
+    def _path(self, url: str) -> str:
+        if (
+            url.startswith("/api/")
+            or url in self._META_EXACT
+            or any(url.startswith(p) for p in self._META_PREFIXES)
+        ):
+            return url
+        if url.startswith("/"):
+            return "/api" + url
+        return url
+
+    def get(self, url, **kwargs):
+        return self._client.get(self._path(url), **kwargs)
+
+    def post(self, url, **kwargs):
+        return self._client.post(self._path(url), **kwargs)
+
+    def put(self, url, **kwargs):
+        return self._client.put(self._path(url), **kwargs)
+
+    def patch(self, url, **kwargs):
+        return self._client.patch(self._path(url), **kwargs)
+
+    def delete(self, url, **kwargs):
+        return self._client.delete(self._path(url), **kwargs)
+
+    def request(self, method, url, **kwargs):
+        return self._client.request(method, self._path(url), **kwargs)
+
+
 @pytest.fixture(scope="session")
 def client(_database):
     from backend_max.app.main import app
 
     with TestClient(app) as c:
-        yield c
+        yield _ApiPrefixedClient(c)
 
 
 @pytest.fixture()

@@ -2,7 +2,7 @@
 -- Идемпотентно: повторный запуск не дублирует строки по max_user_id / inn / title.
 --
 -- Полный seed (матчинг + Wave A extras) лучше через API:
---   POST /auth/max {"dev_max_user_id": 7777001}
+--   POST /api/auth/max {"dev_max_user_id": 7777001}
 --   POST /api/admin/seed
 --
 -- Применение на сервере:

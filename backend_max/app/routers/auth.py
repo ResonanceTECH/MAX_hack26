@@ -131,7 +131,7 @@ def auth_max(payload: AuthInitIn, db: Session = Depends(get_db)) -> AuthResponse
     return _auth_init_impl(payload, db)
 
 
-@router.post("/api/auth/init", response_model=AuthResponse, include_in_schema=False)
+@router.post("/auth/init", response_model=AuthResponse, include_in_schema=False)
 def auth_init_legacy(payload: AuthInitIn, db: Session = Depends(get_db)) -> AuthResponse:
     return _auth_init_impl(payload, db)
 
@@ -141,6 +141,6 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)) ->
     return _user_out(user, db)
 
 
-@router.get("/api/auth/me", response_model=UserOut, include_in_schema=False)
+@router.get("/auth/me", response_model=UserOut, include_in_schema=False)
 def me_legacy(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> UserOut:
     return _user_out(user, db)

@@ -4,7 +4,7 @@ import { TOKEN_STORAGE_KEY } from '@/shared/api/mappers/userMapper'
 import { normalizeApiError } from '@/shared/api/errors'
 
 /**
- * HTTP client for FastAPI backend (root paths, no /api/v1).
+ * HTTP client for FastAPI backend (paths relative to /api).
  * Domain modules switch via apiCapabilities when VITE_USE_MOCK_API=false.
  */
 export const apiClient = axios.create({

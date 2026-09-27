@@ -20,7 +20,7 @@ from ..schemas import (
 )
 from ..services import request_out
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 def compute_stats(db: Session) -> StatsOut:

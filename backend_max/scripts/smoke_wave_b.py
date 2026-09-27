@@ -49,7 +49,7 @@ def req(method: str, path: str, token: str | None = None, body: dict | None = No
 def auth(max_user_id: int, first_name: str = "Smoke") -> str:
     status, data = req(
         "POST",
-        "/auth/max",
+        "/api/auth/max",
         body={"dev_max_user_id": max_user_id, "dev_first_name": first_name, "dev_last_name": "Test"},
     )
     if status != 200 or not data or "access_token" not in data:
@@ -74,13 +74,13 @@ def main() -> None:
 
     # Manager 7777010
     mgr = auth(ROLES["MANAGER"], "Игорь")
-    status, me = req("GET", "/me", token=mgr)
+    status, me = req("GET", "/api/me", token=mgr)
     ok(
         "manager /me member_role",
         status == 200 and (me or {}).get("member_role") == "MANAGER",
         str(me),
     )
-    status, services = req("GET", "/companies/me/services", token=mgr)
+    status, services = req("GET", "/api/companies/me/services", token=mgr)
     ok(
         "manager service list",
         status == 200 and isinstance(services, list) and len(services) >= 1,
@@ -88,7 +88,7 @@ def main() -> None:
     )
     status, _ = req(
         "POST",
-        "/companies/me/members",
+        "/api/companies/me/members",
         token=mgr,
         body={
             "email": "smoke-denied@example.com",
@@ -101,7 +101,7 @@ def main() -> None:
 
     # Viewer 7777011
     viewer = auth(ROLES["VIEWER"], "Мария")
-    status, me_v = req("GET", "/me", token=viewer)
+    status, me_v = req("GET", "/api/me", token=viewer)
     ok(
         "viewer /me member_role",
         status == 200 and (me_v or {}).get("member_role") == "VIEWER",
@@ -109,7 +109,7 @@ def main() -> None:
     )
     status, _ = req(
         "POST",
-        "/companies/me/services",
+        "/api/companies/me/services",
         token=viewer,
         body={"title": "Blocked", "description": "x", "category": "IT"},
     )
@@ -118,7 +118,7 @@ def main() -> None:
     # Invite get + accept (fresh user so pending token still available after re-seed)
     # Re-seed restores pending token; accept as new max_user_id
     invitee = auth(7777098, "Invitee")
-    status, inv = req("GET", f"/company-invitations/{PENDING_TOKEN}", token=invitee)
+    status, inv = req("GET", f"/api/company-invitations/{PENDING_TOKEN}", token=invitee)
     ok(
         "invite get",
         status == 200 and isinstance(inv, dict) and inv.get("token") == PENDING_TOKEN,
@@ -127,7 +127,7 @@ def main() -> None:
     if status == 200 and (inv or {}).get("status") == "pending":
         status, accepted = req(
             "POST",
-            f"/company-invitations/{PENDING_TOKEN}/accept",
+            f"/api/company-invitations/{PENDING_TOKEN}/accept",
             token=invitee,
         )
         ok(
@@ -140,7 +140,7 @@ def main() -> None:
         ca = auth(ROLES["COMPANY_ADMIN"])
         status, member = req(
             "POST",
-            "/companies/me/members",
+            "/api/companies/me/members",
             token=ca,
             body={
                 "email": "smoke-invitee@example.com",
@@ -153,17 +153,17 @@ def main() -> None:
         ok("create invite fallback", status in (200, 201), str(member))
         # Look up token via members list is not exposed — accept by numeric id fallback
         mid = (member or {}).get("id")
-        status, by_id = req("GET", f"/company-invitations/{mid}", token=invitee)
+        status, by_id = req("GET", f"/api/company-invitations/{mid}", token=invitee)
         token = (by_id or {}).get("token") or str(mid)
-        status, accepted = req("POST", f"/company-invitations/{token}/accept", token=invitee)
+        status, accepted = req("POST", f"/api/company-invitations/{token}/accept", token=invitee)
         ok("invite accept fallback", status == 200, str(accepted))
 
     # WebForge customer: own opportunities + proposals
     bu = auth(ROLES["BUSINESS_USER"], "Ольга")
-    status, opps = req("GET", "/opportunities/mine", token=bu)
+    status, opps = req("GET", "/api/opportunities/mine", token=bu)
     # Fallback path if /opportunities/mine missing — use list filter via dashboard
     if status == 404:
-        status, dash = req("GET", "/me/dashboard", token=bu)
+        status, dash = req("GET", "/api/me/dashboard", token=bu)
         mine = (dash or {}).get("my_requests") if isinstance(dash, dict) else None
         ok(
             "webforge customer opportunities",
@@ -183,7 +183,7 @@ def main() -> None:
 
     if redesign:
         oid = redesign["id"]
-        status, props = req("GET", f"/opportunities/{oid}/proposals", token=bu)
+        status, props = req("GET", f"/api/opportunities/{oid}/proposals", token=bu)
         ok(
             "webforge see proposals",
             status == 200 and isinstance(props, list) and len(props) >= 1,
@@ -195,7 +195,7 @@ def main() -> None:
     # Report create
     status, report = req(
         "POST",
-        "/reports",
+        "/api/reports",
         token=bu,
         body={
             "target_type": "company",

@@ -4,7 +4,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
@@ -76,21 +76,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
-app.include_router(companies.router)
-app.include_router(company_workspace.router)
-app.include_router(opportunities.router)
-app.include_router(proposals.router)
-app.include_router(deals.router)
-app.include_router(feed.router)
-app.include_router(files.router)
-app.include_router(inbox.router)
-app.include_router(share.router)
-app.include_router(dictionaries.router)
-app.include_router(favorites.router)
-app.include_router(moderation.router)
-app.include_router(platform_admin.router)
-app.include_router(admin.router)
+api = APIRouter(prefix="/api")
+api.include_router(auth.router)
+api.include_router(companies.router)
+api.include_router(company_workspace.router)
+api.include_router(opportunities.router)
+api.include_router(proposals.router)
+api.include_router(deals.router)
+api.include_router(feed.router)
+api.include_router(files.router)
+api.include_router(inbox.router)
+api.include_router(share.router)
+api.include_router(dictionaries.router)
+api.include_router(favorites.router)
+api.include_router(moderation.router)
+api.include_router(platform_admin.router)
+api.include_router(admin.router)
+
+
+@api.get("/health", tags=["meta"])
+def api_health() -> dict:
+    return {"status": "ok"}
+
+
+app.include_router(api)
 
 
 @app.get("/", tags=["meta"])
@@ -100,6 +109,7 @@ def root() -> dict:
         "version": "0.1.0",
         "docs": "/docs",
         "health": "/health",
+        "api": "/api",
     }
 
 
