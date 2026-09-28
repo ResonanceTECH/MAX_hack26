@@ -104,21 +104,17 @@ async function realGetAll(filters?: OpportunityFilters, sort?: OpportunitySort):
     const { data } = await apiClient.get<RequestDto[]>('/opportunities', {
       params: {
         q: filters?.query,
-        category: filters?.category,
+        categories: filters?.industries?.length ? filters.industries.join(',') : filters?.category,
+        technologies: filters?.technologies?.join(','),
         region: filters?.region,
+        budget_min: filters?.budgetMin,
         budget_max: filters?.budgetMax,
+        min_match_score: filters?.minMatchScore,
+        sort: sort === 'match' ? 'match_desc' : sort,
         limit: 100,
       },
     })
-    let items = data.map(mapRequestDtoToOpportunity)
-    items = applyFilters(items, {
-      industries: filters?.industries,
-      technologies: filters?.technologies,
-      remoteAllowed: filters?.remoteAllowed,
-      status: filters?.status,
-      budgetMin: filters?.budgetMin,
-    })
-    return applySort(items, sort)
+    return data.map(mapRequestDtoToOpportunity)
   } catch (error) {
     throw toApiError(error)
   }

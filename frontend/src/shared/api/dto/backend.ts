@@ -38,6 +38,7 @@ export interface CompanyDto {
   industries: string[]
   services: string[]
   competencies: string[]
+  technologies: string[]
   regions: string[]
   budget_min: number | null
   budget_max: number | null
@@ -110,6 +111,8 @@ export interface RequestDto {
   published_at: string | null
   expires_at: string | null
   proposals_count: number
+  match_id: number | null
+  match_score: number | null
   match_count: number
   days_left: number | null
   matches?: MatchDto[]

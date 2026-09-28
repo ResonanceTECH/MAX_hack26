@@ -64,6 +64,7 @@ export function mapRequestDtoToOpportunity(dto: RequestDto): Opportunity {
     status: mapOpportunityStatus(dto.status),
     createdAt: dto.created_at,
     proposalsCount: dto.proposals_count ?? 0,
+    matchScore: dto.match_score ?? null,
     newProposalsCount: 0,
   }
 }

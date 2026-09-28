@@ -27,6 +27,7 @@ export interface OpportunityCardProps {
 
 export function OpportunityCard({ opportunity, match, onDismiss }: OpportunityCardProps) {
   const topReasons = (match?.reasons ?? []).filter((r) => r.matched).slice(0, 3)
+  const fallbackScore = opportunity.matchScore != null ? opportunity.matchScore : null
 
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -41,6 +42,8 @@ export function OpportunityCard({ opportunity, match, onDismiss }: OpportunityCa
                 missingRequirements={match.missingRequirements}
                 variant="full"
               />
+            ) : fallbackScore != null ? (
+              <MatchScore score={fallbackScore} />
             ) : (
               <Box />
             )}

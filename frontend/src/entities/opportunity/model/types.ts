@@ -48,4 +48,5 @@ export interface Opportunity {
   createdAt: string
   proposalsCount: number
   newProposalsCount?: number
+  matchScore?: number | null
 }

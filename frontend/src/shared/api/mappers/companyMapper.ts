@@ -22,7 +22,7 @@ export function mapCompanyDtoToModel(dto: CompanyDto): Company {
     industries: dto.industries ?? [],
     services: dto.services ?? [],
     capabilities: dto.competencies ?? [],
-    technologies: [],
+    technologies: dto.technologies ?? [],
     priceFrom: dto.budget_min,
     priceTo: dto.budget_max,
     rating: dto.rating ?? 0,

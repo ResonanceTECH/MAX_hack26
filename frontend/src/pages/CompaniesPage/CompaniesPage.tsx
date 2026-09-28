@@ -11,7 +11,7 @@ import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import { useCompanies } from '@/entities/company/api/queries'
 import { useCompanySearchStore } from '@/features/company-search/model/searchStore'
-import { INDUSTRIES, REGIONS } from '@/shared/constants/labels'
+import { COMPANY_SERVICES, INDUSTRIES, REGIONS } from '@/shared/constants/labels'
 import { useUiStore } from '@/shared/hooks/useUiStore'
 import {
   AppButton,
@@ -38,16 +38,11 @@ function CompanyFiltersForm() {
         options={[{ value: '', label: 'Все' }, ...INDUSTRIES.map((i) => ({ value: i, label: i }))]}
         onChange={(v) => patch({ industries: v ? [v] : undefined })}
       />
-      <AppInput
+      <AppSelect
         label="Услуги"
-        value={filters.services?.join(', ') ?? ''}
-        onChange={(e) => {
-          const services = e.target.value
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-          patch({ services: services.length ? services : undefined })
-        }}
+        value={filters.services?.[0] ?? ''}
+        options={[{ value: '', label: 'Все' }, ...COMPANY_SERVICES.map((s) => ({ value: s, label: s }))]}
+        onChange={(v) => patch({ services: v ? [v] : undefined })}
       />
       <AppInput
         label="Технологии"
@@ -116,7 +111,8 @@ export function CompaniesPage() {
     () => ({
       ...filters,
       query: query || filters.query,
-      services: focusSupply ? ['Поставка', ...(filters.services ?? [])] : filters.services,
+      industries: focusSupply ? ['Производство', 'Логистика'] : filters.industries,
+      services: focusSupply ? ['поставка сырья', 'грузоперевозки', ...(filters.services ?? [])] : filters.services,
     }),
     [filters, query, focusSupply],
   )

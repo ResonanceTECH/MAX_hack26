@@ -59,23 +59,19 @@ async function realGetAll(filters?: CompanyFilters): Promise<Company[]> {
     const { data } = await apiClient.get<CompanyDto[]>('/companies', {
       params: {
         q: filters?.query,
-        category: filters?.industries?.[0],
+        categories: filters?.industries?.join(','),
+        services: filters?.services?.join(','),
+        technologies: filters?.technologies?.join(','),
         region: filters?.region,
+        min_price: filters?.priceFrom,
+        max_price: filters?.priceTo,
+        min_rating: filters?.minRating,
+        has_cases: filters?.hasCases === true ? true : undefined,
         verified_only: filters?.verified === true ? true : undefined,
-        limit: 100,
+        limit: 200,
       },
     })
-    let companies = data.map(mapCompanyDtoToModel)
-    // Client-side for unsupported filters
-    companies = applyFilters(companies, {
-      services: filters?.services,
-      technologies: filters?.technologies,
-      priceFrom: filters?.priceFrom,
-      priceTo: filters?.priceTo,
-      minRating: filters?.minRating,
-      hasCases: filters?.hasCases,
-    })
-    return companies
+    return data.map(mapCompanyDtoToModel)
   } catch (error) {
     throw toApiError(error)
   }
