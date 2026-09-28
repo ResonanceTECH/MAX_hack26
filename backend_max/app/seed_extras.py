@@ -203,12 +203,6 @@ def seed_digital_lab_workspace(db: Session) -> None:
         ]:
             db.add(CompanyDocumentItem(company_id=company.id, **row))
 
-    for svc in db.query(CompanyServiceItem).filter(
-        CompanyServiceItem.company_id == company.id,
-        CompanyServiceItem.status == "published",
-    ).all():
-        svc.status = "active"
-
     seed_digitallab_members(db, company, owner)
 
     if db.query(CompanyActivityEvent).filter(CompanyActivityEvent.company_id == company.id).count() == 0:

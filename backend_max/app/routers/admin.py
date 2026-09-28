@@ -40,7 +40,6 @@ def seed_demo_data(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> StatsOut:
-    """Загружает демо-данные (компании, запросы, матчи) для проверки сценария."""
     from ..seed import seed_demo
 
     seed_demo(db)
@@ -52,14 +51,54 @@ def reset_data(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Полный сброс данных (для повторяемых проверок и тестовых прогонов).
+    from ..models import (
+        AuditEvent,
+        CompanyActivityEvent,
+        CompanyCaseItem,
+        CompanyDocumentItem,
+        CompanyMember,
+        CompanyServiceItem,
+        Deal,
+        DictionaryItem,
+        Escalation,
+        FeatureFlag,
+        Favorite,
+        ModerationDecision,
+        ModerationItem,
+        NotificationLog,
+        OpportunityInvite,
+        PlatformSettings,
+        Proposal,
+        Report,
+        RequestMatch,
+        UploadedFile,
+    )
 
-    Удаляет все записи: уведомления, сделки, отклики, матчи, запросы,
-    компании и пользователей. Файлы на диске не затрагиваются.
-    """
-    from ..models import Deal, NotificationLog, Proposal, RequestMatch, UploadedFile
-
-    for model in (NotificationLog, Deal, Proposal, RequestMatch, Request, UploadedFile, Company, User):
+    for model in (
+        NotificationLog,
+        AuditEvent,
+        CompanyActivityEvent,
+        ModerationDecision,
+        Escalation,
+        Report,
+        ModerationItem,
+        OpportunityInvite,
+        CompanyMember,
+        CompanyDocumentItem,
+        CompanyCaseItem,
+        CompanyServiceItem,
+        Favorite,
+        Deal,
+        Proposal,
+        RequestMatch,
+        Request,
+        UploadedFile,
+        DictionaryItem,
+        FeatureFlag,
+        PlatformSettings,
+        Company,
+        User,
+    ):
         db.query(model).delete()
     db.commit()
     return {"reset": True}

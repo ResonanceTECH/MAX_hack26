@@ -96,6 +96,26 @@ def require_role(*roles: str):
     return _dep
 
 
+def get_current_user_optional(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> User | None:
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization.removeprefix("Bearer ").strip()
+    user_id = decode_access_token(token, settings)
+    if user_id is None:
+        return None
+    user = db.get(User, user_id)
+    if user is None:
+        return None
+    user_status = (getattr(user, "status", "active") or "active").lower()
+    if user_status == "blocked":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Пользователь заблокирован")
+    return user
+
+
 def get_membership(db: Session, user: User, company_id: int) -> CompanyMember | None:
     return (
         db.query(CompanyMember)

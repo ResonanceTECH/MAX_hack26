@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings, get_settings
 from ..db import get_db
-from ..deps import get_current_user, require_company_permission
+from ..deps import get_current_user, get_current_user_optional, require_company_permission
+from ..matching import match_company
 from ..models import Company, Deal, Proposal, Request, RequestMatch, UploadedFile, User
 from ..permissions import PERM_CREATE_OPPORTUNITY, STAFF_ROLES
 from ..schemas import (
@@ -52,13 +53,11 @@ def _structurize(payload: RequestCreateIn) -> dict:
 
 @router.post("/ai/parse-opportunity", response_model=StructuredRequestOut)
 def ai_parse(payload: RequestCreateIn) -> StructuredRequestOut:
-    """AI-структуризация свободного описания потребности без публикации."""
     return StructuredRequestOut(**_structurize(payload))
 
 
 @router.post("/opportunities/preview", response_model=StructuredRequestOut)
 def preview_opportunity(payload: RequestCreateIn) -> StructuredRequestOut:
-    """Совместимый алиас /ai/parse-opportunity."""
     return StructuredRequestOut(**_structurize(payload))
 
 
@@ -68,11 +67,6 @@ def create_opportunity(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> RequestDetailOut:
-    """Создаёт потребность. Свободное описание структурируется автоматически.
-
-    Если publish=false — запрос сохраняется как draft (публикация отдельно:
-    POST /opportunities/{id}/publish).
-    """
     if user.role in STAFF_ROLES or user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Модераторы и админы платформы не публикуют запросы")
     company = require_company_permission(db, user, PERM_CREATE_OPPORTUNITY)
@@ -129,25 +123,97 @@ def create_opportunity(
 def list_opportunities(
     q: str | None = None,
     category: str | None = None,
+    categories: str | None = Query(default=None, description="Категории через запятую"),
+    technologies: str | None = Query(default=None, description="Технологии через запятую (по требованиям)"),
     region: str | None = None,
+    budget_min: int | None = None,
     budget_max: int | None = None,
+    status: str | None = None,
+    min_match_score: int | None = None,
+    sort: str | None = Query(
+        default=None,
+        pattern="^(match_desc|newest|budget_asc|budget_desc|deadline)$",
+    ),
     limit: int = Query(default=50, le=100),
     offset: int = 0,
+    user: User | None = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ) -> list[RequestOut]:
-    """Витрина опубликованных потребностей (без персонального матчинга)."""
+    """Витрина опубликованных потребностей с серверными фильтрами, сортировкой
+    и персональным процентом совпадения (match_score) для текущего пользователя."""
     query = db.query(Request).filter(Request.status == "published")
     if q:
         like = f"%{q}%"
         query = query.filter(or_(Request.title.ilike(like), Request.description_raw.ilike(like)))
-    requests = query.order_by(Request.published_at.desc()).offset(offset).limit(limit).all()
+    if budget_min is not None:
+        query = query.filter(Request.budget_max.isnot(None), Request.budget_max >= budget_min)
+    if budget_max is not None:
+        query = query.filter(Request.budget_min.isnot(None), Request.budget_min <= budget_max)
+    requests = query.all()
+
+    cat_list = [x.strip() for x in categories.split(",") if x.strip()] if categories else []
     if category:
-        requests = [r for r in requests if r.category == category]
+        cat_list = [category] + cat_list
+    tech_list = [x.strip() for x in technologies.split(",") if x.strip()] if technologies else []
+
+    if cat_list:
+        requests = [r for r in requests if r.category in cat_list]
     if region:
         requests = [r for r in requests if region in (r.regions or [])]
-    if budget_max:
-        requests = [r for r in requests if (r.budget_max or float("inf")) <= budget_max]
-    return [request_out(r, db) for r in requests]
+    if tech_list:
+        requests = [r for r in requests if any(t in (r.requirements or []) for t in tech_list)]
+    if status and status != "all":
+        requests = [r for r in requests if r.status == status]
+
+    # персональный матч текущей компании пользователя
+    match_by_request: dict[int, RequestMatch] = {}
+    company = None
+    if user is not None:
+        from ..services import get_company_for_user
+
+        company = get_company_for_user(db, user)
+    if company is not None:
+        for m in (
+            db.query(RequestMatch)
+            .filter(RequestMatch.company_id == company.id)
+            .all()
+        ):
+            match_by_request[m.request_id] = m
+
+    def my_score(r: Request) -> int | None:
+        stored = match_by_request.get(r.id)
+        if stored is not None:
+            return stored.score
+        if company is None:
+            return None
+        score, _ = match_company(r, company)
+        return score
+
+    if min_match_score is not None:
+        requests = [r for r in requests if (my_score(r) or 0) >= min_match_score]
+
+    if sort == "match_desc":
+        requests.sort(key=lambda r: my_score(r) or -1, reverse=True)
+    elif sort == "newest":
+        requests.sort(key=lambda r: r.published_at or r.created_at, reverse=True)
+    elif sort == "budget_asc":
+        requests.sort(key=lambda r: r.budget_min if r.budget_min is not None else float("inf"))
+    elif sort == "budget_desc":
+        requests.sort(key=lambda r: r.budget_max if r.budget_max is not None else -1.0, reverse=True)
+    elif sort == "deadline":
+        requests.sort(key=lambda r: r.expires_at or datetime.max.replace(tzinfo=timezone.utc))
+    else:
+        requests.sort(key=lambda r: r.published_at or r.created_at, reverse=True)
+
+    page = requests[offset : offset + limit]
+    out = []
+    for r in page:
+        item = request_out(r, db)
+        stored = match_by_request.get(r.id)
+        item.match_id = stored.id if stored else None
+        item.match_score = my_score(r)
+        out.append(item)
+    return out
 
 
 @router.get("/opportunities/mine", response_model=list[RequestOut])
@@ -271,7 +337,6 @@ def comparison(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CompareOut:
-    """Comparison Board: отклики и компании в единой структуре."""
     request = get_request_or_404(db, opportunity_id)
     company = require_company(db, user)
     ensure_owns_request(user, company, request)
@@ -328,7 +393,6 @@ def deal_room(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> DealRoomOut:
-    """Deal Room: единый контекст взаимодействия по потребности."""
     request = get_request_or_404(db, opportunity_id)
     company = require_company(db, user)
     ensure_owns_request(user, company, request)

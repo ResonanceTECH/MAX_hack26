@@ -78,6 +78,7 @@ class CompanyOut(BaseModel):
     industries: list[str] = Field(default_factory=list)
     services: list[str] = Field(default_factory=list)
     competencies: list[str] = Field(default_factory=list)
+    technologies: list[str] = Field(default_factory=list)
     regions: list[str] = Field(default_factory=list)
     budget_min: int | None = None
     budget_max: int | None = None
@@ -191,6 +192,8 @@ class RequestOut(BaseModel):
     proposals_count: int = 0
     match_count: int = 0
     days_left: int | None = None
+    match_id: int | None = None
+    match_score: int | None = None
 
 
 class CriterionOut(BaseModel):
@@ -467,8 +470,11 @@ class CompanyMemberPatchIn(BaseModel):
     status: str | None = None
 
 
+class CompetencyIn(BaseModel):
+    value: str
+
+
 class CompanyInvitationOut(BaseModel):
-    """Team invite details for FE accept flow (token-based)."""
 
     token: str
     company_id: int

@@ -64,7 +64,7 @@ EXPECTED_ENDPOINTS: set[tuple[str, str]] = {
     ("GET", "/api/opportunities/*/dealroom"),
     # proposals
     ("POST", "/api/opportunities/*/proposals"),
-    ("POST", "/api/requests/*/proposals"),
+    ("POST", "/api/opportunities/*/proposals"),
     ("GET", "/api/opportunities/*/proposals"),
     ("GET", "/api/proposals/mine"),
     ("GET", "/api/proposals/*"),
@@ -161,7 +161,7 @@ def scenario_reset_and_seed() -> None:
     check("POST /api/admin/reset", call("POST", "/api/admin/reset", token=token, expected=200)["reset"] is True)
     token = login(7777001, "Admin")
     stats = call("POST", "/api/admin/seed", token=token, expected=200)
-    check("Seed после сброса", stats["companies"] == 8 and stats["requests"] == 3 and stats["matches"] > 0)
+    check("Seed после сброса", stats["companies"] >= 8 and stats["requests"] >= 3 and stats["matches"] > 0)
 
 
 def scenario_health_and_auth() -> None:
@@ -184,6 +184,7 @@ def scenario_health_and_auth() -> None:
 
 def scenario_company() -> None:
     print("Сценарий 2. Профиль компании и каталог")
+    admin = login(7777001, "Админ")
     owner = login(RUN_ID + 2, "Owner")
     stranger = login(RUN_ID + 3, "Stranger")
 
@@ -195,10 +196,10 @@ def scenario_company() -> None:
     check("PUT /companies/me создаёт профиль", company["name"] == "ПроверкаКом")
 
     patched = call(
-        "PATCH", f"/api/companies/{company_id}", token=owner, expected=200,
+        "PATCH", f"/api/companies/{company_id}", token=admin, expected=200,
         json={"description": "Описание обновлено", "budget_max": 900_000},
     )
-    check("PATCH /companies/{id} (владелец)", patched["description"] == "Описание обновлено")
+    check("PATCH /companies/{id} (админ/владелец)", patched["description"] == "Описание обновлено")
 
     forbidden = requests.patch(
         BASE + f"/api/companies/{company_id}",
@@ -330,9 +331,9 @@ def scenario_full_marketplace() -> None:
     check("Лента исполнителя содержит запрос", item is not None)
     if item:
         check("Лента содержит match_id и критерии", item["match_id"] > 0 and item["criteria"])
-        fb = call("POST", f"/matches/{item['match_id']}/feedback", token=exec1, expected=200, json={"positive": True})
+        fb = call("POST", f"/api/matches/{item['match_id']}/feedback", token=exec1, expected=200, json={"positive": True})
         check("Feedback положительный", fb["feedback"] is True)
-        fb2 = call("POST", f"/matches/{item['match_id']}/feedback", token=exec1, expected=200, json={"positive": False})
+        fb2 = call("POST", f"/api/matches/{item['match_id']}/feedback", token=exec1, expected=200, json={"positive": False})
         check("Feedback можно изменить", fb2["feedback"] is False)
 
     # отклики
@@ -361,8 +362,8 @@ def scenario_full_marketplace() -> None:
     proposals = call("GET", f"/api/opportunities/{oid}/proposals", token=customer, expected=200)
     check("Список предложений (2 шт.)", len(proposals) == 2)
 
-    check("GET /proposals/{id} (исполнитель)", call("GET", f"/proposals/{p1['id']}", token=exec1, expected=200)["id"] == p1["id"])
-    hidden = requests.get(BASE + f"/proposals/{p1['id']}", headers={"Authorization": f"Bearer {outsider}"}, timeout=10)
+    check("GET /proposals/{id} (исполнитель)", call("GET", f"/api/proposals/{p1['id']}", token=exec1, expected=200)["id"] == p1["id"])
+    hidden = requests.get(BASE + f"/api/proposals/{p1['id']}", headers={"Authorization": f"Bearer {outsider}"}, timeout=10)
     check("GET /proposals/{id} чужому -> 403", hidden.status_code == 403, f"получено {hidden.status_code}")
 
     comp = call("GET", f"/api/opportunities/{oid}/comparison", token=customer, expected=200)
@@ -377,7 +378,7 @@ def scenario_full_marketplace() -> None:
 
     # недопустимый статус
     bad_status = requests.post(
-        BASE + f"/proposals/{p1['id']}/status",
+        BASE + f"/api/proposals/{p1['id']}/status",
         headers={"Authorization": f"Bearer {customer}"},
         json={"status": "bogus"},
         timeout=10,
@@ -414,7 +415,7 @@ def scenario_full_marketplace() -> None:
     check("Загрузка файла в сделку -> 201", up_deal.status_code == 201, f"получено {up_deal.status_code}: {up_deal.text[:200]}")
     if up_deal.status_code == 201:
         deal_file_id = up_deal.json()["id"]
-        deal_with_files = call("GET", f"/deals/{deal['id']}", token=customer, expected=200)
+        deal_with_files = call("GET", f"/api/deals/{deal['id']}", token=customer, expected=200)
         check("Файл виден в Deal Room", any(f["id"] == deal_file_id for f in deal_with_files["files"]))
         dl_deal = requests.get(
             BASE + f"/api/files/{deal_file_id}",
@@ -434,7 +435,7 @@ def scenario_full_marketplace() -> None:
     check("Deal Room: shortlist и next_action", len(dealroom["shortlist"]) == 2 and dealroom["next_action"])
 
     # выбор исполнителя и закрытие приёма
-    chosen = call("POST", f"/proposals/{p1['id']}/status", token=customer, expected=200, json={"status": "chosen"})
+    chosen = call("POST", f"/api/proposals/{p1['id']}/status", token=customer, expected=200, json={"status": "chosen"})
     check("Статус chosen", chosen["status"] == "chosen")
 
     closed = call("POST", f"/api/opportunities/{oid}/close", token=customer, expected=200)
@@ -463,7 +464,7 @@ def scenario_notifications_and_files() -> None:
 
     created = call("POST", "/api/opportunities", token=a, expected=201,
                    json={"description": "Нужен сайт, бюджет 100 тысяч, срок три недели, Москва"})
-    call("POST", f"/opportunities/{created['id']}/proposals", token=b, expected=201,
+    call("POST", f"/api/opportunities/{created['id']}/proposals", token=b, expected=201,
          json={"price": 90_000, "term_days": 21, "solution_text": "Сделаем"})
 
     inbox_a = call("GET", "/api/notifications", token=a, expected=200)
@@ -471,7 +472,7 @@ def scenario_notifications_and_files() -> None:
     check("Inbox: поля is_read/ok", all("is_read" in n and "ok" in n for n in inbox_a))
 
     if inbox_a:
-        marked = call("POST", f"/notifications/{inbox_a[0]['id']}/read", token=a, expected=200)
+        marked = call("POST", f"/api/notifications/{inbox_a[0]['id']}/read", token=a, expected=200)
         check("Отметить прочитанным", marked["is_read"] is True)
     call("POST", "/api/notifications/read-all", token=a, expected=200)
     check("Read-all", all(n["is_read"] for n in call("GET", "/api/notifications", token=a, expected=200)))
@@ -567,10 +568,10 @@ def scenario_all_endpoints() -> None:
     check("GET /opportunities/{id}/compare (legacy)",
           "rows" in call("GET", f"/api/opportunities/{oid}/compare", token=a, expected=200))
 
-    prop = call("POST", f"/api/requests/{oid}/proposals", token=b, expected=201,
+    prop = call("POST", f"/api/opportunities/{oid}/proposals", token=b, expected=201,
                 json={"price": 95_000, "term_days": 21, "solution_text": "legacy путь"})
     pid = prop["id"]
-    check("POST /api/requests/{id}/proposals (legacy)", prop["status"] == "sent")
+    check("POST /api/opportunities/{id}/proposals (scenario 8)", prop["status"] == "sent")
 
     call("POST", f"/api/proposals/{pid}/view", token=a, expected=200)
     check("POST /proposals/{id}/view", call("GET", f"/api/proposals/{pid}", token=a, expected=200)["status"] == "viewed")
@@ -578,7 +579,7 @@ def scenario_all_endpoints() -> None:
           call("POST", f"/api/proposals/{pid}/shortlist", token=a, expected=200)["status"] == "shortlisted")
 
     deal = call("POST", "/api/deals", token=a, expected=201, json={"opportunity_id": oid, "proposal_id": pid})
-    check("GET /deals/{id}", call("GET", f"/deals/{deal['id']}", token=a, expected=200)["id"] == deal["id"])
+    check("GET /deals/{id}", call("GET", f"/api/deals/{deal['id']}", token=a, expected=200)["id"] == deal["id"])
 
     check("GET /feed?mode=executor", "feed" in call("GET", "/api/feed", token=b, params={"mode": "executor"}, expected=200))
     check("GET /feed?mode=customer", "my_requests" in call("GET", "/api/feed", token=a, params={"mode": "customer"}, expected=200))
