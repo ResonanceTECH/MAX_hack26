@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from .config import Settings, get_settings
@@ -25,12 +25,17 @@ from .security import decode_access_token
 
 settings: Settings = get_settings()
 
+# пути, доступные приостановленным пользователям (вход и служебное)
+SUSPENDED_EXEMPT_PATHS = {"/auth/max", "/api/auth/init"}
+MUTATION_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
 
 def sync_admin_flag(user: User) -> None:
     user.is_admin = user.role == ROLE_PLATFORM_ADMIN
 
 
 def get_current_user(
+    request: Request,
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> User:
@@ -43,13 +48,21 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Пользователь не найден")
-    if getattr(user, "status", "active") == "blocked":
+
+    user_status = (getattr(user, "status", "active") or "active").lower()
+    if user_status == "blocked":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Пользователь заблокирован")
+    if user_status == "suspended":
+        # чтение разрешено, изменения — нет
+        if request.method in MUTATION_METHODS and request.url.path not in SUSPENDED_EXEMPT_PATHS:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Аккаунт приостановлен: изменения недоступны, доступен только просмотр",
+            )
     return user
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
-    """Backward-compatible: PLATFORM_ADMIN or legacy is_admin."""
     if user.role != ROLE_PLATFORM_ADMIN and not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Требуются права администратора")
     return user
@@ -107,13 +120,6 @@ def get_active_membership(db: Session, user: User) -> CompanyMember | None:
 
 
 def resolve_member_role(db: Session, user: User, company: Company) -> str | None:
-    """Effective company member role for RBAC.
-
-    - Active membership wins (MANAGER / VIEWER / COMPANY_ADMIN).
-    - Company owner with system COMPANY_ADMIN → COMPANY_ADMIN.
-    - Owner alone (e.g. WebForge BUSINESS_USER) is NOT company-admin.
-    - PLATFORM_ADMIN / MODERATOR never get company-manage via ownership.
-    """
     if user.role in STAFF_ROLES or user.is_admin:
         return None
     member = get_membership(db, user, company.id)
@@ -130,23 +136,27 @@ def user_has_company_permission(db: Session, user: User, company: Company, permi
     member_role = resolve_member_role(db, user, company)
     if member_role:
         return company_role_has_permission(member_role, permission)
-    # BUSINESS_USER owner / no membership: marketplace-only
+
     if user.role == ROLE_BUSINESS_USER:
         return permission in BUSINESS_USER_PERMISSIONS
     if user.role == ROLE_COMPANY_ADMIN:
-        # Company admin without resolved membership still has full CA perms for own company
+
         if company.user_id == user.id:
             return permission in COMPANY_ROLE_PERMISSIONS[MEMBER_ROLE_ADMIN]
     return False
 
 
 def require_company_permission(db: Session, user: User, permission: str) -> Company:
-    """Resolve company for user and enforce company-scoped permission."""
-    from .services import get_company_for_user
+    from .services import get_company_for_user, is_company_active
 
     company = get_company_for_user(db, user)
     if company is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нет профиля компании")
+    if not is_company_active(company):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Компания заблокирована или приостановлена: операции недоступны",
+        )
     if not user_has_company_permission(db, user, company, permission):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Недостаточно прав")
     return company
@@ -156,7 +166,6 @@ def require_company_admin_member(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> tuple[User, Company]:
-    """Active COMPANY_ADMIN membership or owner with system COMPANY_ADMIN."""
     from .permissions import PERM_MANAGE_COMPANY_MEMBERS
     from .services import get_company_for_user
 

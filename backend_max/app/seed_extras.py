@@ -1,5 +1,3 @@
-"""Extra demo rows for Wave A (workspace, marketplace graph, moderation, dicts)."""
-
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
@@ -103,7 +101,7 @@ def seed_digital_lab_workspace(db: Session) -> None:
                 "title": "Разработка B2B-порталов",
                 "description": "Каталоги, ЛК, интеграции с 1С/CRM",
                 "category": "IT-разработка",
-                "status": "active",
+                "status": "published",
                 "short_description": "Порталы под ключ",
                 "price_min": 400_000,
                 "price_max": 2_000_000,
@@ -117,7 +115,7 @@ def seed_digital_lab_workspace(db: Session) -> None:
                 "title": "Интеграции с 1С",
                 "description": "Обмен заказами, остатками, контрагентами",
                 "category": "IT-разработка",
-                "status": "active",
+                "status": "published",
                 "short_description": "1С ↔ веб",
                 "price_min": 150_000,
                 "price_max": 800_000,
@@ -205,14 +203,12 @@ def seed_digital_lab_workspace(db: Session) -> None:
         ]:
             db.add(CompanyDocumentItem(company_id=company.id, **row))
 
-    # Fix legacy published → active for public list filter
     for svc in db.query(CompanyServiceItem).filter(
         CompanyServiceItem.company_id == company.id,
         CompanyServiceItem.status == "published",
     ).all():
         svc.status = "active"
 
-    # Manager / Viewer loginable users + pending invite
     seed_digitallab_members(db, company, owner)
 
     if db.query(CompanyActivityEvent).filter(CompanyActivityEvent.company_id == company.id).count() == 0:
@@ -366,7 +362,6 @@ def seed_digitallab_members(db: Session, company: Company, owner: User) -> None:
 
 
 def seed_marketplace_graph(db: Session) -> None:
-    """Proposals, deals, favorites, invites, notifications for demo."""
     mebel = _company_by_name(db, "МебельПро")
     digital = _company_by_name(db, "DigitalLab")
     webforge = _company_by_name(db, "WebForge")
@@ -380,7 +375,6 @@ def seed_marketplace_graph(db: Session) -> None:
     if not all([owner_mebel, owner_digital, owner_web]):
         return
 
-    # Prefer IT shop request authored by МебельПро
     requests = db.query(Request).filter(Request.company_id == mebel.id).all()
     if not requests:
         requests = db.query(Request).all()
@@ -426,7 +420,6 @@ def seed_marketplace_graph(db: Session) -> None:
             )
             p_digital.status = "negotiating"
 
-    # SMM request proposals if exists
     smm_reqs = [r for r in db.query(Request).all() if "SMM" in (r.title or "") or "smm" in (r.description_raw or "").lower()]
     if smm_reqs and marketlab is not None:
         smm = smm_reqs[0]
@@ -442,7 +435,6 @@ def seed_marketplace_graph(db: Session) -> None:
                 )
             )
 
-    # Favorites
     for user, target_type, target_id in [
         (owner_web, "company", digital.id),
         (owner_digital, "opportunity", opp.id),
@@ -460,7 +452,6 @@ def seed_marketplace_graph(db: Session) -> None:
         if not exists:
             db.add(Favorite(user_id=user.id, target_type=target_type, target_id=target_id))
 
-    # Opportunity invite DigitalLab → WebForge on mebel opp (if not exists)
     if (
         db.query(OpportunityInvite)
         .filter(OpportunityInvite.opportunity_id == opp.id, OpportunityInvite.company_id == webforge.id)
@@ -475,7 +466,6 @@ def seed_marketplace_graph(db: Session) -> None:
             )
         )
 
-    # Notifications inbox
     if db.query(NotificationLog).filter(NotificationLog.target_user_id == owner_digital.id).count() == 0:
         for text, uid in [
             (f"Вас добавили в shortlist по запросу «{opp.title}»", owner_digital.id),
@@ -647,7 +637,6 @@ def seed_moderation_demo(db: Session) -> None:
                 )
             )
 
-    # Moderator / admin notification via NotificationLog
     if mod and db.query(NotificationLog).filter(NotificationLog.target_user_id == mod.id).count() == 0:
         for text in [
             "Новая жалоба на компанию DigitalLab",
@@ -667,7 +656,6 @@ def seed_moderation_demo(db: Session) -> None:
             )
         )
 
-    # Audit sample
     if db.query(AuditEvent).count() == 0 and admin:
         db.add(
             AuditEvent(
@@ -703,7 +691,6 @@ def seed_webforge_workspace(db: Session) -> None:
     if company is None or owner is None:
         return
 
-    # Strip accidental ADMIN membership for BUSINESS_USER owner (marketplace-only)
     from .roles import MEMBER_ROLE_ADMIN
 
     for row in (
@@ -714,7 +701,6 @@ def seed_webforge_workspace(db: Session) -> None:
         if owner.role == ROLE_BUSINESS_USER and row.member_role == MEMBER_ROLE_ADMIN:
             db.delete(row)
 
-    # Enrich company profile competencies if thin
     if not company.competencies:
         company.competencies = ["react", "figma", "wordpress", "интернет-магазин", "дизайн"]
     caps = set(company.competencies or [])
@@ -727,7 +713,7 @@ def seed_webforge_workspace(db: Session) -> None:
                 "title": "Корпоративные сайты",
                 "description": "Дизайн и вёрстка корпоративных сайтов под ключ",
                 "category": "IT-разработка",
-                "status": "active",
+                "status": "published",
                 "short_description": "Сайты для бизнеса",
                 "price_min": 150_000,
                 "price_max": 600_000,
@@ -741,7 +727,7 @@ def seed_webforge_workspace(db: Session) -> None:
                 "title": "Интернет-магазины",
                 "description": "Витрины, корзина, оплата, каталог",
                 "category": "IT-разработка",
-                "status": "active",
+                "status": "published",
                 "short_description": "E-commerce",
                 "price_min": 200_000,
                 "price_max": 800_000,
@@ -755,7 +741,7 @@ def seed_webforge_workspace(db: Session) -> None:
                 "title": "UI/UX дизайн",
                 "description": "Прототипы и дизайн-системы в Figma",
                 "category": "Дизайн",
-                "status": "active",
+                "status": "published",
                 "short_description": "Figma-дизайн",
                 "price_min": 80_000,
                 "price_max": 350_000,
@@ -851,7 +837,6 @@ def seed_webforge_customer_demo(db: Session) -> None:
         db.refresh(opp)
         publish_request(db, opp)
 
-        # Matches without notifications
         settings = get_settings()
         for company in db.query(Company).filter(Company.id != webforge.id).all():
             score, criteria = match_company(opp, company)
@@ -867,7 +852,6 @@ def seed_webforge_customer_demo(db: Session) -> None:
             )
         db.commit()
 
-    # Ensure APPROVED moderation item
     mod_item = (
         db.query(ModerationItem)
         .filter(ModerationItem.entity_type == "opportunity", ModerationItem.entity_id == str(opp.id))
@@ -936,8 +920,6 @@ def seed_webforge_customer_demo(db: Session) -> None:
                     viewed_at=utcnow(),
                 )
             )
-    # Third: ЛогистикГрупп won't fit — use СтройКомплект skip; add МебельПро? better find Tech-ish
-    # Use existing company СтройКомплект only if we need 3 — DigitalLab + MarketLab is enough
     _ = techflow
     db.commit()
 
@@ -945,7 +927,6 @@ def seed_webforge_customer_demo(db: Session) -> None:
 def seed_wave_a_extras(db: Session) -> None:
     from .services import enqueue_moderation_for_request
 
-    # Backfill moderation for already-published opportunities
     for req in db.query(Request).filter(Request.status == "published").all():
         enqueue_moderation_for_request(db, req)
 
@@ -956,7 +937,6 @@ def seed_wave_a_extras(db: Session) -> None:
     seed_webforge_customer_demo(db)
     seed_moderation_demo(db)
 
-    # Normalize any leftover MISLEADING report types
     for r in db.query(Report).filter(Report.report_type == "MISLEADING").all():
         r.report_type = "MISLEADING_INFORMATION"
     db.commit()

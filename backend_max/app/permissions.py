@@ -1,18 +1,13 @@
-"""Company-scoped RBAC mirroring frontend companyRolePermissions."""
-
 from __future__ import annotations
 
 from .roles import (
     MEMBER_ROLE_ADMIN,
     MEMBER_ROLE_MANAGER,
     MEMBER_ROLE_VIEWER,
-    ROLE_BUSINESS_USER,
-    ROLE_COMPANY_ADMIN,
     ROLE_MODERATOR,
     ROLE_PLATFORM_ADMIN,
 )
 
-# Permission keys (aligned with FE Permission enum)
 PERM_VIEW_COMPANY_PROFILE = "VIEW_COMPANY_PROFILE"
 PERM_EDIT_COMPANY = "EDIT_COMPANY"
 PERM_MANAGE_COMPANY_MEMBERS = "MANAGE_COMPANY_MEMBERS"
@@ -104,10 +99,8 @@ COMPANY_ROLE_PERMISSIONS: dict[str, set[str]] = {
     },
 }
 
-# BUSINESS_USER without company membership: marketplace only
 BUSINESS_USER_PERMISSIONS = set(_MARKETPLACE)
 
-# Platform roles that must not use marketplace company-manage APIs
 STAFF_ROLES = {ROLE_PLATFORM_ADMIN, ROLE_MODERATOR}
 
 

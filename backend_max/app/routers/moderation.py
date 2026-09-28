@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import get_current_user, require_moderator, require_platform_admin
-from ..models import Escalation, ModerationItem, Report, User, utcnow
+from ..models import Escalation, ModerationDecision, ModerationItem, Report, User, utcnow
 from ..schemas import (
     EscalationOut,
     ModerationDashboardOut,
@@ -18,7 +17,7 @@ from ..schemas import (
     ResolveEscalationIn,
     ResolveReportIn,
 )
-from ..services import append_audit
+from ..services import append_audit, apply_moderation_decision
 
 router = APIRouter(tags=["moderation"])
 
@@ -118,7 +117,6 @@ def dashboard(user: User = Depends(require_moderator), db: Session = Depends(get
 
 @router.get("/moderation/mine", response_model=list[ModerationItemOut])
 def my_moderation_items(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Owner-facing: items belonging to the current user that need attention."""
     rows = (
         db.query(ModerationItem)
         .filter(
@@ -170,11 +168,34 @@ def assign(item_id: int, user: User = Depends(require_moderator), db: Session = 
 def _decide(item: ModerationItem, new_status: str, payload: ModerationDecisionIn, user: User, db: Session):
     if payload.expected_version is not None and payload.expected_version != item.version:
         raise HTTPException(status.HTTP_409_CONFLICT, "Версия устарела")
+    is_platform_admin = user.role == "PLATFORM_ADMIN" or user.is_admin
+    if (
+        item.assigned_moderator_id is not None
+        and item.assigned_moderator_id != user.id
+        and not is_platform_admin
+    ):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Элемент взят модератором {item.assigned_moderator_name or item.assigned_moderator_id}",
+        )
+    previous_status = item.status
     item.status = new_status
     item.moderator_note = payload.private_note or payload.comment
     item.version = (item.version or 1) + 1
     item.assigned_moderator_id = user.id
     item.assigned_moderator_name = _mod_name(user)
+    db.add(
+        ModerationDecision(
+            item_id=item.id,
+            moderator_id=user.id,
+            action=new_status,
+            reason=payload.reason_code,
+            comment=payload.comment,
+            previous_status=previous_status,
+            new_status=new_status,
+        )
+    )
+    apply_moderation_decision(db, item.entity_type, item.entity_id, new_status)
     db.commit()
     db.refresh(item)
     append_audit(
@@ -254,7 +275,6 @@ def history(user: User = Depends(require_moderator), db: Session = Depends(get_d
 
 @router.post("/moderation/items/{item_id}/resubmit", response_model=ModerationItemOut)
 def resubmit_item(item_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Owner (or moderator) resubmits after NEEDS_CHANGES."""
     item = db.get(ModerationItem, item_id)
     if item is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Элемент не найден")
@@ -329,6 +349,37 @@ def create_report(
         priority=payload.priority or "NORMAL",
     )
     db.add(r)
+    db.flush()
+
+    item = (
+        db.query(ModerationItem)
+        .filter(
+            ModerationItem.entity_type == target_type,
+            ModerationItem.entity_id == str(payload.target_id),
+        )
+        .first()
+    )
+    if item is None:
+        db.add(
+            ModerationItem(
+                entity_type=target_type,
+                entity_id=str(payload.target_id),
+                title=payload.target_name or payload.target_id,
+                status="PENDING",
+                priority="NORMAL",
+                reason="USER_REPORT",
+                summary=payload.description or None,
+                related_report_ids=[r.id],
+                reports_count=1,
+                data_origin="REPORT",
+            )
+        )
+    else:
+        item.reports_count = (item.reports_count or 0) + 1
+        related = list(item.related_report_ids or [])
+        if r.id not in related:
+            related.append(r.id)
+        item.related_report_ids = related
     db.commit()
     db.refresh(r)
     return _report_out(r)
@@ -379,6 +430,25 @@ def resolve_report(report_id: int, payload: ResolveReportIn, user: User = Depend
     r = db.get(Report, report_id)
     if r is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Жалоба не найдена")
+    apply_action = (payload.apply_action or "none").upper()
+    if apply_action == "BLOCK":
+        apply_moderation_decision(db, r.target_type, r.target_id, "BLOCKED")
+    elif apply_action == "UNPUBLISH":
+        if r.target_type in {"opportunity", "case"}:
+            apply_moderation_decision(db, r.target_type, r.target_id, "REJECTED")
+        elif r.target_type == "company":
+            apply_moderation_decision(db, r.target_type, r.target_id, "BLOCKED")
+    if apply_action in {"BLOCK", "UNPUBLISH"}:
+        item = (
+            db.query(ModerationItem)
+            .filter(
+                ModerationItem.entity_type == r.target_type,
+                ModerationItem.entity_id == str(r.target_id),
+            )
+            .first()
+        )
+        if item is not None:
+            item.status = "BLOCKED"
     r.status = "RESOLVED"
     r.resolution_code = payload.resolution_code
     r.resolution = payload.comment

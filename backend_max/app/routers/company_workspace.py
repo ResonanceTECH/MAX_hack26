@@ -1,5 +1,3 @@
-"""Company workspace: members, services, cases, documents, settings, verification, activity, invites."""
-
 from __future__ import annotations
 
 import uuid
@@ -27,7 +25,6 @@ from ..models import (
     utcnow,
 )
 from ..permissions import (
-    PERM_EDIT_COMPANY,
     PERM_MANAGE_COMPANY_CASES,
     PERM_MANAGE_COMPANY_DOCUMENTS,
     PERM_MANAGE_COMPANY_SERVICES,
@@ -39,6 +36,7 @@ from ..roles import (
     INVITE_STATUS_EXPIRED,
     INVITE_STATUS_PENDING,
     MEMBER_ROLES,
+    MEMBER_ROLE_ADMIN,
     MEMBER_STATUS_ACTIVE,
     MEMBER_STATUS_DEACTIVATED,
     MEMBER_STATUS_INVITED,
@@ -64,9 +62,19 @@ from ..schemas import (
 )
 from ..services import (
     append_activity,
+    enqueue_moderation_item,
     ensure_owner_member,
+    get_company_or_404,
     get_request_or_404,
+    is_company_active,
     require_company,
+)
+from ..statuses import (
+    PUBLIC_SERVICE_STATUS,
+    SERVICE_STATUS_ARCHIVED,
+    SERVICE_STATUS_DRAFT,
+    SERVICE_STATUSES,
+    normalize_service_status,
 )
 
 router = APIRouter(tags=["company-workspace"])
@@ -328,6 +336,18 @@ def invite_member(
     return _member_out(member)
 
 
+def _active_admin_count(db: Session, company: Company, exclude_member_id: int | None = None) -> int:
+    q = db.query(CompanyMember).filter(
+        CompanyMember.company_id == company.id,
+        CompanyMember.member_role == MEMBER_ROLE_ADMIN,
+        CompanyMember.status == MEMBER_STATUS_ACTIVE,
+        CompanyMember.user_id != company.user_id,
+    )
+    if exclude_member_id is not None:
+        q = q.filter(CompanyMember.id != exclude_member_id)
+    return q.count()
+
+
 @router.patch("/companies/me/members/{member_id}", response_model=CompanyMemberOut)
 def patch_member(
     member_id: int,
@@ -339,6 +359,14 @@ def patch_member(
     member = db.get(CompanyMember, member_id)
     if member is None or member.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Сотрудник не найден")
+    is_active_admin = (
+        member.member_role == MEMBER_ROLE_ADMIN and member.status == MEMBER_STATUS_ACTIVE
+    )
+    demoting = (payload.role is not None and payload.role != MEMBER_ROLE_ADMIN)
+    suspending = (payload.status is not None and payload.status != MEMBER_STATUS_ACTIVE)
+    if is_active_admin and (demoting or suspending):
+        if _active_admin_count(db, company, exclude_member_id=member.id) == 0:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Нельзя понизить или приостановить последнего администратора")
     if payload.role is not None:
         if payload.role not in MEMBER_ROLES:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Недопустимая роль")
@@ -363,6 +391,9 @@ def remove_member(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Сотрудник не найден")
     if member.user_id == company.user_id:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Нельзя удалить владельца")
+    if member.member_role == MEMBER_ROLE_ADMIN and member.status == MEMBER_STATUS_ACTIVE:
+        if _active_admin_count(db, company, exclude_member_id=member.id) == 0:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Нельзя удалить последнего администратора")
     member.status = MEMBER_STATUS_DEACTIVATED
     db.commit()
     append_activity(db, company.id, "MEMBER_REMOVED", _actor_name(user), "удалила сотрудника", member.email)
@@ -375,7 +406,6 @@ def resend_member_invite(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Company admin resends an outstanding team invite (bumps invited_at / expires_at)."""
     _user, company = require_company_admin_member(user=user, db=db)
     member = db.get(CompanyMember, member_id)
     if member is None or member.company_id != company.id:
@@ -493,9 +523,12 @@ def list_services(user: User = Depends(get_current_user), db: Session = Depends(
 
 @router.get("/companies/{company_id}/services", response_model=list[ServiceOut])
 def list_public_services(company_id: int, db: Session = Depends(get_db)):
+    company = get_company_or_404(db, company_id)
+    if not is_company_active(company):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Компания не найдена")
     rows = (
         db.query(CompanyServiceItem)
-        .filter(CompanyServiceItem.company_id == company_id, CompanyServiceItem.status == "active")
+        .filter(CompanyServiceItem.company_id == company_id, CompanyServiceItem.status == PUBLIC_SERVICE_STATUS)
         .all()
     )
     return [_service_out(s) for s in rows]
@@ -509,9 +542,14 @@ def create_service(
 ):
     company = require_company_permission(db, user, PERM_MANAGE_COMPANY_SERVICES)
     data = payload.model_dump(exclude_unset=True)
-    item = CompanyServiceItem(company_id=company.id, **{k: v for k, v in data.items() if v is not None or k in ("description", "title", "category")})
-    if "status" not in data or data["status"] is None:
-        item.status = "draft"
+    status_value = normalize_service_status(data.get("status") or SERVICE_STATUS_DRAFT)
+    if status_value not in SERVICE_STATUSES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"status: {sorted(SERVICE_STATUSES)}")
+    item = CompanyServiceItem(
+        company_id=company.id,
+        **{k: v for k, v in data.items() if v is not None or k in ("description", "title", "category")},
+    )
+    item.status = status_value
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -531,8 +569,13 @@ def patch_service(
     if item is None or item.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Услуга не найдена")
     for k, v in payload.model_dump(exclude_unset=True).items():
-        if v is not None:
-            setattr(item, k, v)
+        if v is None:
+            continue
+        if k == "status":
+            v = normalize_service_status(v)
+            if v not in SERVICE_STATUSES:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"status: {sorted(SERVICE_STATUSES)}")
+        setattr(item, k, v)
     db.commit()
     db.refresh(item)
     append_activity(db, company.id, "SERVICE_UPDATED", _actor_name(user), "обновила услугу", item.title)
@@ -545,7 +588,7 @@ def delete_service(service_id: int, user: User = Depends(get_current_user), db: 
     item = db.get(CompanyServiceItem, service_id)
     if item is None or item.company_id != company.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Услуга не найдена")
-    item.status = "archived"
+    item.status = SERVICE_STATUS_ARCHIVED
     db.commit()
     return {"archived": True}
 
@@ -561,6 +604,9 @@ def list_cases(user: User = Depends(get_current_user), db: Session = Depends(get
 
 @router.get("/companies/{company_id}/cases", response_model=list[CaseItemOut])
 def list_public_cases(company_id: int, db: Session = Depends(get_db)):
+    company = get_company_or_404(db, company_id)
+    if not is_company_active(company):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Компания не найдена")
     rows = (
         db.query(CompanyCaseItem)
         .filter(CompanyCaseItem.company_id == company_id, CompanyCaseItem.status == "published")
@@ -577,6 +623,18 @@ def create_case(payload: CaseItemIn, user: User = Depends(get_current_user), db:
     db.add(item)
     db.commit()
     db.refresh(item)
+    if item.status == "published":
+        enqueue_moderation_item(
+            db,
+            entity_type="case",
+            entity_id=str(item.id),
+            title=item.title,
+            company_name=company.name,
+            owner_id=str(user.id),
+            owner_name=_actor_name(user),
+            reason="CASE_PUBLISHED",
+            summary=item.description or None,
+        )
     append_activity(db, company.id, "CASE_CREATED", _actor_name(user), "добавила кейс", item.title)
     return _case_out(item)
 
@@ -592,6 +650,18 @@ def patch_case(case_id: int, payload: CaseItemIn, user: User = Depends(get_curre
             setattr(item, k, v)
     db.commit()
     db.refresh(item)
+    if item.status == "published":
+        enqueue_moderation_item(
+            db,
+            entity_type="case",
+            entity_id=str(item.id),
+            title=item.title,
+            company_name=company.name,
+            owner_id=str(user.id),
+            owner_name=_actor_name(user),
+            reason="CASE_PUBLISHED",
+            summary=item.description or None,
+        )
     return _case_out(item)
 
 
@@ -634,6 +704,17 @@ def add_document(payload: DocumentItemIn, user: User = Depends(get_current_user)
     db.add(item)
     db.commit()
     db.refresh(item)
+    enqueue_moderation_item(
+        db,
+        entity_type="document",
+        entity_id=str(item.id),
+        title=item.name,
+        company_name=company.name,
+        owner_id=str(user.id),
+        owner_name=_actor_name(user),
+        reason="DOCUMENT_UPLOADED",
+        summary=f"{item.doc_type or ''} {item.number or ''}".strip() or None,
+    )
     append_activity(db, company.id, "DOCUMENT_UPLOADED", _actor_name(user), "загрузила документ", item.name)
     return _doc_out(item)
 
@@ -732,9 +813,21 @@ def get_verification(user: User = Depends(get_current_user), db: Session = Depen
 
 @router.post("/companies/me/verification", response_model=CompanyVerificationOut)
 def submit_verification(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    company = require_company_permission(db, user, PERM_EDIT_COMPANY)
+    company = require_company(db, user)
     company.verification_status = "PENDING"
     db.commit()
+    enqueue_moderation_item(
+        db,
+        entity_type="company",
+        entity_id=str(company.id),
+        title=f"Верификация: {company.name}",
+        company_name=company.name,
+        owner_id=str(user.id),
+        owner_name=_actor_name(user),
+        reason="VERIFICATION_SUBMITTED",
+        summary=f"ИНН: {company.inn or '—'}, статус: {company.company_status or '—'}",
+        payload={"inn": company.inn, "company_status": company.company_status},
+    )
     return get_verification(user, db)
 
 
@@ -803,7 +896,6 @@ def create_invite(
         opportunity_id=opportunity_id,
         company_id=payload.company_id,
         invited_by_user_id=user.id,
-        status="PENDING",
     )
     db.add(inv)
     db.commit()
