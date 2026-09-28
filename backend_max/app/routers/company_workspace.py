@@ -25,6 +25,7 @@ from ..models import (
     utcnow,
 )
 from ..permissions import (
+    PERM_EDIT_COMPANY,
     PERM_MANAGE_COMPANY_CASES,
     PERM_MANAGE_COMPANY_DOCUMENTS,
     PERM_MANAGE_COMPANY_SERVICES,
@@ -49,9 +50,11 @@ from ..schemas import (
     CompanyMemberInviteIn,
     CompanyMemberOut,
     CompanyMemberPatchIn,
+    CompanyOut,
     CompanySettingsOut,
     CompanySettingsPatchIn,
     CompanyVerificationOut,
+    CompetencyIn,
     DocumentItemIn,
     DocumentItemOut,
     OpportunityInviteIn,
@@ -591,6 +594,47 @@ def delete_service(service_id: int, user: User = Depends(get_current_user), db: 
     item.status = SERVICE_STATUS_ARCHIVED
     db.commit()
     return {"archived": True}
+
+
+# ---------- competencies ----------
+
+
+@router.post("/companies/me/competencies", response_model=CompanyOut)
+def add_competency(
+    payload: CompetencyIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    company = require_company_permission(db, user, PERM_EDIT_COMPANY)
+    value = payload.value.strip()
+    if not value:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Компетенция не может быть пустой")
+    competencies = list(company.competencies or [])
+    if value not in competencies:
+        competencies.append(value)
+        company.competencies = competencies
+        db.commit()
+        db.refresh(company)
+    append_activity(db, company.id, "COMPETENCY_ADDED", _actor_name(user), "добавила компетенцию", value)
+    return CompanyOut.model_validate(company)
+
+
+@router.delete("/companies/me/competencies/{value:path}", response_model=CompanyOut)
+def remove_competency(
+    value: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    company = require_company_permission(db, user, PERM_EDIT_COMPANY)
+    competencies = list(company.competencies or [])
+    if value not in competencies:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Компетенция не найдена")
+    competencies.remove(value)
+    company.competencies = competencies
+    db.commit()
+    db.refresh(company)
+    append_activity(db, company.id, "COMPETENCY_REMOVED", _actor_name(user), "удалила компетенцию", value)
+    return CompanyOut.model_validate(company)
 
 
 # ---------- cases ----------
