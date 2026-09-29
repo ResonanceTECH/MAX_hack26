@@ -125,8 +125,8 @@ export function CompanySettingsPage() {
               onChange={(v) => void patch({ notifications: { proposalStatusChanges: v } })}
             />
             <SettingSwitch
-              label="Shortlist"
-              description="События shortlist"
+              label="Шортлист"
+              description="События шортлиста"
               checked={data.notifications.shortlist}
               disabled={update.isPending}
               onChange={(v) => void patch({ notifications: { shortlist: v } })}
