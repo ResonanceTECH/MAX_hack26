@@ -1,14 +1,7 @@
 import { Controller, type Control } from 'react-hook-form'
 import Stack from '@mui/material/Stack'
 import type { CaseFormValues } from '@/features/company-management'
-import { AppInput, AppTextarea } from '@/shared/ui'
-
-function parseTags(value: string): string[] {
-  return value
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-}
+import { AppInput, AppTextarea, CommaListInput } from '@/shared/ui'
 
 export function CaseFormFields({ control }: { control: Control<CaseFormValues> }) {
   return (
@@ -66,10 +59,11 @@ export function CaseFormFields({ control }: { control: Control<CaseFormValues> }
         name="technologies"
         control={control}
         render={({ field, fieldState }) => (
-          <AppInput
+          <CommaListInput
             label="Технологии (через запятую)"
-            value={field.value.join(', ')}
-            onChange={(e) => field.onChange(parseTags(e.target.value))}
+            value={field.value}
+            onChange={field.onChange}
+            onBlur={field.onBlur}
             error={Boolean(fieldState.error)}
             helperText={fieldState.error?.message}
           />
