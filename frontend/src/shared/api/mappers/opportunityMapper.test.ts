@@ -36,4 +36,10 @@ describe('mapRequestDtoToOpportunity requirements', () => {
     expect(opp.requiredRequirements).toEqual(['React', 'TypeScript'])
     expect(opp.desiredRequirements).toEqual(['ISO'])
   })
+
+  it('does not mirror category into industries', () => {
+    const opp = mapRequestDtoToOpportunity(baseDto)
+    expect(opp.category).toBe('IT-разработка')
+    expect(opp.industries).toEqual([])
+  })
 })

@@ -2,6 +2,8 @@ import { apiClient } from '@/shared/api/apiClient'
 import { isReal } from '@/shared/api/apiCapabilities'
 import { toApiError } from '@/shared/api/errors'
 import { delay } from '@/shared/lib/delay'
+import { persistDeals } from '@/shared/mocks/hydrateMocks'
+import { getDealById } from '@/shared/mocks'
 
 export interface UploadedFileMeta {
   id: string
@@ -44,8 +46,16 @@ export interface UploadFileParams {
   onProgress?: (percent: number) => void
 }
 
+const MAX_BYTES = 10 * 1024 * 1024
+
 export const filesApi = {
+  maxBytes: MAX_BYTES,
+
   async upload(params: UploadFileParams): Promise<UploadedFileMeta> {
+    if (params.file.size > MAX_BYTES) {
+      throw new Error('Файл больше 10 МБ')
+    }
+
     if (isReal('documents')) {
       try {
         const form = new FormData()
@@ -68,13 +78,33 @@ export const filesApi = {
 
     await delay(400)
     params.onProgress?.(100)
-    return {
+    const meta: UploadedFileMeta = {
       id: `file-${Date.now()}`,
       name: params.file.name,
       contentType: params.file.type,
       size: params.file.size,
       url: `mock://${params.file.name}`,
+      opportunityId: params.opportunityId ?? null,
+      dealId: params.dealId ?? null,
       createdAt: new Date().toISOString(),
     }
+    if (params.dealId) {
+      const deal = getDealById(params.dealId)
+      if (deal) {
+        deal.files = [
+          ...(deal.files ?? []),
+          {
+            id: meta.id,
+            name: meta.name,
+            contentType: meta.contentType ?? null,
+            size: meta.size,
+            createdAt: meta.createdAt,
+          },
+        ]
+        deal.updatedAt = meta.createdAt
+        persistDeals()
+      }
+    }
+    return meta
   },
 }

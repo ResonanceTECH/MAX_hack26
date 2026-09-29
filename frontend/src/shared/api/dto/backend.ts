@@ -132,6 +132,15 @@ export interface DealDto {
   proposal: ProposalDto | null
   files: FileDto[]
   next_action: string
+  terms_summary?: string | null
+  agreed_price?: number | null
+  agreed_term_days?: number | null
+}
+
+export interface DealTermsDto {
+  terms_summary: string
+  agreed_price?: number | null
+  agreed_term_days?: number | null
 }
 
 export interface FileDto {

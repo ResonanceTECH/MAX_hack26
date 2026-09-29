@@ -1,16 +1,49 @@
-// Значения синхронизированы с бэкендом: GET /api/dictionaries
-// (categories из structurizer CATEGORIES, regions из structurizer REGIONS).
-export const INDUSTRIES = [
-  'IT-разработка',
+// Справочники UI. Категория ≠ отрасль:
+// - OPPORTUNITY_CATEGORIES — тип услуги / предмет запроса (filters «Категория», create form)
+// - INDUSTRIES — вертикаль рынка заказчика (Healthcare, Retail…; filters «Отрасль»)
+// Backend structurizer.CATEGORIES мапится в UI-категории через CATEGORY_TO_UI в parseOpportunityText.
+
+/** Тип услуги / предмет запроса (не отрасль). */
+export const OPPORTUNITY_CATEGORIES = [
+  'Разработка ПО',
   'Маркетинг и реклама',
-  'Производство',
   'Логистика',
-  'Строительство и ремонт',
-  'Бухгалтерия и финансы',
+  'Производство',
+  'Консалтинг',
+  'Поставка оборудования',
+  'Поставки',
+  'Партнёрство',
   'Дизайн',
+  'ИБ и безопасность',
+  'Облачные сервисы',
+  'Аналитика и BI',
+  'AI / ML',
+  'Поддержка и аутсорсинг',
+  'Обучение',
+  'Оборудование',
+  'Упаковка',
+  'Прочее',
 ] as const
 
-export const OPPORTUNITY_CATEGORIES = INDUSTRIES
+/** Отрасль / вертикаль рынка (не путать с категорией услуги). */
+export const INDUSTRIES = [
+  'IT',
+  'Business Automation',
+  'Healthcare',
+  'Retail',
+  'Manufacturing',
+  'Logistics',
+  'Marketing',
+  'Finance',
+  'Education',
+  'Energy',
+  'Construction',
+  'Agro',
+  'Web',
+] as const
+
+export type OpportunityCategory = (typeof OPPORTUNITY_CATEGORIES)[number]
+export type Industry = (typeof INDUSTRIES)[number]
 
 export const COMPANY_SERVICES = [
   'web-разработка',
@@ -50,8 +83,44 @@ export const REGIONS = [
   'Самара',
   'Нижний Новгород',
   'Краснодар',
+  'Ростов-на-Дону',
+  'Уфа',
+  'Пермь',
+  'Челябинск',
+  'Омск',
+  'Красноярск',
+  'Воронеж',
+  'Волгоград',
+  'Сочи',
+  'Тюмень',
+  'Ижевск',
+  'Калининград',
+  'Владивосток',
+  'Хабаровск',
+  'Иркутск',
+  'Томск',
+  'Ярославль',
+  'Рязань',
+  'Тула',
+  'Саратов',
+  'Севастополь',
+  'Крым',
+  'Московская область',
+  'Ленинградская область',
+  'Татарстан',
+  'Свердловская область',
   'Вся Россия',
+  'Россия',
 ] as const
+
+export type Region = (typeof REGIONS)[number]
+
+/** Case/ё-insensitive substring match for region typeahead. */
+export function filterRegions(query: string, options: readonly string[] = REGIONS): string[] {
+  const q = query.trim().toLowerCase().replaceAll('ё', 'е')
+  if (!q) return [...options]
+  return options.filter((r) => r.toLowerCase().replaceAll('ё', 'е').includes(q))
+}
 
 export const CURRENCIES = {
   RUB: 'RUB',

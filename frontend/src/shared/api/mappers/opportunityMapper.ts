@@ -54,8 +54,9 @@ function uniqueStrings(values: string[]): string[] {
 
 export function mapRequestDtoToOpportunity(dto: RequestDto): Opportunity {
   const company = companySummaryFromIds(dto.company_id, dto.company_name)
-  // Backend stores one flat requirements list — don't mirror it into both skills + technologies
-  // (UI would render "React" twice as tags under the requirements block).
+  // Backend: requirements = must-haves; required_certificates = extra (shown as «желательные»).
+  // Don't mirror requirements into skills+technologies — details page would look like
+  // обязательные === желательные (same chips twice).
   const requirements = uniqueStrings(dto.requirements ?? [])
   const certificates = uniqueStrings(dto.required_certificates ?? []).filter(
     (item) => !requirements.some((req) => req.toLowerCase() === item.toLowerCase()),
@@ -68,8 +69,10 @@ export function mapRequestDtoToOpportunity(dto: RequestDto): Opportunity {
     company,
     category: dto.category,
     subcategory: dto.subcategory ?? '',
-    industries: dto.category ? [dto.category] : [],
+    // Backend Request has no industries — don't mirror category (looks like category === industry).
+    industries: [],
     skills: [],
+    // Keep for cards/filters; details page hides tags already listed as required.
     technologies: requirements,
     requiredRequirements: requirements,
     desiredRequirements: certificates,
