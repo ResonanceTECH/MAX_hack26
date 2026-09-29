@@ -93,7 +93,7 @@ export const COMPANY_PERMISSION_MATRIX_ROWS: { permission: Permission; label: st
   { permission: Permission.MANAGE_COMPANY_PERMISSIONS, label: 'Настройка прав доступа' },
   { permission: Permission.CREATE_OPPORTUNITY, label: 'Публикация запросов' },
   { permission: Permission.CREATE_PROPOSAL, label: 'Отклики' },
-  { permission: Permission.MANAGE_SHORTLIST, label: 'Shortlist' },
+  { permission: Permission.MANAGE_SHORTLIST, label: 'Шортлист' },
   { permission: Permission.START_NEGOTIATION, label: 'Старт переговоров' },
 ]
 

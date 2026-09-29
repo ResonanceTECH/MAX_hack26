@@ -7,7 +7,7 @@ import type { ReportEntityType } from '@/entities/report'
 import { BaseUiMenu } from '@/features/company-management/ui/BaseUiMenu'
 import { ReportEntityDialog } from '@/features/reports/ui/ReportEntityDialog'
 import { AppIcon } from '@/shared/ui'
-import { AlertCircleIcon } from '@/shared/ui/icons'
+import { Flag01Icon } from '@/shared/ui/icons'
 
 export interface ReportActionProps {
   targetType: ReportEntityType
@@ -27,9 +27,17 @@ export function ReportAction({ targetType, targetId, targetName }: ReportActionP
           <IconButton
             aria-label="Пожаловаться"
             onClick={() => setOpen(true)}
-            sx={{ minWidth: 44, minHeight: 44 }}
+            sx={{
+              minWidth: 44,
+              minHeight: 44,
+              color: 'error.main',
+              '&:hover': {
+                bgcolor: 'error.light',
+                color: 'error.dark',
+              },
+            }}
           >
-            <AppIcon icon={AlertCircleIcon} size={20} />
+            <AppIcon icon={Flag01Icon} size={20} color="currentColor" />
           </IconButton>
         </Tooltip>
       ) : (
@@ -39,6 +47,7 @@ export function ReportAction({ targetType, targetId, targetName }: ReportActionP
             {
               key: 'report',
               label: 'Пожаловаться',
+              destructive: true,
               onClick: () => setOpen(true),
             },
           ]}
