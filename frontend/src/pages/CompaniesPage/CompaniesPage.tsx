@@ -137,17 +137,22 @@ export function CompaniesPage() {
         }
       />
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start">
         {isDesktop ? (
           <Box
             sx={{
               width: 280,
               flexShrink: 0,
+              alignSelf: 'flex-start',
               p: 2,
               borderRadius: 2,
               border: '1px solid',
               borderColor: 'divider',
               bgcolor: 'background.paper',
+              position: 'sticky',
+              top: { md: 'calc(56px + 16px)' },
+              maxHeight: { md: 'calc(100dvh - 56px - 32px)' },
+              overflow: 'auto',
             }}
           >
             <Typography variant="h3" sx={{ mb: 2 }}>
