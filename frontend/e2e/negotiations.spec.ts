@@ -27,11 +27,13 @@ test('[DEAL-08] [DEAL-09] tabs and timeline', async ({ page }) => {
   for (const name of ['Обзор', 'Предложение', 'Файлы', 'История']) {
     await expect(page.getByRole('tab', { name })).toBeVisible()
   }
+  await expect(page.getByRole('button', { name: /Зафиксировать условия|Обновить условия/ })).toBeVisible()
   await page.getByRole('tab', { name: 'Файлы' }).click()
+  await expect(page.getByRole('button', { name: 'Загрузить файл' })).toBeVisible()
   await expect(page.getByText('Файлов пока нет')).toBeVisible()
   await page.getByRole('tab', { name: 'История' }).click()
   await expect(page.getByText('Получено предложение')).toBeVisible()
-  await expect(page.getByText('Компания добавлена в shortlist')).toBeVisible()
+  await expect(page.getByText('Компания добавлена в shortlist').or(page.getByText('Компания добавлена в шортлист'))).toBeVisible()
   await expect(page.getByText('Начаты переговоры')).toBeVisible()
 })
 
