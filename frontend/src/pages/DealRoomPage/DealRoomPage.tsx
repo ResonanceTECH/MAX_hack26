@@ -24,12 +24,13 @@ import {
   AppIcon,
   AppInput,
   AppTextarea,
+  BentoGrid,
+  BentoTile,
   EmptyState,
   ErrorState,
   LoadingState,
   MoneyValue,
   PageHeader,
-  Section,
   StatusChip,
 } from '@/shared/ui'
 import {
@@ -182,275 +183,299 @@ export function DealRoomPage() {
         actions={<StatusChip status={deal.status} kind="deal" />}
       />
 
-      <Tabs
-        value={tab}
-        onChange={(_, v: number) => setTab(v)}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
-      >
-        {TABS.map((label) => (
-          <Tab key={label} label={label} />
-        ))}
-      </Tabs>
+      <BentoGrid>
+        <BentoTile span={12} noPadding>
+          <Tabs
+            value={tab}
+            onChange={(_, v: number) => setTab(v)}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ borderBottom: 1, borderColor: 'divider', px: 1 }}
+          >
+            {TABS.map((label) => (
+              <Tab key={label} label={label} />
+            ))}
+          </Tabs>
+        </BentoTile>
 
-      {tab === 0 ? (
-        <Stack spacing={3}>
-          <Section title="Сделка">
-            <Stack spacing={1.25}>
-              <Row label="Заказчик" value={buyerName} />
-              <Row label="Исполнитель" value={deal.companyName} />
-              <Stack direction="row" spacing={1} alignItems="baseline">
-                <Typography variant="body2" color="text.secondary" sx={{ minWidth: 120 }}>
-                  Стоимость
-                </Typography>
-                <MoneyValue amount={deal.price} currency={deal.currency} variant="body1" />
+        {tab === 0 ? (
+          <>
+            <BentoTile span={6} variant="emphasis">
+              <Typography variant="h3" sx={{ mb: 1.5 }}>
+                Сделка
+              </Typography>
+              <Stack spacing={1.25}>
+                <Row label="Заказчик" value={buyerName} />
+                <Row label="Исполнитель" value={deal.companyName} />
+                <Stack direction="row" spacing={1} alignItems="baseline">
+                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 120 }}>
+                    Стоимость
+                  </Typography>
+                  <MoneyValue amount={deal.price} currency={deal.currency} variant="body1" />
+                </Stack>
+                <Row
+                  label="Срок"
+                  value={deal.durationDays != null ? `${deal.durationDays} дн.` : 'не указан'}
+                />
+                <Row label="Контакт" value={deal.contactName || '—'} />
+                <Row label="Следующий шаг" value={deal.nextAction} />
+                <Row label="Последнее действие" value={deal.lastAction} />
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 120 }}>
+                    Статус
+                  </Typography>
+                  <StatusChip status={deal.status} kind="deal" />
+                </Stack>
               </Stack>
-              <Row
-                label="Срок"
-                value={deal.durationDays != null ? `${deal.durationDays} дн.` : 'не указан'}
-              />
-              <Row label="Контакт" value={deal.contactName || '—'} />
-              <Row label="Следующий шаг" value={deal.nextAction} />
-              <Row label="Последнее действие" value={deal.lastAction} />
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="body2" color="text.secondary" sx={{ minWidth: 120 }}>
-                  Статус
-                </Typography>
-                <StatusChip status={deal.status} kind="deal" />
-              </Stack>
-            </Stack>
-          </Section>
-
-          <Section title="Фиксация условий">
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Здесь стороны записывают согласованные условия (цена, срок, этапы). История только
-              показывает факт — редактирование на этой вкладке «Обзор».
-            </Typography>
-            {termsFixed && deal.termsSummary ? (
-              <Box
-                sx={{
-                  mb: 2,
-                  p: 1.5,
-                  borderRadius: 2,
-                  bgcolor: 'action.hover',
-                  border: '1px solid',
-                  borderColor: 'divider',
+              <AppButton
+                variant="outlined"
+                sx={{ mt: 2, minHeight: 44 }}
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      const bridge = getMaxBridge()
+                      const result = await bridge.openChat({
+                        dealId: deal.id,
+                        title: headerTitle,
+                        url: window.location.href,
+                      })
+                      if (result.mode === 'clipboard') {
+                        showInfo('Ссылка на сделку скопирована — откройте чат в MAX')
+                      } else if (result.mode === 'share') {
+                        showInfo('Поделитесь ссылкой в MAX, чтобы продолжить чат')
+                      } else if (result.mode === 'noop') {
+                        showInfo('Чат MAX недоступен в этом окружении')
+                      }
+                    } catch (err) {
+                      showError(err instanceof Error ? err.message : 'Не удалось открыть чат')
+                    }
+                  })()
                 }}
               >
-                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                  Уже зафиксировано
-                </Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {deal.termsSummary}
+                Открыть чат в MAX
+              </AppButton>
+            </BentoTile>
+
+            <BentoTile span={6}>
+              <Typography variant="h3" sx={{ mb: 1 }}>
+                Фиксация условий
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Здесь стороны записывают согласованные условия (цена, срок, этапы). История только
+                показывает факт — редактирование на этой вкладке «Обзор».
+              </Typography>
+              {termsFixed && deal.termsSummary ? (
+                <Box
+                  sx={{
+                    mb: 2,
+                    p: 1.5,
+                    borderRadius: 1,
+                    bgcolor: 'action.hover',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                    Уже зафиксировано
+                  </Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {deal.termsSummary}
+                  </Typography>
+                </Box>
+              ) : null}
+              <Stack spacing={2}>
+                <AppTextarea
+                  label="Согласованные условия"
+                  placeholder="Например: оплата 50/50, старт через неделю, NDA до пятницы…"
+                  value={termsSummary}
+                  onChange={(e) => setTermsSummary(e.target.value)}
+                  minRows={3}
+                />
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <AppInput
+                    label="Согласованная стоимость, ₽"
+                    type="number"
+                    inputMode="numeric"
+                    value={agreedPrice}
+                    onChange={(e) => setAgreedPrice(e.target.value)}
+                  />
+                  <AppInput
+                    label="Срок, дней"
+                    type="number"
+                    inputMode="numeric"
+                    value={agreedDays}
+                    onChange={(e) => setAgreedDays(e.target.value)}
+                  />
+                </Stack>
+                <AppButton
+                  variant="contained"
+                  onClick={submitTerms}
+                  loading={fixTerms.isPending}
+                  disabled={fixTerms.isPending || termsSummary.trim().length < 3}
+                >
+                  {termsFixed ? 'Обновить условия' : 'Зафиксировать условия'}
+                </AppButton>
+              </Stack>
+            </BentoTile>
+          </>
+        ) : null}
+
+        {tab === 1 ? (
+          <BentoTile span={12}>
+            {!deal.proposalId ? (
+              <EmptyState
+                title="Предложение не привязано"
+                description="Для этой сделки пока нет связанного коммерческого предложения."
+              />
+            ) : proposalQuery.isLoading ? (
+              <LoadingState rows={2} />
+            ) : proposalQuery.isError || !proposalQuery.data ? (
+              <ErrorState onRetry={() => void proposalQuery.refetch()} />
+            ) : (
+              <Stack spacing={2}>
+                <Typography variant="body1">{proposalQuery.data.description}</Typography>
+                <Stack direction="row" spacing={2} alignItems="baseline">
+                  <MoneyValue
+                    amount={proposalQuery.data.price}
+                    currency={proposalQuery.data.currency}
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    {proposalQuery.data.durationDays} дн.
+                  </Typography>
+                </Stack>
+                <AppButton
+                  component={RouterLink}
+                  to={proposalDetailsPath(deal.proposalId)}
+                  variant="outlined"
+                >
+                  Открыть полное предложение
+                </AppButton>
+              </Stack>
+            )}
+          </BentoTile>
+        ) : null}
+
+        {tab === 2 ? (
+          <BentoTile span={12}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              hidden
+              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip,.txt"
+              onChange={(e) => onFileSelected(e.target.files)}
+            />
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1.5}
+              alignItems={{ sm: 'center' }}
+              sx={{ mb: 2 }}
+            >
+              <AppButton
+                variant="contained"
+                onClick={openFilePicker}
+                loading={uploading}
+                disabled={uploading}
+              >
+                Загрузить файл
+              </AppButton>
+              <Typography variant="body2" color="text.secondary">
+                Договоры, NDA, приложения — до 10 МБ
+              </Typography>
+            </Stack>
+            {uploadProgress != null ? (
+              <Box sx={{ mb: 2 }}>
+                <LinearProgress variant="determinate" value={uploadProgress} sx={{ mb: 0.5 }} />
+                <Typography variant="caption" color="text.secondary">
+                  Загрузка… {uploadProgress}%
                 </Typography>
               </Box>
             ) : null}
-            <Stack spacing={2}>
-              <AppTextarea
-                label="Согласованные условия"
-                placeholder="Например: оплата 50/50, старт через неделю, NDA до пятницы…"
-                value={termsSummary}
-                onChange={(e) => setTermsSummary(e.target.value)}
-                minRows={3}
+            {files.length === 0 ? (
+              <EmptyState
+                title="Файлов пока нет"
+                description="Загрузите договор, NDA или приложение — файл будет доступен обеим сторонам сделки."
+                actionLabel={uploading ? undefined : 'Выбрать файл'}
+                onAction={uploading ? undefined : openFilePicker}
               />
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <AppInput
-                  label="Согласованная стоимость, ₽"
-                  type="number"
-                  inputMode="numeric"
-                  value={agreedPrice}
-                  onChange={(e) => setAgreedPrice(e.target.value)}
-                />
-                <AppInput
-                  label="Срок, дней"
-                  type="number"
-                  inputMode="numeric"
-                  value={agreedDays}
-                  onChange={(e) => setAgreedDays(e.target.value)}
-                />
-              </Stack>
-              <AppButton
-                variant="contained"
-                onClick={submitTerms}
-                loading={fixTerms.isPending}
-                disabled={fixTerms.isPending || termsSummary.trim().length < 3}
-              >
-                {termsFixed ? 'Обновить условия' : 'Зафиксировать условия'}
-              </AppButton>
+            ) : (
+              <List disablePadding>
+                {files.map((file) => (
+                  <ListItem
+                    key={file.id}
+                    divider
+                    secondaryAction={
+                      <AppButton
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          void downloadDealFile(file).catch((err: unknown) => {
+                            showError(
+                              err instanceof Error ? err.message : 'Не удалось скачать файл',
+                            )
+                          })
+                        }}
+                      >
+                        Скачать
+                      </AppButton>
+                    }
+                    sx={{ px: 0 }}
+                  >
+                    <AppIcon icon={File02Icon} size={22} color="text.secondary" aria-hidden />
+                    <ListItemText
+                      sx={{ ml: 1.5 }}
+                      primary={file.name}
+                      secondary={`${formatFileSize(file.size)} · ${formatDate(file.createdAt)}`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </BentoTile>
+        ) : null}
+
+        {tab === 3 ? (
+          <BentoTile span={12}>
+            <Stack spacing={0}>
+              {[...deal.events]
+                .sort((a, b) => +new Date(a.date) - +new Date(b.date))
+                .map((event, index, list) => (
+                  <Stack key={event.id} direction="row" spacing={2} sx={{ pb: 3 }}>
+                    <Stack alignItems="center" sx={{ width: 32 }}>
+                      <AppIcon
+                        icon={eventIcon(event.type)}
+                        size={22}
+                        color="secondary.main"
+                        aria-hidden
+                      />
+                      {index < list.length - 1 ? (
+                        <Box
+                          sx={{
+                            flex: 1,
+                            width: 2,
+                            bgcolor: 'divider',
+                            minHeight: 24,
+                            mt: 1,
+                          }}
+                        />
+                      ) : null}
+                    </Stack>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatDate(event.date)} · {formatRelativeDate(event.date)}
+                      </Typography>
+                      <Typography variant="h4" sx={{ mt: 0.25 }}>
+                        {event.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {event.description}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                ))}
             </Stack>
-          </Section>
-
-          <AppButton
-            variant="outlined"
-            onClick={() => {
-              void (async () => {
-                try {
-                  const bridge = getMaxBridge()
-                  const result = await bridge.openChat({
-                    dealId: deal.id,
-                    title: headerTitle,
-                    url: window.location.href,
-                  })
-                  if (result.mode === 'clipboard') {
-                    showInfo('Ссылка на сделку скопирована — откройте чат в MAX')
-                  } else if (result.mode === 'share') {
-                    showInfo('Поделитесь ссылкой в MAX, чтобы продолжить чат')
-                  } else if (result.mode === 'noop') {
-                    showInfo('Чат MAX недоступен в этом окружении')
-                  }
-                } catch (err) {
-                  showError(err instanceof Error ? err.message : 'Не удалось открыть чат')
-                }
-              })()
-            }}
-          >
-            Открыть чат в MAX
-          </AppButton>
-        </Stack>
-      ) : null}
-
-      {tab === 1 ? (
-        <Box>
-          {!deal.proposalId ? (
-            <EmptyState
-              title="Предложение не привязано"
-              description="Для этой сделки пока нет связанного коммерческого предложения."
-            />
-          ) : proposalQuery.isLoading ? (
-            <LoadingState rows={2} />
-          ) : proposalQuery.isError || !proposalQuery.data ? (
-            <ErrorState onRetry={() => void proposalQuery.refetch()} />
-          ) : (
-            <Stack spacing={2}>
-              <Typography variant="body1">{proposalQuery.data.description}</Typography>
-              <Stack direction="row" spacing={2} alignItems="baseline">
-                <MoneyValue
-                  amount={proposalQuery.data.price}
-                  currency={proposalQuery.data.currency}
-                />
-                <Typography variant="body2" color="text.secondary">
-                  {proposalQuery.data.durationDays} дн.
-                </Typography>
-              </Stack>
-              <AppButton
-                component={RouterLink}
-                to={proposalDetailsPath(deal.proposalId)}
-                variant="outlined"
-              >
-                Открыть полное предложение
-              </AppButton>
-            </Stack>
-          )}
-        </Box>
-      ) : null}
-
-      {tab === 2 ? (
-        <Stack spacing={2}>
-          <input
-            ref={fileInputRef}
-            type="file"
-            hidden
-            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip,.txt"
-            onChange={(e) => onFileSelected(e.target.files)}
-          />
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
-            <AppButton
-              variant="contained"
-              onClick={openFilePicker}
-              loading={uploading}
-              disabled={uploading}
-            >
-              Загрузить файл
-            </AppButton>
-            <Typography variant="body2" color="text.secondary">
-              Договоры, NDA, приложения — до 10 МБ
-            </Typography>
-          </Stack>
-          {uploadProgress != null ? (
-            <Box>
-              <LinearProgress variant="determinate" value={uploadProgress} sx={{ mb: 0.5 }} />
-              <Typography variant="caption" color="text.secondary">
-                Загрузка… {uploadProgress}%
-              </Typography>
-            </Box>
-          ) : null}
-          {files.length === 0 ? (
-            <EmptyState
-              title="Файлов пока нет"
-              description="Загрузите договор, NDA или приложение — файл будет доступен обеим сторонам сделки."
-              actionLabel={uploading ? undefined : 'Выбрать файл'}
-              onAction={uploading ? undefined : openFilePicker}
-            />
-          ) : (
-            <List disablePadding>
-              {files.map((file) => (
-                <ListItem
-                  key={file.id}
-                  divider
-                  secondaryAction={
-                    <AppButton
-                      size="small"
-                      variant="outlined"
-                      onClick={() => {
-                        void downloadDealFile(file).catch((err: unknown) => {
-                          showError(err instanceof Error ? err.message : 'Не удалось скачать файл')
-                        })
-                      }}
-                    >
-                      Скачать
-                    </AppButton>
-                  }
-                  sx={{ px: 0 }}
-                >
-                  <AppIcon icon={File02Icon} size={22} color="text.secondary" aria-hidden />
-                  <ListItemText
-                    sx={{ ml: 1.5 }}
-                    primary={file.name}
-                    secondary={`${formatFileSize(file.size)} · ${formatDate(file.createdAt)}`}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </Stack>
-      ) : null}
-
-      {tab === 3 ? (
-        <Stack spacing={0}>
-          {[...deal.events]
-            .sort((a, b) => +new Date(a.date) - +new Date(b.date))
-            .map((event, index, list) => (
-            <Stack key={event.id} direction="row" spacing={2} sx={{ pb: 3 }}>
-              <Stack alignItems="center" sx={{ width: 32 }}>
-                <AppIcon icon={eventIcon(event.type)} size={22} color="secondary.main" aria-hidden />
-                {index < list.length - 1 ? (
-                  <Box
-                    sx={{
-                      flex: 1,
-                      width: 2,
-                      bgcolor: 'divider',
-                      minHeight: 24,
-                      mt: 1,
-                    }}
-                  />
-                ) : null}
-              </Stack>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" color="text.secondary">
-                  {formatDate(event.date)} · {formatRelativeDate(event.date)}
-                </Typography>
-                <Typography variant="h4" sx={{ mt: 0.25 }}>
-                  {event.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {event.description}
-                </Typography>
-              </Box>
-            </Stack>
-          ))}
-        </Stack>
-      ) : null}
+          </BentoTile>
+        ) : null}
+      </BentoGrid>
     </Box>
   )
 }

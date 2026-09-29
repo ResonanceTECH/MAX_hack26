@@ -34,6 +34,8 @@ import { companyTeamMemberPath, ROUTES } from '@/shared/constants/routes'
 import {
   AppButton,
   AppSelect,
+  BentoGrid,
+  BentoTile,
   ConfirmDialog,
   EmptyState,
   ErrorState,
@@ -197,6 +199,9 @@ export function CompanyTeamPage() {
         }
       />
 
+
+      <BentoGrid>
+        <BentoTile span={12}>
       <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
         <Typography variant="body2" color="text.secondary">
           Всего: {summary.total}
@@ -376,6 +381,9 @@ export function CompanyTeamPage() {
           ))}
         </Stack>
       ) : null}
+
+        </BentoTile>
+      </BentoGrid>
 
       <ConfirmDialog
         open={Boolean(confirm)}

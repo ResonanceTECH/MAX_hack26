@@ -27,6 +27,8 @@ import {
 } from '@/shared/constants/routes'
 import {
   AppButton,
+  BentoGrid,
+  BentoTile,
   ConfirmDialog,
   EmptyState,
   ErrorState,
@@ -105,13 +107,15 @@ export function CompanyServicesPage() {
         }
       />
 
-      <Tabs
-        value={TABS.findIndex((t) => t.key === tab)}
-        onChange={(_, i: number) => setTab(TABS[i]!.key)}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
-      >
+      <BentoGrid>
+        <BentoTile span={12} noPadding>
+          <Tabs
+            value={TABS.findIndex((t) => t.key === tab)}
+            onChange={(_, i: number) => setTab(TABS[i]!.key)}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ borderBottom: 1, borderColor: 'divider', px: 1 }}
+          >
         {TABS.map((t) => (
           <Tab key={t.key} label={t.label} />
         ))}
@@ -215,6 +219,8 @@ export function CompanyServicesPage() {
           </Box>
         ))}
       </Stack>
+        </BentoTile>
+      </BentoGrid>
 
       <ConfirmDialog
         open={Boolean(confirm)}

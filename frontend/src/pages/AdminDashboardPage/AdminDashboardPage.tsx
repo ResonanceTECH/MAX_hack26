@@ -1,21 +1,20 @@
 import { Link as RouterLink } from 'react-router-dom'
 import Box from '@mui/material/Box'
-import Card from '@mui/material/Card'
-import CardActionArea from '@mui/material/CardActionArea'
-import CardContent from '@mui/material/CardContent'
 import Chip from '@mui/material/Chip'
-import Grid from '@mui/material/Grid2'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
-import {
-  useAdminDashboard,
-  MetricCard,
-  AUDIT_ACTION_LABELS,
-} from '@/features/admin'
+import { useAdminDashboard, AUDIT_ACTION_LABELS } from '@/features/admin'
 import { useModerationSummary } from '@/features/moderation/api/queries'
 import { ROUTES, adminUserPath, adminCompanyPath } from '@/shared/constants/routes'
 import { formatDate, formatRelativeDate } from '@/shared/lib/format'
-import { AppButton, ErrorState, LoadingState, PageHeader } from '@/shared/ui'
+import {
+  AppButton,
+  BentoGrid,
+  BentoTile,
+  ErrorState,
+  LoadingState,
+  PageHeader,
+} from '@/shared/ui'
 import type { PeriodDelta } from '@/shared/mocks/analytics'
 
 function healthColor(value: string): 'success' | 'warning' | 'error' | 'default' {
@@ -24,6 +23,21 @@ function healthColor(value: string): 'success' | 'warning' | 'error' | 'default'
   if (v.includes('деград') || v.includes('ожид')) return 'warning'
   if (v.includes('ошиб') || v.includes('недоступ')) return 'error'
   return 'default'
+}
+
+function formatDelta(delta?: PeriodDelta | null): { text: string; color: string } | null {
+  if (!delta) return null
+  const sign = delta.changePercent > 0 ? '+' : ''
+  const color =
+    delta.changePercent > 0
+      ? 'success.main'
+      : delta.changePercent < 0
+        ? 'error.main'
+        : 'text.secondary'
+  return {
+    text: `${sign}${delta.changePercent}% к пред. периоду`,
+    color,
+  }
 }
 
 export function AdminDashboardPage() {
@@ -89,7 +103,12 @@ export function AdminDashboardPage() {
         subtitle="Состояние B2B Match · Demo / Model data"
         actions={
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <AppButton component={RouterLink} to={ROUTES.ADMIN_USERS} variant="outlined" sx={{ minHeight: 44 }}>
+            <AppButton
+              component={RouterLink}
+              to={ROUTES.ADMIN_USERS}
+              variant="outlined"
+              sx={{ minHeight: 44 }}
+            >
               Пользователи
             </AppButton>
             <AppButton
@@ -123,93 +142,124 @@ export function AdminDashboardPage() {
       ) : null}
 
       {!loading && !error && overview ? (
-        <>
-          <Grid container spacing={1.5} sx={{ mb: 3 }}>
-            {metrics.map((m) => (
-              <Grid key={m.label} size={{ xs: 6, sm: 4, md: 3 }}>
-                {m.to ? (
-                  <CardActionArea
-                    component={RouterLink}
-                    to={m.to}
-                    sx={{ borderRadius: 1, height: '100%', display: 'block' }}
-                  >
-                    <MetricCard label={m.label} value={m.value} delta={m.delta} />
-                  </CardActionArea>
-                ) : (
-                  <MetricCard label={m.label} value={m.value} delta={m.delta} />
-                )}
-              </Grid>
-            ))}
-          </Grid>
+        <BentoGrid>
+          <BentoTile span={8} variant="emphasis">
+            <Typography variant="h2" component="h2" sx={{ mb: 0.5 }}>
+              Ключевые метрики
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Данные обновлены: {formatDate(new Date().toISOString())} · источник — model data
+            </Typography>
+          </BentoTile>
 
-          <Typography variant="h3" sx={{ mb: 1.5 }}>
-            Здоровье платформы
-          </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 3 }}>
-            {health
-              ? (
-                  [
-                    ['Mini App', health.miniApp],
-                    ['Mock API', health.mockApi],
-                    ['Уведомления', health.notifications],
-                    ['Matching', health.matching],
-                    ['Обслуживание', health.maintenance],
-                  ] as const
-                ).map(([label, value]) => (
-                  <Chip
-                    key={label}
-                    label={`${label}: ${value}`}
-                    color={healthColor(value)}
-                    variant="outlined"
-                    sx={{ minHeight: 36 }}
-                  />
-                ))
-              : null}
-            <Chip label={health?.label ?? 'Demo / Model data'} size="small" />
-          </Stack>
+          <BentoTile span={4}>
+            <Typography variant="h4" sx={{ mb: 1 }}>
+              Здоровье
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {health
+                ? (
+                    [
+                      ['Mini App', health.miniApp],
+                      ['Mock API', health.mockApi],
+                      ['Уведомления', health.notifications],
+                      ['Matching', health.matching],
+                      ['Обслуживание', health.maintenance],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <Chip
+                      key={label}
+                      label={`${label}: ${value}`}
+                      color={healthColor(value)}
+                      variant="outlined"
+                      sx={{ minHeight: 36 }}
+                    />
+                  ))
+                : null}
+              <Chip label={health?.label ?? 'Demo / Model data'} size="small" />
+            </Stack>
+          </BentoTile>
 
-          <Typography variant="h3" sx={{ mb: 1.5 }}>
-            Модерация
-          </Typography>
-          <Grid container spacing={1.5} sx={{ mb: 3 }}>
-            <Grid size={{ xs: 6, md: 3 }}>
-              <MetricCard
-                label="В очереди"
-                value={moderation.data?.pendingTotal ?? overview.moderationPending}
-              />
-            </Grid>
-            <Grid size={{ xs: 6, md: 3 }}>
-              <MetricCard label="Жалобы" value={overview.openReports} />
-            </Grid>
-            <Grid size={{ xs: 6, md: 3 }}>
-              <MetricCard
-                label="Эскалации"
-                value={moderation.data?.escalations ?? overview.moderation.escalations}
-              />
-            </Grid>
-            <Grid size={{ xs: 6, md: 3 }}>
-              <MetricCard
-                label="Ср. возраст очереди"
-                value={`${overview.moderation.averageQueueAgeHours} ч`}
-              />
-            </Grid>
-          </Grid>
+          {metrics.map((m) => {
+            const d = formatDelta(m.delta)
+            return (
+              <BentoTile
+                key={m.label}
+                span={3}
+                to={m.to}
+                variant={m.to ? 'action' : 'default'}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  {m.label}
+                </Typography>
+                <Typography variant="h2" sx={{ mt: 0.5, fontSize: { xs: '1.5rem', md: '1.75rem' } }}>
+                  {m.value}
+                </Typography>
+                {d ? (
+                  <Typography variant="caption" sx={{ color: d.color, mt: 0.5 }}>
+                    {d.text}
+                  </Typography>
+                ) : null}
+              </BentoTile>
+            )
+          })}
 
-          <Stack
-            direction={{ xs: 'column', sm: 'row' }}
-            justifyContent="space-between"
-            alignItems={{ sm: 'center' }}
-            sx={{ mb: 1.5 }}
-          >
-            <Typography variant="h3">Недавняя активность</Typography>
-            <AppButton component={RouterLink} to={ROUTES.ADMIN_AUDIT} size="small">
-              Весь audit log
-            </AppButton>
-          </Stack>
-          <Stack spacing={1} sx={{ mb: 3 }}>
-            {recent.map((ev) => (
-              <Card key={ev.id} variant="outlined">
-                <CardContent sx={{ py: 1.25, '&:last-child': { pb: 1.25 } }}>
+          <BentoTile span={3} variant="muted">
+            <Typography variant="body2" color="text.secondary">
+              В очереди
+            </Typography>
+            <Typography variant="h2" sx={{ mt: 0.5 }}>
+              {moderation.data?.pendingTotal ?? overview.moderationPending}
+            </Typography>
+          </BentoTile>
+          <BentoTile span={3} variant="muted">
+            <Typography variant="body2" color="text.secondary">
+              Жалобы
+            </Typography>
+            <Typography variant="h2" sx={{ mt: 0.5 }}>
+              {overview.openReports}
+            </Typography>
+          </BentoTile>
+          <BentoTile span={3} variant="muted">
+            <Typography variant="body2" color="text.secondary">
+              Эскалации
+            </Typography>
+            <Typography variant="h2" sx={{ mt: 0.5 }}>
+              {moderation.data?.escalations ?? overview.moderation.escalations}
+            </Typography>
+          </BentoTile>
+          <BentoTile span={3} variant="muted">
+            <Typography variant="body2" color="text.secondary">
+              Ср. возраст очереди
+            </Typography>
+            <Typography variant="h2" sx={{ mt: 0.5 }}>
+              {overview.moderation.averageQueueAgeHours} ч
+            </Typography>
+          </BentoTile>
+
+          <BentoTile span={8}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ mb: 1.5 }}
+            >
+              <Typography variant="h3">Недавняя активность</Typography>
+              <AppButton component={RouterLink} to={ROUTES.ADMIN_AUDIT} size="small">
+                Весь audit log
+              </AppButton>
+            </Stack>
+            <Stack spacing={1}>
+              {recent.map((ev) => (
+                <Box
+                  key={ev.id}
+                  sx={{
+                    py: 1.25,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    '&:last-child': { borderBottom: 0 },
+                  }}
+                >
                   <Typography variant="subtitle2">
                     {AUDIT_ACTION_LABELS[ev.action] ?? ev.action}
                   </Typography>
@@ -221,55 +271,54 @@ export function AdminDashboardPage() {
                       Причина: {ev.reason}
                     </Typography>
                   ) : null}
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
+                </Box>
+              ))}
+            </Stack>
+          </BentoTile>
 
-          <Typography variant="h3" sx={{ mb: 1.5 }}>
-            Быстрые действия
-          </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            {[
-              { to: ROUTES.ADMIN_USERS, label: 'Пользователи' },
-              { to: ROUTES.ADMIN_COMPANIES, label: 'Компании' },
-              { to: ROUTES.ADMIN_MODERATION, label: 'Модерация' },
-              { to: ROUTES.ADMIN_DICTIONARIES, label: 'Справочники' },
-              { to: ROUTES.ADMIN_SETTINGS, label: 'Настройки' },
-              { to: ROUTES.ADMIN_FEATURE_FLAGS, label: 'Feature flags' },
-              { to: ROUTES.ADMIN_NOTIFICATIONS, label: 'Уведомления' },
-            ].map((a) => (
+          <BentoTile span={4}>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>
+              Быстрые действия
+            </Typography>
+            <Stack spacing={1}>
+              {[
+                { to: ROUTES.ADMIN_USERS, label: 'Пользователи' },
+                { to: ROUTES.ADMIN_COMPANIES, label: 'Компании' },
+                { to: ROUTES.ADMIN_MODERATION, label: 'Модерация' },
+                { to: ROUTES.ADMIN_DICTIONARIES, label: 'Справочники' },
+                { to: ROUTES.ADMIN_SETTINGS, label: 'Настройки' },
+                { to: ROUTES.ADMIN_FEATURE_FLAGS, label: 'Feature flags' },
+                { to: ROUTES.ADMIN_NOTIFICATIONS, label: 'Уведомления' },
+              ].map((a) => (
+                <AppButton
+                  key={a.to}
+                  component={RouterLink}
+                  to={a.to}
+                  variant="outlined"
+                  sx={{ minHeight: 44, justifyContent: 'flex-start' }}
+                >
+                  {a.label}
+                </AppButton>
+              ))}
               <AppButton
-                key={a.to}
                 component={RouterLink}
-                to={a.to}
-                variant="outlined"
-                sx={{ minHeight: 44 }}
+                to={adminUserPath('user-platform-admin')}
+                variant="text"
+                sx={{ minHeight: 44, justifyContent: 'flex-start' }}
               >
-                {a.label}
+                Мой профиль
               </AppButton>
-            ))}
-            <AppButton
-              component={RouterLink}
-              to={adminUserPath('user-platform-admin')}
-              variant="text"
-              sx={{ minHeight: 44 }}
-            >
-              Мой профиль
-            </AppButton>
-            <AppButton
-              component={RouterLink}
-              to={adminCompanyPath('company-techsolutions')}
-              variant="text"
-              sx={{ minHeight: 44 }}
-            >
-              Пример компании
-            </AppButton>
-          </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-            Данные обновлены: {formatDate(new Date().toISOString())} · источник — model data
-          </Typography>
-        </>
+              <AppButton
+                component={RouterLink}
+                to={adminCompanyPath('company-techsolutions')}
+                variant="text"
+                sx={{ minHeight: 44, justifyContent: 'flex-start' }}
+              >
+                Пример компании
+              </AppButton>
+            </Stack>
+          </BentoTile>
+        </BentoGrid>
       ) : null}
     </Box>
   )

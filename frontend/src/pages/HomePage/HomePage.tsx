@@ -1,10 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
-import Card from '@mui/material/Card'
-import CardActionArea from '@mui/material/CardActionArea'
-import CardContent from '@mui/material/CardContent'
-import Chip from '@mui/material/Chip'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
@@ -27,10 +23,11 @@ import {
   AppButton,
   AppIcon,
   AppInput,
+  BentoGrid,
+  BentoTile,
   EmptyState,
   ErrorState,
   LoadingState,
-  Section,
   StatusChip,
 } from '@/shared/ui'
 import {
@@ -100,7 +97,6 @@ export function HomePage() {
       .map((opp) => {
         const match = matches.find((m) => {
           if (m.opportunityId !== opp.id) return false
-          // Feed matches may omit/zero company_id — treat as current company in real mode
           if (realMode) {
             return !m.companyId || m.companyId === '0' || m.companyId === companyId
           }
@@ -155,6 +151,9 @@ export function HomePage() {
     )
     .slice(0, 3)
 
+  const negotiationDeal = (dealsQuery.data ?? []).find((d) => d.status === 'negotiation')
+  const proposalsPreview = (proposalsQuery.data ?? []).slice(0, 3)
+
   const isLoading =
     recommended.isLoading ||
     mineQuery.isLoading ||
@@ -176,67 +175,83 @@ export function HomePage() {
   }
 
   return (
-    <Box>
-      <Typography variant="h1" component="h1" sx={{ mb: 0.5 }}>
-        Что нужно вашему бизнесу?
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Найдите исполнителя, поставщика или подходящий заказ.
-      </Typography>
-
-      <Stack spacing={1.5} sx={{ mb: 2 }}>
-        <AppInput
-          label="Опишите задачу своими словами"
-          placeholder="Например, нужен подрядчик на разработку CRM для сети клиник"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <AppButton
-          component={RouterLink}
-          to={
-            query
-              ? `${ROUTES.OPPORTUNITIES}?q=${encodeURIComponent(query)}`
-              : ROUTES.OPPORTUNITIES
-          }
-          variant="contained"
-          size="large"
-          startIcon={<AppIcon icon={Search01Icon} size={18} />}
-        >
-          Найти
-        </AppButton>
-      </Stack>
-
-      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 4 }}>
-        {quickActions.map((action) => (
-          <Chip
-            key={action.label}
-            component={RouterLink}
-            to={action.to}
-            clickable
-            icon={<AppIcon icon={action.icon} size={16} />}
-            label={action.label}
-            variant="outlined"
-            sx={{ borderRadius: 2, textDecoration: 'none', height: 40, px: 0.5 }}
+    <BentoGrid>
+      <BentoTile span={8} variant="emphasis">
+        <Typography variant="h1" component="h1" sx={{ mb: 0.5 }}>
+          Что нужно вашему бизнесу?
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Найдите исполнителя, поставщика или подходящий заказ.
+        </Typography>
+        <Stack spacing={1.5}>
+          <AppInput
+            label="Опишите задачу своими словами"
+            placeholder="Например, нужен подрядчик на разработку CRM для сети клиник"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
           />
-        ))}
-      </Stack>
+          <AppButton
+            component={RouterLink}
+            to={
+              query
+                ? `${ROUTES.OPPORTUNITIES}?q=${encodeURIComponent(query)}`
+                : ROUTES.OPPORTUNITIES
+            }
+            variant="contained"
+            size="large"
+            startIcon={<AppIcon icon={Search01Icon} size={18} />}
+          >
+            Найти
+          </AppButton>
+        </Stack>
+      </BentoTile>
 
-      <Section
-        title="Для вас"
-        subtitle="Возможности, которые подходят вашей компании."
-        action={
+      <BentoTile span={4}>
+        <Typography variant="h4" sx={{ mb: 1.5 }}>
+          Быстрые действия
+        </Typography>
+        <Stack spacing={1} sx={{ flex: 1 }}>
+          {quickActions.map((action) => (
+            <AppButton
+              key={action.label}
+              component={RouterLink}
+              to={action.to}
+              variant="outlined"
+              startIcon={<AppIcon icon={action.icon} size={16} />}
+              sx={{ justifyContent: 'flex-start', minHeight: 44 }}
+            >
+              {action.label}
+            </AppButton>
+          ))}
+        </Stack>
+      </BentoTile>
+
+      <BentoTile span={6}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          sx={{ mb: 1.5 }}
+        >
+          <Box>
+            <Typography variant="h2" component="h2">
+              Для вас
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Возможности, которые подходят вашей компании.
+            </Typography>
+          </Box>
           <AppButton component={RouterLink} to={ROUTES.OPPORTUNITIES} size="small">
             Все
           </AppButton>
-        }
-      >
+        </Stack>
         {forYou.length === 0 ? (
           <EmptyState
             title="Пока нет подходящих заказов"
             description="Попробуйте изменить фильтры или дополнить профиль компании."
           />
         ) : (
-          <Stack spacing={2}>
+          <Stack spacing={1.5}>
             {forYou.map(({ opportunity, match }) => (
               <OpportunityCard
                 key={opportunity.id}
@@ -253,16 +268,22 @@ export function HomePage() {
             ))}
           </Stack>
         )}
-      </Section>
+      </BentoTile>
 
-      <Section
-        title="Ваши запросы"
-        action={
+      <BentoTile span={6}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          sx={{ mb: 1.5 }}
+        >
+          <Typography variant="h2" component="h2">
+            Ваши запросы
+          </Typography>
           <AppButton component={RouterLink} to={ROUTES.MY_REQUESTS} size="small">
-            Все запросы
+            Все
           </AppButton>
-        }
-      >
+        </Stack>
         {myActive.length === 0 ? (
           <EmptyState
             title="У вас пока нет запросов"
@@ -277,41 +298,50 @@ export function HomePage() {
             }
           />
         ) : (
-          <Stack spacing={2}>
+          <Stack spacing={1.5}>
             {myActive.map((opp) => (
-              <Card key={opp.id}>
-                <CardContent>
-                  <Stack spacing={1}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                      <Typography variant="h3">{opp.title}</Typography>
-                      <StatusChip status={opp.status} />
-                    </Stack>
-                    <Typography variant="body2" color="text.secondary">
-                      Получено: {opp.proposalsCount} предложений
-                      {opp.newProposalsCount ? ` · Новых: ${opp.newProposalsCount}` : ''}
-                    </Typography>
-                    <AppButton
-                      component={RouterLink}
-                      to={opportunityProposalsPath(opp.id)}
-                      variant="contained"
-                      size="small"
-                    >
-                      Посмотреть предложения
-                    </AppButton>
+              <Box
+                key={opp.id}
+                sx={{
+                  p: 1.5,
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Stack spacing={1}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                    <Typography variant="h3">{opp.title}</Typography>
+                    <StatusChip status={opp.status} />
                   </Stack>
-                </CardContent>
-              </Card>
+                  <Typography variant="body2" color="text.secondary">
+                    Получено: {opp.proposalsCount} предложений
+                    {opp.newProposalsCount ? ` · Новых: ${opp.newProposalsCount}` : ''}
+                  </Typography>
+                  <AppButton
+                    component={RouterLink}
+                    to={opportunityProposalsPath(opp.id)}
+                    variant="contained"
+                    size="small"
+                  >
+                    Посмотреть предложения
+                  </AppButton>
+                </Stack>
+              </Box>
             ))}
           </Stack>
         )}
-      </Section>
+      </BentoTile>
 
-      <Section title="Новые предложения">
-        {(proposalsQuery.data ?? []).length === 0 ? (
+      <BentoTile span={8}>
+        <Typography variant="h2" component="h2" sx={{ mb: 1.5 }}>
+          Новые предложения
+        </Typography>
+        {proposalsPreview.length === 0 ? (
           <EmptyState title="Нет новых предложений" />
         ) : (
-          <Stack spacing={2}>
-            {(proposalsQuery.data ?? []).slice(0, 3).map((p) => (
+          <Stack spacing={1.5}>
+            {proposalsPreview.map((p) => (
               <ProposalCard
                 key={p.id}
                 proposal={p}
@@ -323,52 +353,72 @@ export function HomePage() {
             ))}
           </Stack>
         )}
-      </Section>
+      </BentoTile>
 
-      <Section title="Продолжить работу">
-        <Stack spacing={1.5}>
+      <BentoTile span={4}>
+        <Typography variant="h2" component="h2" sx={{ mb: 1.5 }}>
+          Продолжить
+        </Typography>
+        <Stack spacing={1} sx={{ flex: 1 }}>
           {myActive[0] ? (
-            <Card>
-              <CardActionArea
-                component={RouterLink}
-                to={opportunityComparePath(myActive[0].id)}
-              >
-                <CardContent>
-                  <Typography variant="h4">Сравнить предложения</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {myActive[0].proposalsCount} компаний по «{myActive[0].title}»
-                  </Typography>
-                </CardContent>
-              </CardActionArea>
-            </Card>
+            <BentoContinueLink
+              to={opportunityComparePath(myActive[0].id)}
+              title="Сравнить предложения"
+              subtitle={`${myActive[0].proposalsCount} компаний по «${myActive[0].title}»`}
+            />
           ) : null}
-          <Card>
-            <CardActionArea component={RouterLink} to={ROUTES.MY_SHORTLIST}>
-              <CardContent>
-                <Typography variant="h4">Шортлист</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {shortlistQuery.data?.length ?? 0} компаний
-                </Typography>
-              </CardContent>
-            </CardActionArea>
-          </Card>
-          {(dealsQuery.data ?? [])
-            .filter((d) => d.status === 'negotiation')
-            .slice(0, 1)
-            .map((deal) => (
-              <Card key={deal.id}>
-                <CardActionArea component={RouterLink} to={`/deals/${deal.id}`}>
-                  <CardContent>
-                    <Typography variant="h4">Переговоры с {deal.companyName}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {deal.opportunityTitle}
-                    </Typography>
-                  </CardContent>
-                </CardActionArea>
-              </Card>
-            ))}
+          <BentoContinueLink
+            to={ROUTES.MY_SHORTLIST}
+            title="Шортлист"
+            subtitle={`${shortlistQuery.data?.length ?? 0} компаний`}
+          />
+          {negotiationDeal ? (
+            <BentoContinueLink
+              to={`/deals/${negotiationDeal.id}`}
+              title={`Переговоры с ${negotiationDeal.companyName}`}
+              subtitle={negotiationDeal.opportunityTitle}
+            />
+          ) : null}
         </Stack>
-      </Section>
+      </BentoTile>
+    </BentoGrid>
+  )
+}
+
+function BentoContinueLink({
+  to,
+  title,
+  subtitle,
+}: {
+  to: string
+  title: string
+  subtitle: string
+}) {
+  return (
+    <Box
+      component={RouterLink}
+      to={to}
+      sx={{
+        p: 1.5,
+        borderRadius: 1,
+        border: '1px solid',
+        borderColor: 'divider',
+        textDecoration: 'none',
+        color: 'inherit',
+        minHeight: 44,
+        transition: 'border-color 0.15s',
+        '&:hover': { borderColor: 'secondary.main' },
+        '&:focus-visible': {
+          outline: '2px solid',
+          outlineColor: 'secondary.main',
+          outlineOffset: 2,
+        },
+      }}
+    >
+      <Typography variant="h4">{title}</Typography>
+      <Typography variant="body2" color="text.secondary">
+        {subtitle}
+      </Typography>
     </Box>
   )
 }

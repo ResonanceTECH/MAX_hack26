@@ -21,6 +21,8 @@ import { formatBudgetRange, formatDate } from '@/shared/lib/format'
 import {
   AppButton,
   AppIcon,
+  BentoGrid,
+  BentoTile,
   CompanyAvatar,
   DeadlineLabel,
   ErrorState,
@@ -50,14 +52,11 @@ export function OpportunityDetailsPage() {
   const canPropose = canCreateProposal && !isOwn && !isExpired && !isClosed
   const match = matchQuery.data
 
-  // RequestDto only has company_id/name — enrich from session when it's our request,
-  // else keep API-enriched company from getById.
   const displayCompany =
     isOwn && sessionCompany && String(sessionCompany.id) === String(data.company.id)
       ? {
           ...data.company,
           ...sessionCompany,
-          // keep opportunity-facing name if session shortName differs
           name: sessionCompany.name || data.company.name,
           shortName: sessionCompany.shortName || data.company.shortName,
         }
@@ -76,8 +75,6 @@ export function OpportunityDetailsPage() {
       data.technologies.some((t) => req.toLowerCase().includes(t.toLowerCase()))) as boolean,
   }))
 
-  // API maps requirements → both requiredRequirements and technologies; don't re-show the same list
-  // under «Желательные» as chips (looks like there is no distinction).
   const desiredOnly = data.desiredRequirements.filter(
     (item) => !isSameRequirement(item, data.requiredRequirements),
   )
@@ -117,46 +114,32 @@ export function OpportunityDetailsPage() {
         }
       />
 
-      <Stack spacing={2} sx={{ mb: 3 }}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <CompanyAvatar
-            name={displayCompany.shortName}
-            logoUrl={displayCompany.logoUrl}
-            size={40}
-          />
-          <Box>
-            <Stack direction="row" spacing={0.75} alignItems="center">
-              <Typography variant="body1" fontWeight={600}>
-                {displayCompany.shortName}
+      <BentoGrid>
+        <BentoTile span={8} variant="emphasis">
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+            <CompanyAvatar
+              name={displayCompany.shortName}
+              logoUrl={displayCompany.logoUrl}
+              size={40}
+            />
+            <Box>
+              <Stack direction="row" spacing={0.75} alignItems="center">
+                <Typography variant="body1" fontWeight={600}>
+                  {displayCompany.shortName}
+                </Typography>
+                <VerifiedBadge verified={displayCompany.verified} compact />
+              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                {[displayCompany.region, displayCompany.industries.join(', ')]
+                  .filter(Boolean)
+                  .join(' · ')}
               </Typography>
-              <VerifiedBadge verified={displayCompany.verified} compact />
-            </Stack>
-            <Typography variant="body2" color="text.secondary">
-              {[displayCompany.region, displayCompany.industries.join(', ')].filter(Boolean).join(' · ')}
-            </Typography>
-          </Box>
-        </Stack>
+            </Box>
+          </Stack>
+          <Typography variant="body1">{data.description}</Typography>
+        </BentoTile>
 
-        {match && !isOwn ? (
-          <MatchExplanation
-            score={match.score}
-            reasons={match.reasons}
-            missingRequirements={match.missingRequirements}
-            title="Почему подходит вам"
-          />
-        ) : null}
-
-        <Typography variant="body1">{data.description}</Typography>
-
-        <Box
-          sx={{
-            p: 2,
-            borderRadius: 2,
-            border: '1px solid',
-            borderColor: 'divider',
-            bgcolor: 'background.paper',
-          }}
-        >
+        <BentoTile span={4}>
           <Typography variant="h3" sx={{ mb: 1.5 }}>
             Основная информация
           </Typography>
@@ -185,9 +168,20 @@ export function OpportunityDetailsPage() {
               <strong>Отрасль:</strong> {data.industries.join(', ')}
             </Typography>
           </Stack>
-        </Box>
+        </BentoTile>
 
-        <Box>
+        {match && !isOwn ? (
+          <BentoTile span={12}>
+            <MatchExplanation
+              score={match.score}
+              reasons={match.reasons}
+              missingRequirements={match.missingRequirements}
+              title="Почему подходит вам"
+            />
+          </BentoTile>
+        ) : null}
+
+        <BentoTile span={6}>
           <Typography variant="h3" sx={{ mb: 1 }}>
             Требования
           </Typography>
@@ -220,7 +214,7 @@ export function OpportunityDetailsPage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
             Плюс к обязательным: не блокируют отклик, но повышают шанс совпадения
           </Typography>
-          <Stack spacing={0.75} sx={{ mb: 2 }}>
+          <Stack spacing={0.75}>
             {desiredOnly.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 Не указаны
@@ -234,32 +228,25 @@ export function OpportunityDetailsPage() {
               ))
             )}
           </Stack>
-        </Box>
+        </BentoTile>
 
-        {techTags.length > 0 ? (
-          <Box>
-            <Typography variant="h3" sx={{ mb: 0.25 }}>
-              Доп. технологии
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Не входят в обязательные требования
-            </Typography>
-            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-              {techTags.map((t) => (
-                <Tag key={t.key} label={t.label} color={t.color} />
-              ))}
-            </Stack>
-          </Box>
-        ) : null}
+        <BentoTile span={6}>
+          {techTags.length > 0 ? (
+            <>
+              <Typography variant="h3" sx={{ mb: 0.25 }}>
+                Доп. технологии
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Не входят в обязательные требования
+              </Typography>
+              <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+                {techTags.map((t) => (
+                  <Tag key={t.key} label={t.label} color={t.color} />
+                ))}
+              </Stack>
+            </>
+          ) : null}
 
-        <Box
-          sx={{
-            p: 2,
-            borderRadius: 2,
-            border: '1px solid',
-            borderColor: 'divider',
-          }}
-        >
           <Typography variant="h3" sx={{ mb: 1 }}>
             {isOwn ? 'Ваша компания' : 'Компания-заказчик'}
           </Typography>
@@ -274,12 +261,7 @@ export function OpportunityDetailsPage() {
               </Stack>
               {hasRating ? (
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <Rating
-                    value={displayCompany.rating}
-                    readOnly
-                    size="small"
-                    precision={0.1}
-                  />
+                  <Rating value={displayCompany.rating} readOnly size="small" precision={0.1} />
                   <Typography variant="body2" color="text.secondary">
                     {displayCompany.rating.toFixed(1)}
                     {displayCompany.reviewsCount > 0
@@ -325,111 +307,109 @@ export function OpportunityDetailsPage() {
           >
             {isOwn ? 'К профилю компании' : 'Посмотреть компанию'}
           </AppButton>
-        </Box>
-      </Stack>
+        </BentoTile>
 
-      <Box
-        sx={{
-          position: { xs: 'fixed', md: 'static' },
-          left: 0,
-          right: 0,
-          bottom: { xs: 'calc(64px + env(safe-area-inset-bottom))', md: 'auto' },
-          p: { xs: 2, md: 0 },
-          bgcolor: { xs: 'background.paper', md: 'transparent' },
-          borderTop: { xs: '1px solid', md: 'none' },
-          borderColor: 'divider',
-          zIndex: 10,
-        }}
-      >
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={1.5}
-          alignItems={{ xs: 'stretch', sm: 'center' }}
-          flexWrap="wrap"
-          useFlexGap
+        <BentoTile
+          span={12}
+          sx={{
+            position: { xs: 'fixed', md: 'static' },
+            left: 0,
+            right: 0,
+            bottom: { xs: 'calc(64px + env(safe-area-inset-bottom))', md: 'auto' },
+            borderRadius: { xs: 0, md: 1 },
+            zIndex: 10,
+          }}
         >
-          {isOwn ? (
-            <>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1.5}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            flexWrap="wrap"
+            useFlexGap
+          >
+            {isOwn ? (
+              <>
+                <AppButton
+                  component={RouterLink}
+                  to={opportunityProposalsPath(data.id)}
+                  variant="contained"
+                  sx={{
+                    width: { xs: '100%', sm: 'auto' },
+                    flex: { sm: '1 1 auto' },
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Управлять запросом
+                </AppButton>
+                <AppButton
+                  component={RouterLink}
+                  to={opportunityProposalsPath(data.id)}
+                  variant="outlined"
+                  sx={{
+                    width: { xs: '100%', sm: 'auto' },
+                    flex: { sm: '1 1 auto' },
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Предложения ({data.proposalsCount})
+                </AppButton>
+                <AppButton
+                  component={RouterLink}
+                  to={opportunityComparePath(data.id)}
+                  variant="outlined"
+                  sx={{
+                    width: { xs: '100%', sm: 'auto' },
+                    flex: { sm: '1 1 auto' },
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Сравнить
+                </AppButton>
+              </>
+            ) : canPropose ? (
               <AppButton
                 component={RouterLink}
-                to={opportunityProposalsPath(data.id)}
+                to={opportunityProposePath(data.id)}
                 variant="contained"
+                sx={{ width: { xs: '100%', sm: 'auto' }, flex: { sm: '1 1 auto' } }}
+              >
+                Предложить решение
+              </AppButton>
+            ) : (
+              <Box
                 sx={{
+                  p: 1.5,
+                  borderRadius: 1,
+                  bgcolor: 'action.hover',
                   width: { xs: '100%', sm: 'auto' },
                   flex: { sm: '1 1 auto' },
-                  whiteSpace: 'nowrap',
                 }}
               >
-                Управлять запросом
-              </AppButton>
-              <AppButton
-                component={RouterLink}
-                to={opportunityProposalsPath(data.id)}
-                variant="outlined"
-                sx={{
-                  width: { xs: '100%', sm: 'auto' },
-                  flex: { sm: '1 1 auto' },
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Предложения ({data.proposalsCount})
-              </AppButton>
-              <AppButton
-                component={RouterLink}
-                to={opportunityComparePath(data.id)}
-                variant="outlined"
-                sx={{
-                  width: { xs: '100%', sm: 'auto' },
-                  flex: { sm: '1 1 auto' },
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Сравнить
-              </AppButton>
-            </>
-          ) : canPropose ? (
+                <Typography variant="body2" fontWeight={600}>
+                  {isExpired
+                    ? 'Приём предложений завершён'
+                    : isClosed
+                      ? 'Запрос закрыт'
+                      : 'Отклик недоступен'}
+                </Typography>
+              </Box>
+            )}
             <AppButton
               component={RouterLink}
-              to={opportunityProposePath(data.id)}
-              variant="contained"
-              sx={{ width: { xs: '100%', sm: 'auto' }, flex: { sm: '1 1 auto' } }}
-            >
-              Предложить решение
-            </AppButton>
-          ) : (
-            <Box
+              to={ROUTES.OPPORTUNITIES}
+              variant="text"
               sx={{
-                p: 1.5,
-                borderRadius: 2,
-                bgcolor: 'action.hover',
-                width: { xs: '100%', sm: 'auto' },
-                flex: { sm: '1 1 auto' },
+                display: { xs: 'none', md: 'inline-flex' },
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+                ml: { md: 'auto' },
               }}
             >
-              <Typography variant="body2" fontWeight={600}>
-                {isExpired
-                  ? 'Приём предложений завершён'
-                  : isClosed
-                    ? 'Запрос закрыт'
-                    : 'Отклик недоступен'}
-              </Typography>
-            </Box>
-          )}
-          <AppButton
-            component={RouterLink}
-            to={ROUTES.OPPORTUNITIES}
-            variant="text"
-            sx={{
-              display: { xs: 'none', md: 'inline-flex' },
-              flexShrink: 0,
-              whiteSpace: 'nowrap',
-              ml: { md: 'auto' },
-            }}
-          >
-            К витрине
-          </AppButton>
-        </Stack>
-      </Box>
+              К витрине
+            </AppButton>
+          </Stack>
+        </BentoTile>
+      </BentoGrid>
     </Box>
   )
 }

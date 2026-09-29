@@ -1,5 +1,4 @@
 import { Link as RouterLink } from 'react-router-dom'
-import Avatar from '@mui/material/Avatar'
 import Box from '@mui/material/Box'
 import Rating from '@mui/material/Rating'
 import Stack from '@mui/material/Stack'
@@ -10,7 +9,17 @@ import { useCompanyPermissions } from '@/features/permissions/hooks/useCompanyPe
 import { NeedsChangesList } from '@/features/moderation/ui/NeedsChangesBanner'
 import { companyDetailsPath, ROUTES } from '@/shared/constants/routes'
 import { formatCurrency } from '@/shared/lib/format'
-import { AppButton, EmptyState, LoadingState, PageHeader, Tag, VerifiedBadge } from '@/shared/ui'
+import {
+  AppButton,
+  BentoGrid,
+  BentoTile,
+  CompanyAvatar,
+  EmptyState,
+  LoadingState,
+  PageHeader,
+  Tag,
+  VerifiedBadge,
+} from '@/shared/ui'
 
 const MANAGEMENT_LINKS = [
   { to: ROUTES.COMPANY_ADMIN, label: 'Панель управления', need: Permission.VIEW_COMPANY_ACTIVITY },
@@ -39,10 +48,14 @@ export function CompanyProfilePage() {
     return (
       <Box>
         <PageHeader title="Профиль компании" subtitle="Компания не привязана к аккаунту" />
-        <EmptyState
-          title="Нет компании"
-          description="Для вашей роли компания не назначена. Marketplace и управление компанией недоступны."
-        />
+        <BentoGrid>
+          <BentoTile span={12} variant="muted">
+            <EmptyState
+              title="Нет компании"
+              description="Для вашей роли компания не назначена. Marketplace и управление компанией недоступны."
+            />
+          </BentoTile>
+        </BentoGrid>
       </Box>
     )
   }
@@ -63,40 +76,69 @@ export function CompanyProfilePage() {
         }
       />
       <NeedsChangesList />
-      <Stack spacing={2}>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Avatar sx={{ width: 64, height: 64, bgcolor: 'primary.main' }}>
-            {company.shortName.slice(0, 1)}
-          </Avatar>
-          <Box>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="h2">{company.shortName}</Typography>
-              <VerifiedBadge verified={company.verified} />
-            </Stack>
-            <Typography variant="body2" color="text.secondary">
-              {user.firstName} {user.lastName} · {user.role}
+
+      <BentoGrid>
+        <BentoTile span={8} variant="emphasis">
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+            <CompanyAvatar name={company.shortName} logoUrl={company.logoUrl} size={64} />
+            <Box>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="h2">{company.shortName}</Typography>
+                <VerifiedBadge verified={company.verified} />
+              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                {user.firstName} {user.lastName} · {user.role}
+              </Typography>
+            </Box>
+          </Stack>
+          <Typography variant="body1" sx={{ mb: 1.5 }}>
+            {company.description}
+          </Typography>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <Rating value={company.rating} readOnly size="small" precision={0.1} />
+            <Typography variant="body2">
+              {company.rating.toFixed(1)} · {company.region}
             </Typography>
-          </Box>
-        </Stack>
+          </Stack>
+          {company.priceFrom != null ? (
+            <Typography variant="body2" fontWeight={600}>
+              от {formatCurrency(company.priceFrom)}
+              {company.priceTo != null ? ` — ${formatCurrency(company.priceTo)}` : ''}
+            </Typography>
+          ) : null}
+        </BentoTile>
 
-        <Typography variant="body1">{company.description}</Typography>
-
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Rating value={company.rating} readOnly size="small" precision={0.1} />
-          <Typography variant="body2">
-            {company.rating.toFixed(1)} · {company.region}
+        <BentoTile span={4}>
+          <Typography variant="h4" sx={{ mb: 1.5 }}>
+            Ссылки
           </Typography>
-        </Stack>
-
-        {company.priceFrom != null ? (
-          <Typography variant="body2" fontWeight={600}>
-            от {formatCurrency(company.priceFrom)}
-            {company.priceTo != null ? ` — ${formatCurrency(company.priceTo)}` : ''}
-          </Typography>
-        ) : null}
+          <Stack spacing={1}>
+            <AppButton
+              component={RouterLink}
+              to={companyDetailsPath(company.id)}
+              variant="contained"
+              sx={{ minHeight: 44 }}
+            >
+              Публичная карточка
+            </AppButton>
+            <AppButton
+              component={RouterLink}
+              to={ROUTES.COMPANIES}
+              variant="outlined"
+              sx={{ minHeight: 44 }}
+            >
+              Каталог компаний
+            </AppButton>
+            {!canEdit ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Редактирование профиля доступно владельцу и администратору компании.
+              </Typography>
+            ) : null}
+          </Stack>
+        </BentoTile>
 
         {company.industries.length > 0 ? (
-          <Box>
+          <BentoTile span={6}>
             <Typography variant="h4" sx={{ mb: 0.75 }}>
               Отрасли
             </Typography>
@@ -105,11 +147,11 @@ export function CompanyProfilePage() {
                 <Tag key={item} label={item} />
               ))}
             </Stack>
-          </Box>
+          </BentoTile>
         ) : null}
 
         {company.services.length > 0 ? (
-          <Box>
+          <BentoTile span={6}>
             <Typography variant="h4" sx={{ mb: 0.75 }}>
               Услуги
             </Typography>
@@ -118,11 +160,11 @@ export function CompanyProfilePage() {
                 <Tag key={s} label={s} />
               ))}
             </Stack>
-          </Box>
+          </BentoTile>
         ) : null}
 
         {company.capabilities.length > 0 ? (
-          <Box>
+          <BentoTile span={6}>
             <Typography variant="h4" sx={{ mb: 0.75 }}>
               Компетенции
             </Typography>
@@ -131,11 +173,11 @@ export function CompanyProfilePage() {
                 <Tag key={c} label={c} />
               ))}
             </Stack>
-          </Box>
+          </BentoTile>
         ) : null}
 
         {company.technologies.length > 0 ? (
-          <Box>
+          <BentoTile span={6}>
             <Typography variant="h4" sx={{ mb: 0.75 }}>
               Технологии
             </Typography>
@@ -144,34 +186,30 @@ export function CompanyProfilePage() {
                 <Tag key={t} label={t} color="secondary" />
               ))}
             </Stack>
-          </Box>
+          </BentoTile>
         ) : null}
 
-        <Typography variant="body2" color="text.secondary">
-          Кейсов в профиле: {company.casesCount}
-          {has(Permission.VIEW_COMPANY_CASES) ? (
-            <>
-              {' · '}
-              <Typography
-                component={RouterLink}
-                to={ROUTES.COMPANY_CASES}
-                variant="body2"
-                color="secondary"
-              >
-                Смотреть кейсы
-              </Typography>
-            </>
-          ) : null}
-        </Typography>
-
-        {!canEdit ? (
+        <BentoTile span={canManageCompany && visibleLinks.length > 0 ? 6 : 12}>
           <Typography variant="body2" color="text.secondary">
-            Редактирование профиля доступно владельцу и администратору компании.
+            Кейсов в профиле: {company.casesCount}
+            {has(Permission.VIEW_COMPANY_CASES) ? (
+              <>
+                {' · '}
+                <Typography
+                  component={RouterLink}
+                  to={ROUTES.COMPANY_CASES}
+                  variant="body2"
+                  color="secondary"
+                >
+                  Смотреть кейсы
+                </Typography>
+              </>
+            ) : null}
           </Typography>
-        ) : null}
+        </BentoTile>
 
         {canManageCompany && visibleLinks.length > 0 ? (
-          <Box>
+          <BentoTile span={6}>
             <Typography variant="h3" sx={{ mb: 1 }}>
               Управление
             </Typography>
@@ -183,23 +221,15 @@ export function CompanyProfilePage() {
                   to={link.to}
                   variant={link.need === Permission.EDIT_COMPANY ? 'contained' : 'outlined'}
                   size="small"
+                  sx={{ minHeight: 44 }}
                 >
                   {link.label}
                 </AppButton>
               ))}
             </Stack>
-          </Box>
+          </BentoTile>
         ) : null}
-
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-          <AppButton component={RouterLink} to={companyDetailsPath(company.id)} variant="contained">
-            Публичная карточка
-          </AppButton>
-          <AppButton component={RouterLink} to={ROUTES.COMPANIES} variant="outlined">
-            Каталог компаний
-          </AppButton>
-        </Stack>
-      </Stack>
+      </BentoGrid>
     </Box>
   )
 }

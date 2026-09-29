@@ -22,6 +22,8 @@ import { companyDetailsPath, dealDetailsPath, ROUTES } from '@/shared/constants/
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import {
   AppButton,
+  BentoGrid,
+  BentoTile,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -197,7 +199,9 @@ export function ShortlistPage({ embedded }: ShortlistPageProps) {
   return (
     <Box>
       <PageHeader title="Шортлист" subtitle="Финалисты по выбранным запросам" />
-      {content}
+      <BentoGrid>
+        <BentoTile span={12}>{content}</BentoTile>
+      </BentoGrid>
     </Box>
   )
 }

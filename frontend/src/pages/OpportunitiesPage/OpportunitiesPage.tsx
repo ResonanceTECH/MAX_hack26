@@ -27,6 +27,8 @@ import {
   AppButton,
   AppInput,
   AppSelect,
+  BentoGrid,
+  BentoTile,
   EmptyState,
   ErrorState,
   FilterDrawer,
@@ -249,22 +251,16 @@ export function OpportunitiesPage() {
         }
       />
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start">
+      <BentoGrid>
         {isDesktop ? (
-          <Box
+          <BentoTile
+            span={4}
             sx={{
-              width: 280,
-              flexShrink: 0,
-              alignSelf: 'flex-start',
-              p: 2,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'divider',
-              bgcolor: 'background.paper',
               position: 'sticky',
               top: { md: 'calc(56px + 16px)' },
               maxHeight: { md: 'calc(100dvh - 56px - 32px)' },
               overflow: 'auto',
+              alignSelf: 'start',
             }}
           >
             <Typography variant="h3" sx={{ mb: 2 }}>
@@ -274,10 +270,10 @@ export function OpportunitiesPage() {
             <AppButton fullWidth variant="text" sx={{ mt: 2 }} onClick={reset}>
               Сбросить
             </AppButton>
-          </Box>
+          </BentoTile>
         ) : null}
 
-        <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
+        <BentoTile span={isDesktop ? 8 : 12}>
           <Stack spacing={2} sx={{ mb: 3 }}>
             <SearchInput
               value={query}
@@ -321,8 +317,8 @@ export function OpportunitiesPage() {
               ))}
             </Stack>
           ) : null}
-        </Box>
-      </Stack>
+        </BentoTile>
+      </BentoGrid>
 
       <FilterDrawer
         open={drawerOpen}
