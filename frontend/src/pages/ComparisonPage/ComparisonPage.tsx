@@ -223,11 +223,11 @@ export function ComparisonPage() {
                           loading={shortlistMutation.isPending}
                           onClick={() =>
                             shortlistMutation.mutate(p.id, {
-                              onSuccess: () => showSuccess('Добавлено в shortlist'),
+                              onSuccess: () => showSuccess('Добавлено в шортлист'),
                             })
                           }
                         >
-                          В shortlist
+                          В шортлист
                         </AppButton>
                       ) : null}
                       <AppButton
