@@ -5,6 +5,7 @@ import { DevRoleSwitcher } from '@/features/auth/ui/DevRoleSwitcher'
 import { AppSnackbar } from '@/features/ui/ui/AppSnackbar'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import { AppHeader } from '@/widgets/AppHeader/AppHeader'
+import { DesktopTopBar } from '@/widgets/AppHeader/DesktopTopBar'
 import { AppBottomNavigation } from '@/widgets/BottomNavigation/BottomNavigation'
 import { Sidebar } from '@/widgets/Sidebar/Sidebar'
 import { LoadingState } from '@/shared/ui'
@@ -39,6 +40,7 @@ export function AppLayout() {
         <Box sx={{ display: { xs: 'block', md: 'none' } }}>
           <AppHeader />
         </Box>
+        <DesktopTopBar />
         <Container
           component="main"
           maxWidth="lg"
