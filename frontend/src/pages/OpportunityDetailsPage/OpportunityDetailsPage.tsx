@@ -65,6 +65,9 @@ export function OpportunityDetailsPage() {
 
   const hasRating = displayCompany.rating > 0 || displayCompany.reviewsCount > 0
 
+  const isSameRequirement = (label: string, pool: string[]) =>
+    pool.some((item) => item.toLowerCase() === label.toLowerCase())
+
   const requiredMatched = data.requiredRequirements.map((req) => ({
     label: req,
     matched: (match?.reasons.some(
@@ -73,10 +76,21 @@ export function OpportunityDetailsPage() {
       data.technologies.some((t) => req.toLowerCase().includes(t.toLowerCase()))) as boolean,
   }))
 
+  // API maps requirements → both requiredRequirements and technologies; don't re-show the same list
+  // under «Желательные» as chips (looks like there is no distinction).
+  const desiredOnly = data.desiredRequirements.filter(
+    (item) => !isSameRequirement(item, data.requiredRequirements),
+  )
   const techTags = [
-    ...data.technologies.map((t) => ({ key: `tech:${t}`, label: t, color: 'secondary' as const })),
+    ...data.technologies
+      .filter((t) => !isSameRequirement(t, data.requiredRequirements))
+      .map((t) => ({ key: `tech:${t}`, label: t, color: 'secondary' as const })),
     ...data.skills
-      .filter((s) => !data.technologies.some((t) => t.toLowerCase() === s.toLowerCase()))
+      .filter(
+        (s) =>
+          !isSameRequirement(s, data.requiredRequirements) &&
+          !data.technologies.some((t) => t.toLowerCase() === s.toLowerCase()),
+      )
       .map((s) => ({ key: `skill:${s}`, label: s, color: undefined })),
   ]
 
@@ -177,8 +191,11 @@ export function OpportunityDetailsPage() {
           <Typography variant="h3" sx={{ mb: 1 }}>
             Требования
           </Typography>
-          <Typography variant="h4" sx={{ mb: 0.75 }}>
+          <Typography variant="h4" sx={{ mb: 0.25 }}>
             Обязательные
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
+            Без них отклик слабо подходит под запрос
           </Typography>
           <Stack spacing={0.75} sx={{ mb: 2 }}>
             {(requiredMatched.length
@@ -197,16 +214,19 @@ export function OpportunityDetailsPage() {
               </Stack>
             ))}
           </Stack>
-          <Typography variant="h4" sx={{ mb: 0.75 }}>
+          <Typography variant="h4" sx={{ mb: 0.25 }}>
             Желательные
           </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
+            Плюс к обязательным: не блокируют отклик, но повышают шанс совпадения
+          </Typography>
           <Stack spacing={0.75} sx={{ mb: 2 }}>
-            {data.desiredRequirements.length === 0 ? (
+            {desiredOnly.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 Не указаны
               </Typography>
             ) : (
-              data.desiredRequirements.map((item) => (
+              desiredOnly.map((item) => (
                 <Stack key={item} direction="row" spacing={1} alignItems="center">
                   <AppIcon icon={AlertCircleIcon} size={18} color="#C47F17" />
                   <Typography variant="body2">△ {item}</Typography>
@@ -218,8 +238,11 @@ export function OpportunityDetailsPage() {
 
         {techTags.length > 0 ? (
           <Box>
-            <Typography variant="h3" sx={{ mb: 1 }}>
-              Технологии
+            <Typography variant="h3" sx={{ mb: 0.25 }}>
+              Доп. технологии
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Не входят в обязательные требования
             </Typography>
             <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
               {techTags.map((t) => (
