@@ -21,17 +21,11 @@ import {
   AppButton,
   AppInput,
   AppTextarea,
+  CommaListInput,
   LoadingState,
   PageHeader,
   Section,
 } from '@/shared/ui'
-
-function parseTags(value: string): string[] {
-  return value
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-}
 
 export function CompanyEditPage() {
   const company = useSessionStore((s) => s.company)
@@ -219,10 +213,11 @@ export function CompanyEditPage() {
               control={form.control}
               render={({ field, fieldState }) => (
                 <Box>
-                  <AppInput
+                  <CommaListInput
                     label="Отрасли (через запятую)"
-                    value={field.value.join(', ')}
-                    onChange={(e) => field.onChange(parseTags(e.target.value))}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
                     error={Boolean(fieldState.error)}
                     helperText={fieldState.error?.message}
                   />
@@ -238,10 +233,11 @@ export function CompanyEditPage() {
               name="capabilities"
               control={form.control}
               render={({ field }) => (
-                <AppInput
+                <CommaListInput
                   label="Компетенции (через запятую)"
-                  value={field.value.join(', ')}
-                  onChange={(e) => field.onChange(parseTags(e.target.value))}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
                 />
               )}
             />
@@ -249,10 +245,11 @@ export function CompanyEditPage() {
               name="technologies"
               control={form.control}
               render={({ field, fieldState }) => (
-                <AppInput
+                <CommaListInput
                   label="Технологии (через запятую)"
-                  value={field.value.join(', ')}
-                  onChange={(e) => field.onChange(parseTags(e.target.value))}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
                   error={Boolean(fieldState.error)}
                   helperText={fieldState.error?.message}
                 />
@@ -262,10 +259,11 @@ export function CompanyEditPage() {
               name="services"
               control={form.control}
               render={({ field }) => (
-                <AppInput
+                <CommaListInput
                   label="Услуги в профиле (через запятую)"
-                  value={(field.value ?? []).join(', ')}
-                  onChange={(e) => field.onChange(parseTags(e.target.value))}
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
                 />
               )}
             />
