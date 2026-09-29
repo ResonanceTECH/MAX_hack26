@@ -1,6 +1,7 @@
 export {
   type MaxBridgeAdapter,
   type ShareData,
+  type ShareResult,
   type OpenChatParams,
   type OpenChatResult,
   BrowserMaxBridgeAdapter,

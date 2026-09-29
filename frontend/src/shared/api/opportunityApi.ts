@@ -1,4 +1,5 @@
 import type { Opportunity } from '@/entities/opportunity'
+import { companyApi } from '@/shared/api/companyApi'
 import { apiClient } from '@/shared/api/apiClient'
 import { isReal } from '@/shared/api/apiCapabilities'
 import type { RequestDto } from '@/shared/api/dto/backend'
@@ -131,7 +132,13 @@ export const opportunityApi = {
     if (isReal('opportunities')) {
       try {
         const { data } = await apiClient.get<RequestDto>(`/opportunities/${id}`)
-        return mapRequestDtoToOpportunity(data)
+        const opportunity = mapRequestDtoToOpportunity(data)
+        try {
+          const company = await companyApi.getById(opportunity.company.id)
+          return { ...opportunity, company }
+        } catch {
+          return opportunity
+        }
       } catch (error) {
         throw toApiError(error)
       }

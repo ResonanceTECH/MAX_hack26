@@ -29,8 +29,8 @@ export const mockDeals: Deal[] = [
       {
         id: 'e2',
         date: '2026-09-24T12:00:00.000Z',
-        title: 'Компания добавлена в shortlist',
-        description: 'Заказчик включил Digital Lab в shortlist финалистов',
+        title: 'Компания добавлена в шортлист',
+        description: 'Заказчик включил Digital Lab в шортлист финалистов',
         type: 'shortlist',
       },
       {
