@@ -1,6 +1,7 @@
 export { AppButton } from './AppButton'
 export { AppIcon } from './AppIcon'
 export { AppInput } from './AppInput'
+export { CommaListInput } from './CommaListInput'
 export { AppSelect } from './AppSelect'
 export { AppTextarea } from './AppTextarea'
 export { Tag } from './Tag'
