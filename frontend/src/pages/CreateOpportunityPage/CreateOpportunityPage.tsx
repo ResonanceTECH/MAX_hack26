@@ -25,10 +25,16 @@ import { OPPORTUNITY_CATEGORIES, REGIONS } from '@/shared/constants/labels'
 import { OPPORTUNITY_TYPE_LABELS } from '@/shared/constants/labels'
 import { companyDetailsPath, opportunityDetailsPath, ROUTES } from '@/shared/constants/routes'
 import { formatBudgetRange } from '@/shared/lib/format'
-import { AppButton, AppInput, AppSelect, AppTextarea, PageHeader } from '@/shared/ui'
+import { AppButton, AppInput, AppSelect, AppTextarea, CommaListInput, PageHeader } from '@/shared/ui'
 import { MatchCard } from '@/widgets/MatchCard/MatchCard'
 
 type Step = 'describe' | 'structured' | 'form' | 'preview' | 'success' | 'draft-saved'
+
+function setBudgetFieldValue(value: unknown): number | null {
+  if (value === '' || value == null) return null
+  const n = typeof value === 'number' ? value : Number(String(value).replace(/\s/g, ''))
+  return Number.isFinite(n) ? n : null
+}
 
 function toPayload(values: OpportunityFormValues) {
   return {
@@ -226,45 +232,30 @@ export function CreateOpportunityPage() {
               helperText={form.formState.errors.category?.message}
               onChange={(v) => form.setValue('category', v, { shouldValidate: true })}
             />
-            <AppInput
+            <CommaListInput
               label="Отрасли (через запятую)"
               error={Boolean(form.formState.errors.industries)}
               helperText={form.formState.errors.industries?.message}
-              value={form.watch('industries').join(', ')}
-              onChange={(e) =>
-                form.setValue(
-                  'industries',
-                  e.target.value
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                  { shouldValidate: true },
-                )
-              }
+              value={form.watch('industries')}
+              onChange={(next) => form.setValue('industries', next, { shouldValidate: true })}
             />
-            <AppInput
+            <CommaListInput
               label="Технологии (через запятую)"
-              value={form.watch('technologies').join(', ')}
-              onChange={(e) =>
-                form.setValue(
-                  'technologies',
-                  e.target.value
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                )
-              }
+              value={form.watch('technologies')}
+              onChange={(next) => form.setValue('technologies', next)}
             />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <AppInput
                 label="Бюджет от"
                 type="number"
-                {...form.register('budgetMin', { valueAsNumber: true })}
+                inputMode="numeric"
+                {...form.register('budgetMin', { setValueAs: setBudgetFieldValue })}
               />
               <AppInput
                 label="Бюджет до"
                 type="number"
-                {...form.register('budgetMax', { valueAsNumber: true })}
+                inputMode="numeric"
+                {...form.register('budgetMax', { setValueAs: setBudgetFieldValue })}
               />
             </Stack>
             <AppSelect

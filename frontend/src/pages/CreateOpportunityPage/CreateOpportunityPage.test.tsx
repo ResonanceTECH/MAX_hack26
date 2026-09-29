@@ -24,4 +24,22 @@ describe('CreateOpportunityForm', () => {
     expect(screen.getByText('React')).toBeInTheDocument()
     expect(screen.getByText('1С')).toBeInTheDocument()
   })
+
+  it('keeps trailing commas while typing technologies and commits on blur', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<CreateOpportunityPage />)
+
+    await user.type(screen.getByLabelText('Описание задачи'), TEXT)
+    await user.click(screen.getByRole('button', { name: 'Продолжить' }))
+    await screen.findByRole('heading', { name: 'Мы поняли ваш запрос так' })
+    await user.click(screen.getByRole('button', { name: 'Редактировать и опубликовать' }))
+
+    const tech = screen.getByLabelText('Технологии (через запятую)')
+    await user.clear(tech)
+    await user.type(tech, 'React, TypeScript,')
+    expect(tech).toHaveValue('React, TypeScript,')
+
+    await user.tab()
+    expect(tech).toHaveValue('React, TypeScript')
+  })
 })
