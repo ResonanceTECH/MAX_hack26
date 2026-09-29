@@ -53,6 +53,7 @@ export const companyRolePermissions: Record<CompanyMemberRole, Permission[]> = {
     Permission.VIEW_NOTIFICATIONS,
     Permission.VIEW_COMPANY_PROFILE,
     Permission.VIEW_COMPANY,
+    Permission.EDIT_COMPANY,
     Permission.MANAGE_COMPANY_SERVICES,
     Permission.MANAGE_COMPANY_CASES,
     Permission.VIEW_COMPANY_SERVICES,
