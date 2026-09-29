@@ -22,6 +22,9 @@ const unsorted: Deal = {
   lastAction: 'Старт',
   updatedAt: '2026-09-25T14:00:00.000Z',
   files: [],
+  termsSummary: null,
+  agreedPrice: null,
+  agreedTermDays: null,
   events: [
     {
       id: 'late',
@@ -57,5 +60,14 @@ describe('DealRoom timeline', () => {
       'Раннее событие',
       'Позднее событие',
     ])
+  })
+
+  it('shows upload control on Files tab', async () => {
+    mockDeals.unshift(unsorted)
+    const user = userEvent.setup()
+    renderRouted(<DealRoomPage />, '/deals/deal-unsorted-audit', '/deals/:id')
+    await user.click(await screen.findByRole('tab', { name: 'Файлы' }))
+    expect(screen.getByRole('button', { name: 'Загрузить файл' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Выбрать файл' })).toBeInTheDocument()
   })
 })
