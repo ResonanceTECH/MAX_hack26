@@ -96,7 +96,7 @@ export function ProposalCard({
             size="small"
             onClick={() => onShortlist(proposal.id)}
           >
-            В shortlist
+            В шортлист
           </AppButton>
         ) : null}
         {onReject ? (
