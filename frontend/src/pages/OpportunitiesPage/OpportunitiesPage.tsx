@@ -21,7 +21,6 @@ import {
   INDUSTRIES,
   OPPORTUNITY_CATEGORIES,
   OPPORTUNITY_STATUS_LABELS,
-  REGIONS,
 } from '@/shared/constants/labels'
 import { useUiStore } from '@/shared/hooks/useUiStore'
 import {
@@ -33,6 +32,7 @@ import {
   FilterDrawer,
   LoadingState,
   PageHeader,
+  RegionAutocomplete,
   SearchInput,
 } from '@/shared/ui'
 import { OpportunityCard } from '@/widgets/OpportunityCard/OpportunityCard'
@@ -137,10 +137,12 @@ function FiltersForm() {
         options={[{ value: '', label: 'Все' }, ...INDUSTRIES.map((i) => ({ value: i, label: i }))]}
         onChange={(value) => patchFilters({ industries: value ? [value] : undefined })}
       />
-      <AppSelect
+      <RegionAutocomplete
         label="Регион"
         value={filters.region ?? ''}
-        options={[{ value: '', label: 'Все' }, ...REGIONS.map((r) => ({ value: r, label: r }))]}
+        allowEmpty
+        emptyLabel="Все"
+        helperText={null}
         onChange={(value) => patchFilters({ region: value || undefined })}
       />
       <AppInput
