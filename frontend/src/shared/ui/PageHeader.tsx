@@ -7,16 +7,18 @@ export interface PageHeaderProps {
   title: string
   subtitle?: string
   actions?: ReactNode
+  /** Drop bottom margin when header sits inside a bento tile. */
+  disableGutter?: boolean
 }
 
-export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, actions, disableGutter }: PageHeaderProps) {
   return (
     <Stack
       direction={{ xs: 'column', sm: 'row' }}
       justifyContent="space-between"
       alignItems={{ xs: 'stretch', sm: 'flex-start' }}
       spacing={2}
-      sx={{ mb: 3 }}
+      sx={{ mb: disableGutter ? 0 : 3 }}
     >
       <Box>
         <Typography variant="h1" component="h1">
