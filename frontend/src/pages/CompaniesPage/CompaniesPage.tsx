@@ -11,7 +11,7 @@ import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import { useCompanies } from '@/entities/company/api/queries'
 import { useCompanySearchStore } from '@/features/company-search/model/searchStore'
-import { COMPANY_SERVICES, INDUSTRIES, REGIONS } from '@/shared/constants/labels'
+import { COMPANY_SERVICES, INDUSTRIES } from '@/shared/constants/labels'
 import { useUiStore } from '@/shared/hooks/useUiStore'
 import {
   AppButton,
@@ -22,6 +22,7 @@ import {
   FilterDrawer,
   LoadingState,
   PageHeader,
+  RegionAutocomplete,
   SearchInput,
 } from '@/shared/ui'
 import { CompanyCard } from '@/widgets/CompanyCard/CompanyCard'
@@ -55,17 +56,26 @@ function CompanyFiltersForm() {
           patch({ technologies: technologies.length ? technologies : undefined })
         }}
       />
-      <AppSelect
+      <RegionAutocomplete
         label="Регион"
         value={filters.region ?? ''}
-        options={[{ value: '', label: 'Все' }, ...REGIONS.map((r) => ({ value: r, label: r }))]}
+        allowEmpty
+        emptyLabel="Все"
+        helperText={null}
         onChange={(v) => patch({ region: v || undefined })}
       />
       <AppInput
-        label="Стоимость от"
+        label="Стоимость до"
         type="number"
-        value={filters.priceFrom ?? ''}
-        onChange={(e) => patch({ priceFrom: e.target.value ? Number(e.target.value) : undefined })}
+        inputMode="numeric"
+        inputProps={{ min: 1, step: 1000 }}
+        value={filters.priceTo ?? ''}
+        onChange={(e) =>
+          patch({
+            priceTo: e.target.value ? Number(e.target.value) : undefined,
+            priceFrom: undefined,
+          })
+        }
       />
       <AppInput
         label="Рейтинг от"
