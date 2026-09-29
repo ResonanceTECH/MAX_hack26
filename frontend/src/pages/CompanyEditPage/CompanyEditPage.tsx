@@ -24,6 +24,7 @@ import {
   CommaListInput,
   LoadingState,
   PageHeader,
+  RegionAutocomplete,
   Section,
 } from '@/shared/ui'
 
@@ -195,9 +196,10 @@ export function CompanyEditPage() {
               name="region"
               control={form.control}
               render={({ field, fieldState }) => (
-                <AppInput
-                  {...field}
+                <RegionAutocomplete
                   label="Регион / город"
+                  value={field.value}
+                  onChange={field.onChange}
                   error={Boolean(fieldState.error)}
                   helperText={fieldState.error?.message}
                 />
