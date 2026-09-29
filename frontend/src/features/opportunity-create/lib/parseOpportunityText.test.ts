@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  normalizeBudgetAmountToken,
   opportunityFormSchema,
+  parseBudgetFromText,
   parseOpportunityText,
 } from '@/features/opportunity-create/lib/parseOpportunityText'
 
@@ -67,5 +69,27 @@ describe('opportunity validation and parser', () => {
     expect(draft.industries).toContain('Healthcare')
     expect(draft.technologies).toEqual(expect.arrayContaining(['React', '1С']))
     expect(draft.budgetMax).toBe(500000)
+  })
+
+  it('keeps zeros in budget amounts and ignores 1С digits', async () => {
+    expect(normalizeBudgetAmountToken('100000')).toBe(100000)
+    expect(normalizeBudgetAmountToken('100 000')).toBe(100000)
+    expect(normalizeBudgetAmountToken('100.000')).toBe(100000)
+
+    expect(parseBudgetFromText('Бюджет 100000')).toBe(100000)
+    expect(parseBudgetFromText('Бюджет 100 000')).toBe(100000)
+    expect(parseBudgetFromText('Бюджет до 100 тыс')).toBe(100000)
+    expect(
+      parseBudgetFromText(
+        'Нужна CRM с интеграцией с 1С для сети клиник. Бюджет до 100000 рублей.',
+      ),
+    ).toBe(100000)
+    expect(parseBudgetFromText('Нужна CRM с интеграцией с 1С для сети клиник.')).toBeNull()
+
+    const draft = await parseOpportunityText(
+      'Нужна CRM с интеграцией с 1С. Бюджет 100000. React.',
+    )
+    expect(draft.budgetMax).toBe(100000)
+    expect(draft.budgetMin).toBe(70000)
   })
 })
