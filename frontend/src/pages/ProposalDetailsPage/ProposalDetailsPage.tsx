@@ -154,11 +154,11 @@ export function ProposalDetailsPage() {
             disabled={actionsDisabled}
             onClick={() =>
               shortlistMutation.mutate(id, {
-                onSuccess: () => showSuccess('Добавлено в shortlist'),
+                onSuccess: () => showSuccess('Добавлено в шортлист'),
               })
             }
           >
-            В shortlist
+            В шортлист
           </AppButton>
           <AppButton
             fullWidth
@@ -181,11 +181,11 @@ export function ProposalDetailsPage() {
             disabled={actionsDisabled}
             onClick={() =>
               shortlistMutation.mutate(id, {
-                onSuccess: () => showSuccess('Добавлено в shortlist'),
+                onSuccess: () => showSuccess('Добавлено в шортлист'),
               })
             }
           >
-            В shortlist
+            В шортлист
           </AppButton>
           <AppButton
             variant="outlined"
