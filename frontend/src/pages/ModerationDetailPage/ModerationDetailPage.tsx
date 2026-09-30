@@ -5,7 +5,6 @@ import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Chip from '@mui/material/Chip'
-import Grid from '@mui/material/Grid'
 import Stack from '@mui/material/Stack'
 import Tab from '@mui/material/Tab'
 import Tabs from '@mui/material/Tabs'
@@ -64,6 +63,8 @@ import {
 } from '@/shared/constants/routes'
 import {
   AppButton,
+  BentoGrid,
+  BentoTile,
   ConfirmDialog,
   ErrorState,
   LoadingState,
@@ -225,8 +226,8 @@ export function ModerationDetailPage() {
 
       <LongWaitAlert submittedAt={item.submittedAt} />
 
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={8}>
+      <BentoGrid>
+        <BentoTile span={8} variant="emphasis">
           <Stack spacing={2}>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
               <Chip size="small" label={MODERATION_TYPE_LABELS[item.entityType]} />
@@ -447,9 +448,9 @@ export function ModerationDetailPage() {
               К очереди
             </AppButton>
           </Stack>
-        </Grid>
+        </BentoTile>
 
-        <Grid item xs={12} md={4} sx={{ display: { xs: 'none', md: 'block' } }}>
+        <BentoTile span={4} sx={{ display: { xs: 'none', md: 'flex' } }}>
           {canDecide ? (
             <ModerationDecisionPanel
               loading={loading}
@@ -475,8 +476,8 @@ export function ModerationDetailPage() {
           ) : (
             <Alert severity="info">Решения по этому статусу недоступны.</Alert>
           )}
-        </Grid>
-      </Grid>
+        </BentoTile>
+      </BentoGrid>
 
       {canDecide ? (
         <Box sx={{ display: { xs: 'block', md: 'none' } }}>

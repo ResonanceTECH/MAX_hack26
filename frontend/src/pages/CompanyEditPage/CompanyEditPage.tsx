@@ -21,6 +21,8 @@ import {
   AppButton,
   AppInput,
   AppTextarea,
+  BentoGrid,
+  BentoTile,
   CommaListInput,
   LoadingState,
   PageHeader,
@@ -127,8 +129,10 @@ export function CompanyEditPage() {
 
       <NeedsChangesBanner entityType="company" entityId={company.id} />
 
-      <Stack component="form" spacing={3} onSubmit={onSubmit} maxWidth={640}>
-        <Section title="Юридические данные">
+      <BentoGrid>
+        <BentoTile span={8}>
+          <Stack component="form" spacing={3} onSubmit={onSubmit}>
+        <Section title="Юридические данные" disableGutter>
           <Stack spacing={2}>
             <AppInput
               label="ИНН"
@@ -279,7 +283,27 @@ export function CompanyEditPage() {
         <AppButton type="submit" variant="contained" loading={updateProfile.isPending}>
           Сохранить
         </AppButton>
-      </Stack>
+          </Stack>
+        </BentoTile>
+
+        <BentoTile span={4} variant="emphasis">
+          <Typography variant="h4" sx={{ mb: 1 }}>
+            Подсказка
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            Юридические поля могут быть заблокированы после верификации. Описание, отрасли и
+            компетенции влияют на матчинг в витрине.
+          </Typography>
+          <AppButton
+            component={RouterLink}
+            to={ROUTES.COMPANY_ADMIN}
+            variant="outlined"
+            size="small"
+          >
+            К обзору компании
+          </AppButton>
+        </BentoTile>
+      </BentoGrid>
 
       <UnsavedChangesDialog
         open={blocker.state === 'blocked'}

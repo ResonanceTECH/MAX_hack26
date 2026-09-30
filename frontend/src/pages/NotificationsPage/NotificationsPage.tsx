@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
-import Card from '@mui/material/Card'
-import CardActionArea from '@mui/material/CardActionArea'
-import CardContent from '@mui/material/CardContent'
 import Chip from '@mui/material/Chip'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
@@ -20,7 +17,15 @@ import {
   opportunityProposePath,
 } from '@/shared/constants/routes'
 import { formatBudgetRange, formatRelativeDate } from '@/shared/lib/format'
-import { AppButton, EmptyState, ErrorState, LoadingState, PageHeader } from '@/shared/ui'
+import {
+  AppButton,
+  BentoGrid,
+  BentoTile,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PageHeader,
+} from '@/shared/ui'
 
 const INVITE_STATUS_LABEL: Record<
   OpportunityInviteStatus,
@@ -127,28 +132,52 @@ export function NotificationsPage() {
           </AppButton>
         }
       />
-      {pageLoading ? <LoadingState rows={4} variant="list" /> : null}
-      {error ? <ErrorState onRetry={() => void fetchAll()} /> : null}
-      {invitesError ? <ErrorState onRetry={() => void loadInvites()} /> : null}
-      {empty ? <EmptyState title="Нет уведомлений" /> : null}
+      <BentoGrid>
+        {pageLoading ? (
+          <BentoTile span={12}>
+            <LoadingState rows={4} variant="list" />
+          </BentoTile>
+        ) : null}
+        {error ? (
+          <BentoTile span={12}>
+            <ErrorState onRetry={() => void fetchAll()} />
+          </BentoTile>
+        ) : null}
+        {invitesError ? (
+          <BentoTile span={12}>
+            <ErrorState onRetry={() => void loadInvites()} />
+          </BentoTile>
+        ) : null}
+        {empty ? (
+          <BentoTile span={12} variant="muted">
+            <EmptyState title="Нет уведомлений" />
+          </BentoTile>
+        ) : null}
 
-      {!pageLoading && invites.length > 0 ? (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h3" sx={{ mb: 1.5 }}>
-            Приглашения откликнуться
-          </Typography>
-          <Stack spacing={1.5}>
-            {invites.map((invite) => {
-              const statusMeta =
-                INVITE_STATUS_LABEL[invite.status] ?? INVITE_STATUS_LABEL.PENDING
-              const pending = invite.status === OPPORTUNITY_INVITE_STATUS.PENDING
-              const budget = formatBudgetRange(
-                invite.budgetMin ?? null,
-                invite.budgetMax ?? null,
-              )
-              return (
-                <Card key={`invite-${invite.id}`} sx={{ borderColor: 'secondary.light' }}>
-                  <CardContent>
+        {!pageLoading && invites.length > 0 ? (
+          <BentoTile span={items.length > 0 ? 6 : 12}>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>
+              Приглашения откликнуться
+            </Typography>
+            <Stack spacing={1.5}>
+              {invites.map((invite) => {
+                const statusMeta =
+                  INVITE_STATUS_LABEL[invite.status] ?? INVITE_STATUS_LABEL.PENDING
+                const pending = invite.status === OPPORTUNITY_INVITE_STATUS.PENDING
+                const budget = formatBudgetRange(
+                  invite.budgetMin ?? null,
+                  invite.budgetMax ?? null,
+                )
+                return (
+                  <Box
+                    key={`invite-${invite.id}`}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'secondary.light',
+                    }}
+                  >
                     <Stack
                       direction="row"
                       justifyContent="space-between"
@@ -211,44 +240,70 @@ export function NotificationsPage() {
                         </AppButton>
                       ) : null}
                     </Stack>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </Stack>
-        </Box>
-      ) : null}
+                  </Box>
+                )
+              })}
+            </Stack>
+          </BentoTile>
+        ) : null}
 
-      <Stack spacing={1.5}>
-        {items.map((item) => (
-          <Card
-            key={item.id}
-            sx={{
-              bgcolor: item.read ? 'background.paper' : 'match.light',
-              borderColor: item.read ? 'divider' : 'secondary.light',
-            }}
-          >
-            <CardActionArea
-              component={item.link ? RouterLink : 'div'}
-              to={item.link}
-              onClick={() => {
-                if (!item.read) void markAsRead(item.id)
-              }}
-            >
-              <CardContent>
-                <Typography variant="h4">{item.title}</Typography>
-                <Typography variant="body2" sx={{ mt: 0.5 }}>
-                  {item.message}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  {formatRelativeDate(item.createdAt)}
-                  {!item.read ? ' · новое' : ''}
-                </Typography>
-              </CardContent>
-            </CardActionArea>
-          </Card>
-        ))}
-      </Stack>
+        {!pageLoading && items.length > 0 ? (
+          <BentoTile span={invites.length > 0 ? 6 : 12}>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>
+              Лента
+            </Typography>
+            <Stack spacing={1.5}>
+              {items.map((item) => {
+                const body = (
+                  <>
+                    <Typography variant="h4">{item.title}</Typography>
+                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                      {item.message}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      {formatRelativeDate(item.createdAt)}
+                      {!item.read ? ' · новое' : ''}
+                    </Typography>
+                  </>
+                )
+                const sx = {
+                  p: 1.5,
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: item.read ? 'divider' : 'secondary.light',
+                  bgcolor: item.read ? 'transparent' : 'match.light',
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  minHeight: 44,
+                } as const
+                return item.link ? (
+                  <Box
+                    key={item.id}
+                    component={RouterLink}
+                    to={item.link}
+                    onClick={() => {
+                      if (!item.read) void markAsRead(item.id)
+                    }}
+                    sx={sx}
+                  >
+                    {body}
+                  </Box>
+                ) : (
+                  <Box
+                    key={item.id}
+                    onClick={() => {
+                      if (!item.read) void markAsRead(item.id)
+                    }}
+                    sx={sx}
+                  >
+                    {body}
+                  </Box>
+                )
+              })}
+            </Stack>
+          </BentoTile>
+        ) : null}
+      </BentoGrid>
     </Box>
   )
 }

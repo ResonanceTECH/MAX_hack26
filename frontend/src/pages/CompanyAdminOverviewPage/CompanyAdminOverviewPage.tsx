@@ -1,12 +1,10 @@
 import { Link as RouterLink } from 'react-router-dom'
 import Box from '@mui/material/Box'
-import Grid from '@mui/material/Grid2'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
 import {
   CompanyActivityItem,
-  CompanyStatCard,
   ProfileCompletion,
   useCompanyActivity,
   useCompanyCases,
@@ -19,12 +17,11 @@ import { COMPANY_DOCUMENT_STATUS } from '@/entities/company-document'
 import { COMPANY_MEMBER_STATUS } from '@/entities/company-member'
 import { COMPANY_SERVICE_STATUS } from '@/entities/company-service'
 import { COMPANY_CASE_STATUS } from '@/entities/company-case'
-import {
-  companyDetailsPath,
-  ROUTES,
-} from '@/shared/constants/routes'
+import { companyDetailsPath, ROUTES } from '@/shared/constants/routes'
 import {
   AppButton,
+  BentoGrid,
+  BentoTile,
   CompanyAvatar,
   LoadingState,
   PageHeader,
@@ -82,51 +79,60 @@ export function CompanyAdminOverviewPage() {
     <Box>
       <PageHeader title="Обзор" subtitle="Управление компанией" />
 
-      <Stack spacing={3}>
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={2}
-          alignItems={{ sm: 'flex-start' }}
-        >
-          <CompanyAvatar name={company.shortName} logoUrl={company.logoUrl} size={72} />
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography variant="h2" component="h1">
-                {company.shortName}
+      <BentoGrid>
+        <BentoTile span={8} variant="emphasis">
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            alignItems={{ sm: 'flex-start' }}
+          >
+            <CompanyAvatar name={company.shortName} logoUrl={company.logoUrl} size={72} />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Typography variant="h2" component="h1">
+                  {company.shortName}
+                </Typography>
+                <VerifiedBadge verified={company.verified} />
+              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                {company.name}
               </Typography>
-              <VerifiedBadge verified={company.verified} />
-            </Stack>
-            <Typography variant="body2" color="text.secondary">
-              {company.name}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              {company.region}
-              {company.inn ? ` · ИНН ${company.inn}` : ''}
-            </Typography>
-            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-              {company.industries.map((i) => (
-                <Tag key={i} label={i} />
-              ))}
-            </Stack>
-            {company.website ? (
-              <Typography
-                component="a"
-                href={company.website}
-                target="_blank"
-                rel="noreferrer"
-                variant="body2"
-                color="secondary"
-                sx={{ display: 'inline-block', mt: 0.75 }}
-              >
-                {company.website.replace(/^https?:\/\//, '')}
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                {company.region}
+                {company.inn ? ` · ИНН ${company.inn}` : ''}
               </Typography>
-            ) : null}
-          </Box>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                {company.industries.map((i) => (
+                  <Tag key={i} label={i} />
+                ))}
+              </Stack>
+              {company.website ? (
+                <Typography
+                  component="a"
+                  href={company.website}
+                  target="_blank"
+                  rel="noreferrer"
+                  variant="body2"
+                  color="secondary"
+                  sx={{ display: 'inline-block', mt: 0.75 }}
+                >
+                  {company.website.replace(/^https?:\/\//, '')}
+                </Typography>
+              ) : null}
+            </Box>
+          </Stack>
+        </BentoTile>
+
+        <BentoTile span={4}>
+          <Typography variant="h4" sx={{ mb: 1.5 }}>
+            Действия
+          </Typography>
+          <Stack spacing={1}>
             <AppButton
               component={RouterLink}
               to={ROUTES.PROFILE_COMPANY_EDIT}
               variant="contained"
+              sx={{ minHeight: 44 }}
             >
               Редактировать
             </AppButton>
@@ -134,31 +140,45 @@ export function CompanyAdminOverviewPage() {
               component={RouterLink}
               to={companyDetailsPath(company.id)}
               variant="outlined"
+              sx={{ minHeight: 44 }}
             >
               Публичная страница
             </AppButton>
           </Stack>
-        </Stack>
+        </BentoTile>
 
-        {completion ? <ProfileCompletion completion={completion} /> : null}
+        {completion ? (
+          <BentoTile span={12}>
+            <ProfileCompletion completion={completion} />
+          </BentoTile>
+        ) : null}
 
-        <Grid container spacing={1.5}>
-          {stats.map((s) => (
-            <Grid key={s.label} size={{ xs: 6, md: 3 }}>
-              <CompanyStatCard label={s.label} value={s.value} to={s.to} hint={s.hint} />
-            </Grid>
-          ))}
-        </Grid>
+        {stats.map((s) => (
+          <BentoTile key={s.label} span={3} to={s.to} variant="action">
+            <Typography variant="h2" component="div">
+              {s.value}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {s.label}
+            </Typography>
+            {s.hint ? (
+              <Typography variant="caption" color="warning.main" display="block" sx={{ mt: 0.5 }}>
+                {s.hint}
+              </Typography>
+            ) : null}
+          </BentoTile>
+        ))}
 
-        <Box>
+        <BentoTile span={6}>
           <Typography variant="h3" sx={{ mb: 1.5 }}>
             Быстрые действия
           </Typography>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} flexWrap="wrap" useFlexGap>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <AppButton
               component={RouterLink}
               to={ROUTES.PROFILE_COMPANY_TEAM_INVITE}
               variant="contained"
+              sx={{ minHeight: 44 }}
             >
               Пригласить сотрудника
             </AppButton>
@@ -166,6 +186,7 @@ export function CompanyAdminOverviewPage() {
               component={RouterLink}
               to={ROUTES.PROFILE_COMPANY_SERVICES_CREATE}
               variant="outlined"
+              sx={{ minHeight: 44 }}
             >
               Создать услугу
             </AppButton>
@@ -173,6 +194,7 @@ export function CompanyAdminOverviewPage() {
               component={RouterLink}
               to={ROUTES.PROFILE_COMPANY_CASES_CREATE}
               variant="outlined"
+              sx={{ minHeight: 44 }}
             >
               Добавить кейс
             </AppButton>
@@ -180,35 +202,40 @@ export function CompanyAdminOverviewPage() {
               component={RouterLink}
               to={ROUTES.PROFILE_COMPANY_DOCUMENTS_UPLOAD}
               variant="outlined"
+              sx={{ minHeight: 44 }}
             >
               Загрузить документ
             </AppButton>
-            <AppButton
-              component={RouterLink}
-              to={ROUTES.PROFILE_COMPANY_EDIT}
-              variant="outlined"
-            >
-              Редактировать профиль
-            </AppButton>
           </Stack>
-        </Box>
+        </BentoTile>
 
-        {completion && completion.recommendations.length > 0 ? (
-          <Box>
-            <Typography variant="h3" sx={{ mb: 1 }}>
-              Рекомендации
-            </Typography>
-            <Stack spacing={0.75} component="ul" sx={{ m: 0, pl: 2.5 }}>
-              {completion.recommendations.slice(0, 5).map((r) => (
-                <Typography key={r} component="li" variant="body2" color="text.secondary">
-                  {r}
-                </Typography>
-              ))}
-            </Stack>
-          </Box>
-        ) : null}
+        <BentoTile span={6}>
+          {completion && completion.recommendations.length > 0 ? (
+            <>
+              <Typography variant="h3" sx={{ mb: 1 }}>
+                Рекомендации
+              </Typography>
+              <Stack spacing={0.75} component="ul" sx={{ m: 0, pl: 2.5 }}>
+                {completion.recommendations.slice(0, 5).map((r) => (
+                  <Typography key={r} component="li" variant="body2" color="text.secondary">
+                    {r}
+                  </Typography>
+                ))}
+              </Stack>
+            </>
+          ) : (
+            <>
+              <Typography variant="h3" sx={{ mb: 1 }}>
+                Рекомендации
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Профиль заполнен — дополнительных шагов нет.
+              </Typography>
+            </>
+          )}
+        </BentoTile>
 
-        <Box>
+        <BentoTile span={12}>
           <Stack
             direction="row"
             justifyContent="space-between"
@@ -216,24 +243,12 @@ export function CompanyAdminOverviewPage() {
             sx={{ mb: 1 }}
           >
             <Typography variant="h3">Недавняя активность</Typography>
-            <AppButton
-              component={RouterLink}
-              to={ROUTES.PROFILE_COMPANY_ACTIVITY}
-              size="small"
-            >
+            <AppButton component={RouterLink} to={ROUTES.PROFILE_COMPANY_ACTIVITY} size="small">
               Вся история
             </AppButton>
           </Stack>
           {activity.data && activity.data.length > 0 ? (
-            <Box
-              sx={{
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 2,
-                px: 2,
-                bgcolor: 'background.paper',
-              }}
-            >
+            <Box>
               {activity.data.map((event) => (
                 <CompanyActivityItem key={event.id} event={event} dense />
               ))}
@@ -243,8 +258,8 @@ export function CompanyAdminOverviewPage() {
               Пока нет событий
             </Typography>
           )}
-        </Box>
-      </Stack>
+        </BentoTile>
+      </BentoGrid>
     </Box>
   )
 }

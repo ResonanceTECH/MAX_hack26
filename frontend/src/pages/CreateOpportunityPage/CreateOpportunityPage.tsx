@@ -30,6 +30,8 @@ import {
   AppInput,
   AppSelect,
   AppTextarea,
+  BentoGrid,
+  BentoTile,
   CommaListInput,
   PageHeader,
   RegionAutocomplete,
@@ -143,23 +145,38 @@ export function CreateOpportunityPage() {
       />
 
       {step === 'describe' ? (
-        <Stack spacing={2}>
-          <Typography variant="h2">Опишите, что вам нужно</Typography>
-          <AppTextarea
-            label="Описание задачи"
-            placeholder="Нужен подрядчик на разработку CRM для медицинской компании. Бюджет до 500 тысяч. React, интеграция с 1С."
-            value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
-          />
-          <AppButton
-            variant="contained"
-            loading={parsing}
-            onClick={() => void handleParse()}
-            disabled={rawText.trim().length < 10}
-          >
-            Продолжить
-          </AppButton>
-        </Stack>
+        <BentoGrid>
+          <BentoTile span={8}>
+            <Typography variant="h2" sx={{ mb: 2 }}>
+              Опишите, что вам нужно
+            </Typography>
+            <Stack spacing={2}>
+              <AppTextarea
+                label="Описание задачи"
+                placeholder="Нужен подрядчик на разработку CRM для медицинской компании. Бюджет до 500 тысяч. React, интеграция с 1С."
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+              />
+              <AppButton
+                variant="contained"
+                loading={parsing}
+                onClick={() => void handleParse()}
+                disabled={rawText.trim().length < 10}
+              >
+                Продолжить
+              </AppButton>
+            </Stack>
+          </BentoTile>
+          <BentoTile span={4} variant="emphasis">
+            <Typography variant="h4" sx={{ mb: 1 }}>
+              Как это работает
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Опишите задачу своими словами — мы структурируем поля запроса и покажем черновик для
+              правок перед публикацией.
+            </Typography>
+          </BentoTile>
+        </BentoGrid>
       ) : null}
 
       {step === 'structured' && draft ? (

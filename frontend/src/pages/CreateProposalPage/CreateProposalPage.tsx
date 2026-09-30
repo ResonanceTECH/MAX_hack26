@@ -21,6 +21,8 @@ import {
   AppInput,
   AppSelect,
   AppTextarea,
+  BentoGrid,
+  BentoTile,
   ErrorState,
   LoadingState,
   PageHeader,
@@ -196,88 +198,120 @@ export function CreateProposalPage() {
   return (
     <Box>
       <PageHeader title="Отклик на запрос" subtitle={opportunity.title} />
-      {company ? (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          От имени {company.shortName} · заказчик: {opportunity.company.shortName}
-        </Typography>
-      ) : null}
       {guardError ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {guardError}
         </Alert>
       ) : null}
 
-      <Stack component="form" spacing={2} onSubmit={(e) => void onSubmit(e)} noValidate>
-        <AppInput
-          label="Стоимость, ₽"
-          type="number"
-          inputMode="numeric"
-          inputProps={{ min: 1, step: 1, max: 1_000_000_000_000 }}
-          error={Boolean(errors.price)}
-          helperText={errors.price?.message}
-          {...register('price', { valueAsNumber: true })}
-        />
-        <AppInput
-          label="Срок, дней"
-          type="number"
-          inputMode="numeric"
-          inputProps={{ min: 1, step: 1, max: 3650 }}
-          error={Boolean(errors.durationDays)}
-          helperText={errors.durationDays?.message}
-          {...register('durationDays', { valueAsNumber: true })}
-        />
-        <AppTextarea
-          label="Описание предложения"
-          error={Boolean(errors.description)}
-          helperText={errors.description?.message}
-          {...register('description')}
-        />
-        <AppTextarea
-          label="Что включено"
-          placeholder="Дизайн, интеграция с 1С, обучение"
-          error={Boolean(errors.included)}
-          helperText={errors.included?.message ?? 'Через запятую'}
-          {...register('included')}
-        />
-        <AppTextarea
-          label="Что не включено"
-          placeholder="Хостинг, лицензии"
-          helperText="Через запятую"
-          {...register('excluded')}
-        />
-        <Controller
-          name="caseId"
-          control={control}
-          render={({ field }) => (
-            <AppSelect
-              label="Релевантный кейс"
-              options={caseOptions}
-              value={field.value ?? NONE_CASE}
-              onChange={field.onChange}
-              helperText={
-                caseOptions.length <= 1
-                  ? 'Нет кейсов в профиле — можно отправить без привязки или добавить в «Кейсы»'
-                  : 'Только кейс из профиля компании (поле case_ref на бэке). Необязательно.'
-              }
+      <BentoGrid>
+        <BentoTile span={8}>
+          <Stack component="form" spacing={2} onSubmit={(e) => void onSubmit(e)} noValidate>
+            <AppInput
+              label="Стоимость, ₽"
+              type="number"
+              inputMode="numeric"
+              inputProps={{ min: 1, step: 1, max: 1_000_000_000_000 }}
+              error={Boolean(errors.price)}
+              helperText={errors.price?.message}
+              {...register('price', { valueAsNumber: true })}
             />
-          )}
-        />
-        {caseOptions.length <= 1 ? (
+            <AppInput
+              label="Срок, дней"
+              type="number"
+              inputMode="numeric"
+              inputProps={{ min: 1, step: 1, max: 3650 }}
+              error={Boolean(errors.durationDays)}
+              helperText={errors.durationDays?.message}
+              {...register('durationDays', { valueAsNumber: true })}
+            />
+            <AppTextarea
+              label="Описание предложения"
+              error={Boolean(errors.description)}
+              helperText={errors.description?.message}
+              {...register('description')}
+            />
+            <AppTextarea
+              label="Что включено"
+              placeholder="Дизайн, интеграция с 1С, обучение"
+              error={Boolean(errors.included)}
+              helperText={errors.included?.message ?? 'Через запятую'}
+              {...register('included')}
+            />
+            <AppTextarea
+              label="Что не включено"
+              placeholder="Хостинг, лицензии"
+              helperText="Через запятую"
+              {...register('excluded')}
+            />
+            <Controller
+              name="caseId"
+              control={control}
+              render={({ field }) => (
+                <AppSelect
+                  label="Релевантный кейс"
+                  options={caseOptions}
+                  value={field.value ?? NONE_CASE}
+                  onChange={field.onChange}
+                  helperText={
+                    caseOptions.length <= 1
+                      ? 'Нет кейсов в профиле — можно отправить без привязки или добавить в «Кейсы»'
+                      : 'Только кейс из профиля компании (поле case_ref на бэке). Необязательно.'
+                  }
+                />
+              )}
+            />
+            {caseOptions.length <= 1 ? (
+              <AppButton
+                component={RouterLink}
+                to={ROUTES.PROFILE_COMPANY_CASES}
+                variant="text"
+                size="small"
+                sx={{ alignSelf: 'flex-start', mt: -1 }}
+              >
+                Перейти к кейсам компании
+              </AppButton>
+            ) : null}
+            <AppTextarea
+              label="Комментарий для заказчика (необязательно)"
+              {...register('comment')}
+            />
+            <AppButton
+              type="submit"
+              variant="contained"
+              loading={isSubmitting || createProposal.isPending}
+            >
+              Отправить предложение
+            </AppButton>
+          </Stack>
+        </BentoTile>
+
+        <BentoTile span={4} variant="emphasis">
+          <Typography variant="h4" sx={{ mb: 1 }}>
+            Запрос
+          </Typography>
+          <Typography variant="body1" fontWeight={600} sx={{ mb: 1 }}>
+            {opportunity.title}
+          </Typography>
+          {company ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              От имени {company.shortName} · заказчик: {opportunity.company.shortName}
+            </Typography>
+          ) : null}
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {opportunity.description.slice(0, 220)}
+            {opportunity.description.length > 220 ? '…' : ''}
+          </Typography>
           <AppButton
             component={RouterLink}
-            to={ROUTES.PROFILE_COMPANY_CASES}
-            variant="text"
+            to={opportunityDetailsPath(opportunity.id)}
+            variant="outlined"
             size="small"
-            sx={{ alignSelf: 'flex-start', mt: -1 }}
           >
-            Перейти к кейсам компании
+            Открыть запрос
           </AppButton>
-        ) : null}
-        <AppTextarea label="Комментарий для заказчика (необязательно)" {...register('comment')} />
-        <AppButton type="submit" variant="contained" loading={isSubmitting || createProposal.isPending}>
-          Отправить предложение
-        </AppButton>
-      </Stack>
+        </BentoTile>
+      </BentoGrid>
     </Box>
   )
 }

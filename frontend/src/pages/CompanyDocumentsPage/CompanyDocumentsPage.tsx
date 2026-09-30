@@ -11,6 +11,8 @@ import { companyDocumentPath, ROUTES } from '@/shared/constants/routes'
 import { formatDate } from '@/shared/lib/format'
 import {
   AppButton,
+  BentoGrid,
+  BentoTile,
   ConfirmDialog,
   EmptyState,
   ErrorState,
@@ -55,6 +57,9 @@ export function CompanyDocumentsPage() {
         }
       />
 
+
+      <BentoGrid>
+        <BentoTile span={12}>
       <Typography variant="caption" color="warning.main" display="block" sx={{ mb: 2 }}>
         Демонстрационный статус / MODEL_DATA — загрузка имитируется на фронтенде.
       </Typography>
@@ -123,6 +128,9 @@ export function CompanyDocumentsPage() {
           </Box>
         ))}
       </Stack>
+
+        </BentoTile>
+      </BentoGrid>
 
       <ConfirmDialog
         open={Boolean(deleteId)}

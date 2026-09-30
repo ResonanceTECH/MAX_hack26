@@ -1,6 +1,5 @@
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import Box from '@mui/material/Box'
-import Paper from '@mui/material/Paper'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import { useMatch } from '@/entities/match/api/queries'
@@ -13,13 +12,14 @@ import { companyDetailsPath } from '@/shared/constants/routes'
 import { formatDate } from '@/shared/lib/format'
 import {
   AppButton,
+  BentoGrid,
+  BentoTile,
   CompanyAvatar,
   ErrorState,
   LoadingState,
   MatchExplanationFromMatch,
   MoneyValue,
   PageHeader,
-  Section,
   StatusChip,
   Tag,
   VerifiedBadge,
@@ -53,86 +53,128 @@ export function ProposalDetailsPage() {
         actions={<StatusChip status={data.status} kind="proposal" />}
       />
 
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 3 }}>
-        <CompanyAvatar
-          name={data.company.shortName}
-          logoUrl={data.company.logoUrl}
-          size={56}
-        />
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-            <Typography variant="h3">{data.company.name}</Typography>
-            <VerifiedBadge verified={data.company.verified} compact />
+      <BentoGrid>
+        <BentoTile span={8} variant="emphasis">
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+            <CompanyAvatar
+              name={data.company.shortName}
+              logoUrl={data.company.logoUrl}
+              size={56}
+            />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Typography variant="h3">{data.company.name}</Typography>
+                <VerifiedBadge verified={data.company.verified} compact />
+              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                {data.company.region}
+              </Typography>
+            </Box>
+            <EntityActionsMenu
+              targetType="proposal"
+              targetId={data.id}
+              targetName={data.company.shortName}
+              shareTitle={`Предложение ${data.company.shortName}`}
+              shareText={data.description}
+              hideFavorite
+            />
           </Stack>
-          <Typography variant="body2" color="text.secondary">
-            {data.company.region}
-          </Typography>
-        </Box>
-        <EntityActionsMenu
-          targetType="proposal"
-          targetId={data.id}
-          targetName={data.company.shortName}
-          shareTitle={`Предложение ${data.company.shortName}`}
-          shareText={data.description}
-          hideFavorite
-        />
-      </Stack>
-
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
-        <MoneyValue amount={data.price} currency={data.currency} variant="h3" />
-        <Typography variant="body1" fontWeight={600} color="text.secondary">
-          Срок: {data.durationDays} дн.
-        </Typography>
-      </Stack>
-
-      {match ? (
-        <Box sx={{ mb: 3 }}>
-          <MatchExplanationFromMatch match={match} companyName={data.company.shortName} />
-        </Box>
-      ) : null}
-
-      <Section title="Описание">
-        <Typography variant="body1">{data.description}</Typography>
-      </Section>
-
-      <Section title="Включено">
-        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-          {data.included.map((item) => (
-            <Tag key={item} label={item} color="secondary" />
-          ))}
-        </Stack>
-      </Section>
-
-      <Section title="Не включено">
-        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-          {data.excluded.map((item) => (
-            <Tag key={item} label={item} />
-          ))}
-        </Stack>
-      </Section>
-
-      <Section title="Релевантные кейсы">
-        <Stack spacing={0.75}>
-          {data.cases.map((c) => (
-            <Typography key={c} variant="body1">
-              · {c}
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
+            <MoneyValue amount={data.price} currency={data.currency} variant="h3" />
+            <Typography variant="body1" fontWeight={600} color="text.secondary">
+              Срок: {data.durationDays} дн.
             </Typography>
-          ))}
-        </Stack>
-      </Section>
+          </Stack>
+          <Typography variant="h4" sx={{ mb: 0.75 }}>
+            Описание
+          </Typography>
+          <Typography variant="body1">{data.description}</Typography>
+        </BentoTile>
 
-      <AppButton
-        component={RouterLink}
-        to={`${companyDetailsPath(data.company.id)}?fromOpportunity=${data.opportunityId}`}
-        variant="outlined"
-        sx={{ mb: 3 }}
-      >
-        Профиль компании
-      </AppButton>
+        <BentoTile span={4}>
+          {match ? (
+            <Box sx={{ mb: 2 }}>
+              <MatchExplanationFromMatch match={match} companyName={data.company.shortName} />
+            </Box>
+          ) : null}
+          <AppButton
+            component={RouterLink}
+            to={`${companyDetailsPath(data.company.id)}?fromOpportunity=${data.opportunityId}`}
+            variant="outlined"
+            fullWidth
+            sx={{ minHeight: 44 }}
+          >
+            Профиль компании
+          </AppButton>
+          {canManageShortlist ? (
+            <Stack
+              direction="column"
+              spacing={1}
+              sx={{ display: { xs: 'none', md: 'flex' }, mt: 1.5 }}
+            >
+              <AppButton
+                variant="contained"
+                loading={shortlistMutation.isPending}
+                disabled={actionsDisabled}
+                onClick={() =>
+                  shortlistMutation.mutate(id, {
+                    onSuccess: () => showSuccess('Добавлено в шортлист'),
+                  })
+                }
+              >
+                В шортлист
+              </AppButton>
+              <AppButton
+                variant="outlined"
+                color="error"
+                loading={rejectMutation.isPending}
+                disabled={actionsDisabled}
+                onClick={() => rejectMutation.mutate(id)}
+              >
+                Отклонить
+              </AppButton>
+            </Stack>
+          ) : null}
+        </BentoTile>
+
+        <BentoTile span={6}>
+          <Typography variant="h3" sx={{ mb: 1 }}>
+            Включено
+          </Typography>
+          <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+            {data.included.map((item) => (
+              <Tag key={item} label={item} color="secondary" />
+            ))}
+          </Stack>
+        </BentoTile>
+
+        <BentoTile span={6}>
+          <Typography variant="h3" sx={{ mb: 1 }}>
+            Не включено
+          </Typography>
+          <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+            {data.excluded.map((item) => (
+              <Tag key={item} label={item} />
+            ))}
+          </Stack>
+        </BentoTile>
+
+        <BentoTile span={12}>
+          <Typography variant="h3" sx={{ mb: 1 }}>
+            Релевантные кейсы
+          </Typography>
+          <Stack spacing={0.75}>
+            {data.cases.map((c) => (
+              <Typography key={c} variant="body1">
+                · {c}
+              </Typography>
+            ))}
+          </Stack>
+        </BentoTile>
+      </BentoGrid>
 
       {canManageShortlist ? (
-        <Paper
-          elevation={0}
+        <Box
           sx={{
             display: { xs: 'flex', md: 'none' },
             position: 'fixed',
@@ -170,33 +212,7 @@ export function ProposalDetailsPage() {
           >
             Отклонить
           </AppButton>
-        </Paper>
-      ) : null}
-
-      {canManageShortlist ? (
-        <Stack direction="row" spacing={1.5} sx={{ display: { xs: 'none', md: 'flex' } }}>
-          <AppButton
-            variant="contained"
-            loading={shortlistMutation.isPending}
-            disabled={actionsDisabled}
-            onClick={() =>
-              shortlistMutation.mutate(id, {
-                onSuccess: () => showSuccess('Добавлено в шортлист'),
-              })
-            }
-          >
-            В шортлист
-          </AppButton>
-          <AppButton
-            variant="outlined"
-            color="error"
-            loading={rejectMutation.isPending}
-            disabled={actionsDisabled}
-            onClick={() => rejectMutation.mutate(id)}
-          >
-            Отклонить
-          </AppButton>
-        </Stack>
+        </Box>
       ) : null}
     </Box>
   )

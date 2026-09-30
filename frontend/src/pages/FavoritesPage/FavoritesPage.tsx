@@ -6,7 +6,7 @@ import Tabs from '@mui/material/Tabs'
 import { useCompanies } from '@/entities/company/api/queries'
 import { useOpportunities } from '@/entities/opportunity/api/queries'
 import { useFavorites } from '@/features/favorites/api/queries'
-import { EmptyState, ErrorState, LoadingState, PageHeader } from '@/shared/ui'
+import { BentoGrid, BentoTile, EmptyState, ErrorState, LoadingState, PageHeader } from '@/shared/ui'
 import { CompanyCard } from '@/widgets/CompanyCard/CompanyCard'
 import { OpportunityCard } from '@/widgets/OpportunityCard/OpportunityCard'
 
@@ -36,49 +36,54 @@ export function FavoritesPage() {
     <Box>
       <PageHeader title="Избранное" subtitle="Сохранённые компании и возможности" />
 
-      <Tabs
-        value={tab}
-        onChange={(_, v: number) => setTab(v)}
-        variant="fullWidth"
-        sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
-      >
-        {TABS.map((label) => (
-          <Tab key={label} label={label} />
-        ))}
-      </Tabs>
-
-      {isLoading ? <LoadingState variant="page" /> : null}
-      {isError ? <ErrorState onRetry={() => void refetch()} /> : null}
-
-      {!isLoading && !isError && tab === 0 ? (
-        companies.length === 0 ? (
-          <EmptyState
-            title="Нет сохранённых компаний"
-            description="Нажмите на закладку у карточки компании, чтобы добавить её в избранное."
-          />
-        ) : (
-          <Stack spacing={2}>
-            {companies.map((company) => (
-              <CompanyCard key={company.id} company={company} />
+      <BentoGrid>
+        <BentoTile span={12} noPadding>
+          <Tabs
+            value={tab}
+            onChange={(_, v: number) => setTab(v)}
+            variant="fullWidth"
+            sx={{ borderBottom: 1, borderColor: 'divider', px: 1 }}
+          >
+            {TABS.map((label) => (
+              <Tab key={label} label={label} />
             ))}
-          </Stack>
-        )
-      ) : null}
+          </Tabs>
+          <Box sx={{ p: 2 }}>
+            {isLoading ? <LoadingState variant="page" /> : null}
+            {isError ? <ErrorState onRetry={() => void refetch()} /> : null}
 
-      {!isLoading && !isError && tab === 1 ? (
-        opportunities.length === 0 ? (
-          <EmptyState
-            title="Нет сохранённых возможностей"
-            description="Сохраняйте интересные запросы, чтобы вернуться к ним позже."
-          />
-        ) : (
-          <Stack spacing={2}>
-            {opportunities.map((opportunity) => (
-              <OpportunityCard key={opportunity.id} opportunity={opportunity} />
-            ))}
-          </Stack>
-        )
-      ) : null}
+            {!isLoading && !isError && tab === 0 ? (
+              companies.length === 0 ? (
+                <EmptyState
+                  title="Нет сохранённых компаний"
+                  description="Нажмите на закладку у карточки компании, чтобы добавить её в избранное."
+                />
+              ) : (
+                <Stack spacing={2}>
+                  {companies.map((company) => (
+                    <CompanyCard key={company.id} company={company} />
+                  ))}
+                </Stack>
+              )
+            ) : null}
+
+            {!isLoading && !isError && tab === 1 ? (
+              opportunities.length === 0 ? (
+                <EmptyState
+                  title="Нет сохранённых возможностей"
+                  description="Сохраняйте интересные запросы, чтобы вернуться к ним позже."
+                />
+              ) : (
+                <Stack spacing={2}>
+                  {opportunities.map((opportunity) => (
+                    <OpportunityCard key={opportunity.id} opportunity={opportunity} />
+                  ))}
+                </Stack>
+              )
+            ) : null}
+          </Box>
+        </BentoTile>
+      </BentoGrid>
     </Box>
   )
 }

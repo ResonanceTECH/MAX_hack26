@@ -8,17 +8,28 @@ export interface SectionProps {
   subtitle?: string
   action?: ReactNode
   children: ReactNode
+  /** Drop outer margin when section sits inside a bento tile. */
+  disableGutter?: boolean
+  /** Tighten header→body gap (useful inside compact tiles). */
+  dense?: boolean
 }
 
-export function Section({ title, subtitle, action, children }: SectionProps) {
+export function Section({
+  title,
+  subtitle,
+  action,
+  children,
+  disableGutter,
+  dense,
+}: SectionProps) {
   return (
-    <Box component="section" sx={{ mb: 4 }}>
+    <Box component="section" sx={{ mb: disableGutter ? 0 : 4, height: '100%' }}>
       <Stack
         direction="row"
         justifyContent="space-between"
         alignItems="flex-start"
         spacing={2}
-        sx={{ mb: 2 }}
+        sx={{ mb: dense ? 1.25 : 2 }}
       >
         <Box>
           <Typography variant="h2" component="h2">

@@ -24,6 +24,8 @@ import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { companyCaseEditPath, companyCasePath, ROUTES } from '@/shared/constants/routes'
 import {
   AppButton,
+  BentoGrid,
+  BentoTile,
   ConfirmDialog,
   EmptyState,
   ErrorState,
@@ -110,6 +112,9 @@ export function CompanyCasesPage() {
         }
       />
 
+
+      <BentoGrid>
+        <BentoTile span={12}>
       <Tabs
         value={TABS.findIndex((t) => t.key === tab)}
         onChange={(_, i: number) => setTab(TABS[i]!.key)}
@@ -214,6 +219,9 @@ export function CompanyCasesPage() {
           </Box>
         ))}
       </Stack>
+
+        </BentoTile>
+      </BentoGrid>
 
       <ConfirmDialog
         open={Boolean(confirm)}

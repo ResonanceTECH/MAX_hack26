@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import Box from '@mui/material/Box'
-import Card from '@mui/material/Card'
-import CardContent from '@mui/material/CardContent'
 import Stack from '@mui/material/Stack'
 import Tab from '@mui/material/Tab'
 import Tabs from '@mui/material/Tabs'
@@ -14,6 +12,8 @@ import { useAllMatches } from '@/entities/match/api/queries'
 import { proposalDetailsPath } from '@/shared/constants/routes'
 import {
   AppButton,
+  BentoGrid,
+  BentoTile,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -55,63 +55,76 @@ export function MyProposalsPage() {
   return (
     <Box>
       <PageHeader title="Мои отклики" subtitle="Предложения, отправленные вашей компанией" />
-      <Tabs
-        value={tab}
-        onChange={(_, v: number) => setTab(v)}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
-      >
-        <Tab label={`Все (${buckets.all.length})`} />
-        <Tab label={`На рассмотрении (${buckets.review.length})`} />
-        <Tab label={`Шортлист (${buckets.shortlist.length})`} />
-        <Tab label={`Переговоры (${buckets.negotiation.length})`} />
-        <Tab label={`Завершённые (${buckets.done.length})`} />
-      </Tabs>
-      {isLoading ? <LoadingState rows={3} /> : null}
-      {isError ? <ErrorState onRetry={() => void refetch()} /> : null}
-      {!isLoading && !isError && list.length === 0 ? (
-        <EmptyState title="Откликов пока нет" description="Найдите подходящий заказ и откликнитесь." />
-      ) : null}
-      <Stack spacing={2}>
-        {list.map((p) => {
-          const opp = opportunitiesQuery.data?.find((o) => o.id === p.opportunityId)
-          const match = matchesQuery.data?.find(
-            (m) => m.opportunityId === p.opportunityId && m.companyId === p.company.id,
-          )
-          return (
-            <Card key={p.id}>
-              <CardContent>
-                <Stack spacing={1}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                    <Box>
-                      <Typography variant="h3">
-                        {opp?.title ?? p.opportunityId}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {opp?.company.shortName}
-                      </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      {match ? <MatchScore score={match.score} /> : null}
-                      <StatusChip status={p.status} kind="proposal" />
-                    </Stack>
-                  </Stack>
-                  <MoneyValue amount={p.price} currency={p.currency} />
-                  <AppButton
-                    component={RouterLink}
-                    to={proposalDetailsPath(p.id)}
-                    variant="contained"
-                    size="small"
+      <BentoGrid>
+        <BentoTile span={12} noPadding>
+          <Tabs
+            value={tab}
+            onChange={(_, v: number) => setTab(v)}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ borderBottom: 1, borderColor: 'divider', px: 1 }}
+          >
+            <Tab label={`Все (${buckets.all.length})`} />
+            <Tab label={`На рассмотрении (${buckets.review.length})`} />
+            <Tab label={`Шортлист (${buckets.shortlist.length})`} />
+            <Tab label={`Переговоры (${buckets.negotiation.length})`} />
+            <Tab label={`Завершённые (${buckets.done.length})`} />
+          </Tabs>
+          <Box sx={{ p: 2 }}>
+            {isLoading ? <LoadingState rows={3} /> : null}
+            {isError ? <ErrorState onRetry={() => void refetch()} /> : null}
+            {!isLoading && !isError && list.length === 0 ? (
+              <EmptyState
+                title="Откликов пока нет"
+                description="Найдите подходящий заказ и откликнитесь."
+              />
+            ) : null}
+            <Stack spacing={1.5}>
+              {list.map((p) => {
+                const opp = opportunitiesQuery.data?.find((o) => o.id === p.opportunityId)
+                const match = matchesQuery.data?.find(
+                  (m) => m.opportunityId === p.opportunityId && m.companyId === p.company.id,
+                )
+                return (
+                  <Box
+                    key={p.id}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                    }}
                   >
-                    Открыть
-                  </AppButton>
-                </Stack>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </Stack>
+                    <Stack spacing={1}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                        <Box>
+                          <Typography variant="h3">{opp?.title ?? p.opportunityId}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {opp?.company.shortName}
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          {match ? <MatchScore score={match.score} /> : null}
+                          <StatusChip status={p.status} kind="proposal" />
+                        </Stack>
+                      </Stack>
+                      <MoneyValue amount={p.price} currency={p.currency} />
+                      <AppButton
+                        component={RouterLink}
+                        to={proposalDetailsPath(p.id)}
+                        variant="contained"
+                        size="small"
+                      >
+                        Открыть
+                      </AppButton>
+                    </Stack>
+                  </Box>
+                )
+              })}
+            </Stack>
+          </Box>
+        </BentoTile>
+      </BentoGrid>
     </Box>
   )
 }
