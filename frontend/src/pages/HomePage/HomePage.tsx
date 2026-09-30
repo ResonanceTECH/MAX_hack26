@@ -345,7 +345,7 @@ export function HomePage() {
           <Card>
             <CardActionArea component={RouterLink} to={ROUTES.MY_SHORTLIST}>
               <CardContent>
-                <Typography variant="h4">Shortlist</Typography>
+                <Typography variant="h4">Шортлист</Typography>
                 <Typography variant="body2" color="text.secondary">
                   {shortlistQuery.data?.length ?? 0} компаний
                 </Typography>

@@ -78,7 +78,7 @@ export function ShortlistPage({ embedded }: ShortlistPageProps) {
     <>
       {grouped.length === 0 ? (
         <EmptyState
-          title="В shortlist пока никого нет"
+          title="В шортлисте пока никого нет"
           description="Добавьте подходящие предложения по вашим запросам, чтобы сравнить финалистов."
           actionLabel="Мои запросы"
           onAction={() => {
@@ -173,7 +173,7 @@ export function ShortlistPage({ embedded }: ShortlistPageProps) {
                             loading={removeMutation.isPending}
                             onClick={() => {
                               removeMutation.mutate(item.id, {
-                                onSuccess: () => showSuccess('Удалено из shortlist'),
+                                onSuccess: () => showSuccess('Удалено из шортлиста'),
                               })
                             }}
                           >
@@ -196,7 +196,7 @@ export function ShortlistPage({ embedded }: ShortlistPageProps) {
 
   return (
     <Box>
-      <PageHeader title="Shortlist" subtitle="Финалисты по выбранным запросам" />
+      <PageHeader title="Шортлист" subtitle="Финалисты по выбранным запросам" />
       {content}
     </Box>
   )

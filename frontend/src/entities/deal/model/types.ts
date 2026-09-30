@@ -40,4 +40,8 @@ export interface Deal {
   updatedAt: string
   events: DealEvent[]
   files: DealFile[]
+  /** Согласованные условия (term sheet lite). */
+  termsSummary: string | null
+  agreedPrice: number | null
+  agreedTermDays: number | null
 }

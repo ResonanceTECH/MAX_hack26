@@ -64,7 +64,7 @@ export function MyProposalsPage() {
       >
         <Tab label={`Все (${buckets.all.length})`} />
         <Tab label={`На рассмотрении (${buckets.review.length})`} />
-        <Tab label={`Shortlist (${buckets.shortlist.length})`} />
+        <Tab label={`Шортлист (${buckets.shortlist.length})`} />
         <Tab label={`Переговоры (${buckets.negotiation.length})`} />
         <Tab label={`Завершённые (${buckets.done.length})`} />
       </Tabs>

@@ -20,7 +20,7 @@ describe('ProposalCard', () => {
       'href',
       '/proposals/prop-2',
     )
-    await user.click(screen.getByRole('button', { name: 'В shortlist' }))
+    await user.click(screen.getByRole('button', { name: 'В шортлист' }))
     await user.click(screen.getByRole('button', { name: 'Отклонить' }))
     expect(onShortlist).toHaveBeenCalledWith('prop-2')
     expect(onReject).toHaveBeenCalledWith('prop-2')

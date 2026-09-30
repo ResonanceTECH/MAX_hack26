@@ -78,16 +78,21 @@ export function OpportunityCard({ opportunity, match, onDismiss }: OpportunityCa
           </Typography>
 
           <Typography variant="body2" color="text.secondary">
-            {opportunity.category} · {opportunity.industries.join(', ')}
+            {[opportunity.category, ...opportunity.industries.filter((i) => i !== opportunity.category)]
+              .filter(Boolean)
+              .join(' · ')}
           </Typography>
 
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
             {opportunity.technologies.slice(0, 4).map((tech) => (
               <Tag key={tech} label={tech} />
             ))}
-            {opportunity.industries.slice(0, 2).map((ind) => (
-              <Tag key={ind} label={ind} color="secondary" />
-            ))}
+            {opportunity.industries
+              .filter((ind) => ind !== opportunity.category)
+              .slice(0, 2)
+              .map((ind) => (
+                <Tag key={ind} label={ind} color="secondary" />
+              ))}
           </Stack>
 
           <Box>
@@ -102,12 +107,28 @@ export function OpportunityCard({ opportunity, match, onDismiss }: OpportunityCa
               {opportunity.region}
               {opportunity.remoteAllowed ? ' · удалённо' : ''}
             </Typography>
-            <DeadlineLabel date={opportunity.proposalDeadline} label="Приём предложений до" />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              {opportunity.proposalsCount}{' '}
-              {pluralRu(opportunity.proposalsCount, 'предложение', 'предложения', 'предложений')}
+            <DeadlineLabel date={opportunity.proposalDeadline} label="Приём откликов до" />
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ mt: 0.5 }}
+              title="Сколько исполнителей уже отправили отклик на этот запрос"
+            >
+              {opportunity.proposalsCount === 0
+                ? 'Пока нет откликов'
+                : `${opportunity.proposalsCount} ${pluralRu(
+                    opportunity.proposalsCount,
+                    'отклик',
+                    'отклика',
+                    'откликов',
+                  )}`}
               {opportunity.newProposalsCount
-                ? ` · ${opportunity.newProposalsCount} новых`
+                ? ` · ${opportunity.newProposalsCount} ${pluralRu(
+                    opportunity.newProposalsCount,
+                    'новый',
+                    'новых',
+                    'новых',
+                  )}`
                 : ''}
             </Typography>
           </Box>

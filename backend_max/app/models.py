@@ -203,6 +203,10 @@ class Deal(Base):
     customer_company_id: Mapped[int] = Column(Integer, ForeignKey("companies.id"), index=True)
     executor_company_id: Mapped[int] = Column(Integer, ForeignKey("companies.id"), index=True)
     status: Mapped[str] = Column(String(20), default="negotiating", index=True)
+    # Зафиксированные на переговорах условия (term sheet lite)
+    terms_summary: Mapped[str | None] = Column(Text, nullable=True)
+    agreed_price: Mapped[int | None] = Column(Integer, nullable=True)
+    agreed_term_days: Mapped[int | None] = Column(Integer, nullable=True)
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = Column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

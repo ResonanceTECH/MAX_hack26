@@ -77,16 +77,22 @@ export const proposalApi = {
 
   async create(payload: CreateProposalPayload): Promise<Proposal> {
     if (isReal('proposals')) {
+      let body
       try {
-        const body = mapCreateProposalToDto(payload)
+        body = mapCreateProposalToDto(payload)
+      } catch (error) {
+        throw new ProposalApiError(
+          error instanceof Error ? error.message : 'Некорректные данные отклика',
+        )
+      }
+      try {
         const { data } = await apiClient.post<ProposalDto>(
           `/opportunities/${payload.opportunityId}/proposals`,
           body,
         )
         return mapProposalDtoToModel(data)
       } catch (error) {
-        const err = toApiError(error)
-        throw new ProposalApiError(err.message)
+        throw new ProposalApiError(toApiError(error).message)
       }
     }
     await delay()

@@ -42,11 +42,19 @@ function companyRoleLabel(
 
 export function DevRoleSwitcher() {
   const activePersonaId = useSessionStore((s) => s.activePersonaId)
+  const company = useSessionStore((s) => s.company)
+  const role = useSessionStore((s) => s.role)
   const switchPersona = useSessionStore((s) => s.switchPersona)
   const isLoading = useSessionStore((s) => s.isLoading)
   const navigate = useNavigate()
 
   if (!isDev || !activePersonaId) return null
+
+  // Desktop company sidebar already has persona switcher — keep overlay for mobile / staff only
+  const hasSidebarSwitcher =
+    Boolean(company) &&
+    role !== SYSTEM_ROLES.MODERATOR &&
+    role !== SYSTEM_ROLES.PLATFORM_ADMIN
 
   return (
     <Paper
@@ -62,6 +70,7 @@ export function DevRoleSwitcher() {
         bgcolor: 'background.paper',
         border: '1px dashed',
         borderColor: 'warning.main',
+        display: hasSidebarSwitcher ? { xs: 'block', md: 'none' } : 'block',
       }}
     >
       <Typography variant="caption" color="warning.dark" fontWeight={700} display="block" mb={0.5}>

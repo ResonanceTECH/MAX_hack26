@@ -24,9 +24,10 @@ describe('MatchExplanation', () => {
       </ThemeProvider>,
     )
     expect(screen.getByText('Почему подходит вам')).toBeInTheDocument()
-    expect(screen.getByText(/94% соответствия/)).toBeInTheDocument()
+    expect(screen.getByLabelText('94% соответствия')).toBeInTheDocument()
     expect(screen.getByText(/Есть опыт Healthcare/)).toBeInTheDocument()
     expect(screen.getByText(/ISO 27001/)).toBeInTheDocument()
+    expect(screen.getByText('Не хватает')).toBeInTheDocument()
     expect(screen.queryByText(/Профиль FTL/)).not.toBeInTheDocument()
   })
 })

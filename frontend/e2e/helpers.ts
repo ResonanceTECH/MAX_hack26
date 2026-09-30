@@ -45,6 +45,14 @@ export async function chooseSelect(page: Page, label: string, option: string) {
   await page.getByRole('option', { name: option, exact: true }).click()
 }
 
+/** RegionAutocomplete (freeSolo combobox) — type to filter, then pick. */
+export async function chooseRegion(page: Page, option: string) {
+  const field = page.getByLabel('Регион', { exact: true })
+  await field.click()
+  await field.fill(option)
+  await page.getByRole('option', { name: option, exact: true }).click()
+}
+
 export async function horizontalOverflow(page: Page) {
   return page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
@@ -56,7 +64,7 @@ export async function fillProposal(page: Page, description: string, price = '455
   await page.getByLabel(/Срок, дней/).fill('40')
   await page.getByLabel('Описание предложения').fill(description)
   await page.getByLabel('Что включено').fill('Дизайн, интеграция с 1С')
-  await page.getByLabel('Релевантные кейсы').fill('CRM для стоматологий')
+  // case_ref is optional and must be a real company case — leave «Без привязки»
 }
 
 const OPPORTUNITY_TEXT =

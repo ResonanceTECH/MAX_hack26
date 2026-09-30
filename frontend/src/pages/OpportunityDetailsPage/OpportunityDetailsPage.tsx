@@ -31,11 +31,12 @@ import {
   Tag,
   VerifiedBadge,
 } from '@/shared/ui'
-import { CheckmarkCircle01Icon, AlertCircleIcon, Location01Icon } from '@/shared/ui/icons'
+import { CheckmarkCircle01Icon, AlertCircleIcon, Location01Icon, Globe02Icon } from '@/shared/ui/icons'
 
 export function OpportunityDetailsPage() {
   const { id = '' } = useParams()
-  const companyId = useSessionStore((s) => s.company?.id)
+  const sessionCompany = useSessionStore((s) => s.company)
+  const companyId = sessionCompany?.id
   const canCreateProposal = useCompanyPermission(Permission.CREATE_PROPOSAL)
   const { data, isLoading, isError, refetch } = useOpportunity(id)
   const matchQuery = useMatch(id, companyId ?? '')
@@ -43,11 +44,29 @@ export function OpportunityDetailsPage() {
   if (isLoading) return <LoadingState variant="page" />
   if (isError || !data) return <ErrorState onRetry={() => void refetch()} />
 
-  const isOwn = data.company.id === companyId
+  const isOwn = Boolean(companyId) && String(data.company.id) === String(companyId)
   const isExpired = data.status === 'expired'
   const isClosed = data.status === 'closed'
   const canPropose = canCreateProposal && !isOwn && !isExpired && !isClosed
   const match = matchQuery.data
+
+  // RequestDto only has company_id/name — enrich from session when it's our request,
+  // else keep API-enriched company from getById.
+  const displayCompany =
+    isOwn && sessionCompany && String(sessionCompany.id) === String(data.company.id)
+      ? {
+          ...data.company,
+          ...sessionCompany,
+          // keep opportunity-facing name if session shortName differs
+          name: sessionCompany.name || data.company.name,
+          shortName: sessionCompany.shortName || data.company.shortName,
+        }
+      : data.company
+
+  const hasRating = displayCompany.rating > 0 || displayCompany.reviewsCount > 0
+
+  const isSameRequirement = (label: string, pool: string[]) =>
+    pool.some((item) => item.toLowerCase() === label.toLowerCase())
 
   const requiredMatched = data.requiredRequirements.map((req) => ({
     label: req,
@@ -56,6 +75,24 @@ export function OpportunityDetailsPage() {
     ) ??
       data.technologies.some((t) => req.toLowerCase().includes(t.toLowerCase()))) as boolean,
   }))
+
+  // API maps requirements → both requiredRequirements and technologies; don't re-show the same list
+  // under «Желательные» as chips (looks like there is no distinction).
+  const desiredOnly = data.desiredRequirements.filter(
+    (item) => !isSameRequirement(item, data.requiredRequirements),
+  )
+  const techTags = [
+    ...data.technologies
+      .filter((t) => !isSameRequirement(t, data.requiredRequirements))
+      .map((t) => ({ key: `tech:${t}`, label: t, color: 'secondary' as const })),
+    ...data.skills
+      .filter(
+        (s) =>
+          !isSameRequirement(s, data.requiredRequirements) &&
+          !data.technologies.some((t) => t.toLowerCase() === s.toLowerCase()),
+      )
+      .map((s) => ({ key: `skill:${s}`, label: s, color: undefined })),
+  ]
 
   return (
     <Box sx={{ pb: { xs: 12, md: 2 } }}>
@@ -82,16 +119,20 @@ export function OpportunityDetailsPage() {
 
       <Stack spacing={2} sx={{ mb: 3 }}>
         <Stack direction="row" spacing={1.5} alignItems="center">
-          <CompanyAvatar name={data.company.shortName} logoUrl={data.company.logoUrl} size={40} />
+          <CompanyAvatar
+            name={displayCompany.shortName}
+            logoUrl={displayCompany.logoUrl}
+            size={40}
+          />
           <Box>
             <Stack direction="row" spacing={0.75} alignItems="center">
               <Typography variant="body1" fontWeight={600}>
-                {data.company.shortName}
+                {displayCompany.shortName}
               </Typography>
-              <VerifiedBadge verified={data.company.verified} compact />
+              <VerifiedBadge verified={displayCompany.verified} compact />
             </Stack>
             <Typography variant="body2" color="text.secondary">
-              {data.company.region} · {data.company.industries.join(', ')}
+              {[displayCompany.region, displayCompany.industries.join(', ')].filter(Boolean).join(' · ')}
             </Typography>
           </Box>
         </Stack>
@@ -150,8 +191,11 @@ export function OpportunityDetailsPage() {
           <Typography variant="h3" sx={{ mb: 1 }}>
             Требования
           </Typography>
-          <Typography variant="h4" sx={{ mb: 0.75 }}>
+          <Typography variant="h4" sx={{ mb: 0.25 }}>
             Обязательные
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
+            Без них отклик слабо подходит под запрос
           </Typography>
           <Stack spacing={0.75} sx={{ mb: 2 }}>
             {(requiredMatched.length
@@ -170,27 +214,43 @@ export function OpportunityDetailsPage() {
               </Stack>
             ))}
           </Stack>
-          <Typography variant="h4" sx={{ mb: 0.75 }}>
+          <Typography variant="h4" sx={{ mb: 0.25 }}>
             Желательные
           </Typography>
-          <Stack spacing={0.75}>
-            {data.desiredRequirements.map((item) => (
-              <Stack key={item} direction="row" spacing={1} alignItems="center">
-                <AppIcon icon={AlertCircleIcon} size={18} color="#C47F17" />
-                <Typography variant="body2">△ {item}</Typography>
-              </Stack>
-            ))}
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
+            Плюс к обязательным: не блокируют отклик, но повышают шанс совпадения
+          </Typography>
+          <Stack spacing={0.75} sx={{ mb: 2 }}>
+            {desiredOnly.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                Не указаны
+              </Typography>
+            ) : (
+              desiredOnly.map((item) => (
+                <Stack key={item} direction="row" spacing={1} alignItems="center">
+                  <AppIcon icon={AlertCircleIcon} size={18} color="#C47F17" />
+                  <Typography variant="body2">△ {item}</Typography>
+                </Stack>
+              ))
+            )}
           </Stack>
         </Box>
 
-        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-          {data.technologies.map((t) => (
-            <Tag key={t} label={t} color="secondary" />
-          ))}
-          {data.skills.map((s) => (
-            <Tag key={s} label={s} />
-          ))}
-        </Stack>
+        {techTags.length > 0 ? (
+          <Box>
+            <Typography variant="h3" sx={{ mb: 0.25 }}>
+              Доп. технологии
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Не входят в обязательные требования
+            </Typography>
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+              {techTags.map((t) => (
+                <Tag key={t.key} label={t.label} color={t.color} />
+              ))}
+            </Stack>
+          </Box>
+        ) : null}
 
         <Box
           sx={{
@@ -201,33 +261,69 @@ export function OpportunityDetailsPage() {
           }}
         >
           <Typography variant="h3" sx={{ mb: 1 }}>
-            Компания-заказчик
+            {isOwn ? 'Ваша компания' : 'Компания-заказчик'}
           </Typography>
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
-            <CompanyAvatar name={data.company.shortName} logoUrl={data.company.logoUrl} />
-            <Box>
-              <Stack direction="row" spacing={0.75} alignItems="center">
+            <CompanyAvatar name={displayCompany.shortName} logoUrl={displayCompany.logoUrl} />
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
                 <Typography variant="body1" fontWeight={600}>
-                  {data.company.name}
+                  {displayCompany.name}
                 </Typography>
-                <VerifiedBadge verified={data.company.verified} compact />
+                <VerifiedBadge verified={displayCompany.verified} compact />
               </Stack>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Rating value={data.company.rating} readOnly size="small" precision={0.1} />
+              {hasRating ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Rating
+                    value={displayCompany.rating}
+                    readOnly
+                    size="small"
+                    precision={0.1}
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    {displayCompany.rating.toFixed(1)}
+                    {displayCompany.reviewsCount > 0
+                      ? ` · ${displayCompany.reviewsCount} отзывов`
+                      : ''}
+                    {displayCompany.casesCount > 0
+                      ? ` · ${displayCompany.casesCount} проектов`
+                      : ''}
+                    {displayCompany.region ? ` · ${displayCompany.region}` : ''}
+                  </Typography>
+                </Stack>
+              ) : (
                 <Typography variant="body2" color="text.secondary">
-                  {data.company.rating.toFixed(1)} · {data.company.casesCount} проектов ·{' '}
-                  {data.company.region}
+                  Пока нет оценок
+                  {displayCompany.casesCount > 0
+                    ? ` · ${displayCompany.casesCount} проектов`
+                    : ''}
+                  {displayCompany.region ? ` · ${displayCompany.region}` : ''}
                 </Typography>
-              </Stack>
+              )}
+              {displayCompany.website ? (
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
+                  <AppIcon icon={Globe02Icon} size={16} aria-hidden />
+                  <Typography
+                    component="a"
+                    href={displayCompany.website}
+                    target="_blank"
+                    rel="noreferrer"
+                    variant="body2"
+                    color="secondary"
+                  >
+                    {displayCompany.website.replace(/^https?:\/\//, '')}
+                  </Typography>
+                </Stack>
+              ) : null}
             </Box>
           </Stack>
           <AppButton
             component={RouterLink}
-            to={companyDetailsPath(data.company.id)}
+            to={isOwn ? ROUTES.PROFILE_COMPANY : companyDetailsPath(displayCompany.id)}
             variant="outlined"
             size="small"
           >
-            Посмотреть компанию
+            {isOwn ? 'К профилю компании' : 'Посмотреть компанию'}
           </AppButton>
         </Box>
       </Stack>
@@ -245,14 +341,24 @@ export function OpportunityDetailsPage() {
           zIndex: 10,
         }}
       >
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1.5}
+          alignItems={{ xs: 'stretch', sm: 'center' }}
+          flexWrap="wrap"
+          useFlexGap
+        >
           {isOwn ? (
             <>
               <AppButton
                 component={RouterLink}
                 to={opportunityProposalsPath(data.id)}
                 variant="contained"
-                fullWidth
+                sx={{
+                  width: { xs: '100%', sm: 'auto' },
+                  flex: { sm: '1 1 auto' },
+                  whiteSpace: 'nowrap',
+                }}
               >
                 Управлять запросом
               </AppButton>
@@ -260,7 +366,11 @@ export function OpportunityDetailsPage() {
                 component={RouterLink}
                 to={opportunityProposalsPath(data.id)}
                 variant="outlined"
-                fullWidth
+                sx={{
+                  width: { xs: '100%', sm: 'auto' },
+                  flex: { sm: '1 1 auto' },
+                  whiteSpace: 'nowrap',
+                }}
               >
                 Предложения ({data.proposalsCount})
               </AppButton>
@@ -268,7 +378,11 @@ export function OpportunityDetailsPage() {
                 component={RouterLink}
                 to={opportunityComparePath(data.id)}
                 variant="outlined"
-                fullWidth
+                sx={{
+                  width: { xs: '100%', sm: 'auto' },
+                  flex: { sm: '1 1 auto' },
+                  whiteSpace: 'nowrap',
+                }}
               >
                 Сравнить
               </AppButton>
@@ -278,7 +392,7 @@ export function OpportunityDetailsPage() {
               component={RouterLink}
               to={opportunityProposePath(data.id)}
               variant="contained"
-              fullWidth
+              sx={{ width: { xs: '100%', sm: 'auto' }, flex: { sm: '1 1 auto' } }}
             >
               Предложить решение
             </AppButton>
@@ -288,7 +402,8 @@ export function OpportunityDetailsPage() {
                 p: 1.5,
                 borderRadius: 2,
                 bgcolor: 'action.hover',
-                width: '100%',
+                width: { xs: '100%', sm: 'auto' },
+                flex: { sm: '1 1 auto' },
               }}
             >
               <Typography variant="body2" fontWeight={600}>
@@ -304,7 +419,12 @@ export function OpportunityDetailsPage() {
             component={RouterLink}
             to={ROUTES.OPPORTUNITIES}
             variant="text"
-            sx={{ display: { xs: 'none', md: 'inline-flex' } }}
+            sx={{
+              display: { xs: 'none', md: 'inline-flex' },
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+              ml: { md: 'auto' },
+            }}
           >
             К витрине
           </AppButton>

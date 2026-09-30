@@ -42,11 +42,10 @@ test('[PRC-05] duration is validated', async ({ page }) => {
   await expect(page.getByText('Укажите срок в днях')).toBeVisible()
 })
 
-test('[PRC-06] a case can be entered', async ({ page }) => {
+test('[PRC-06] a case can be selected from company profile', async ({ page }) => {
   await page.goto('/opportunities/opp-mobile-app/propose')
-  const cases = page.getByLabel('Релевантные кейсы')
-  await cases.fill('CRM для стоматологий')
-  await expect(cases).toHaveValue('CRM для стоматологий')
+  await expect(page.getByLabel('Релевантный кейс')).toBeVisible()
+  await expect(page.getByText(/Без привязки|кейсов в профиле|Только кейс/)).toBeVisible()
 })
 
 test('[PRC-07] [PRC-08] [PRC-09] [PRC-10] [PRC-11] [PRC-12] valid proposal is stored', async ({

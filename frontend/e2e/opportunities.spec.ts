@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { chooseSelect, gap } from './helpers'
+import { chooseSelect, chooseRegion, gap } from './helpers'
 
 async function openList(page: import('@playwright/test').Page) {
   await page.goto('/opportunities')
@@ -44,7 +44,7 @@ test('[OPP-05] industry filter changes the list', async ({ page }) => {
 
 test('[OPP-06] region filter changes the list', async ({ page }) => {
   await openList(page)
-  await chooseSelect(page, 'Регион', 'Екатеринбург')
+  await chooseRegion(page, 'Екатеринбург')
   await expect(page.getByRole('heading', { name: 'Регулярные FTL-перевозки Урал — Москва' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Разработка CRM для сети клиник' })).toHaveCount(0)
 })
@@ -73,14 +73,14 @@ test('[OPP-09] match score filter changes the list', async ({ page }) => {
 test('[OPP-10] combined filters', async ({ page }) => {
   await openList(page)
   await chooseSelect(page, 'Категория', 'Логистика')
-  await chooseSelect(page, 'Регион', 'Екатеринбург')
+  await chooseRegion(page, 'Екатеринбург')
   await expect(page.getByRole('heading', { name: 'Регулярные FTL-перевозки Урал — Москва' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Мобильное приложение для логистики' })).toHaveCount(0)
 })
 
 test('[OPP-11] reset filters restores the list', async ({ page }) => {
   await openList(page)
-  await chooseSelect(page, 'Регион', 'Нижний Новгород')
+  await chooseRegion(page, 'Нижний Новгород')
   await expect(page.getByText('Пока нет подходящих заказов')).toBeVisible()
   await page.getByRole('button', { name: 'Сбросить', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Разработка CRM для сети клиник' })).toBeVisible()
@@ -107,7 +107,7 @@ test('[OPP-13] sort by date', async ({ page }) => {
 
 test('[OPP-14] empty state', async ({ page }) => {
   await openList(page)
-  await chooseSelect(page, 'Регион', 'Нижний Новгород')
+  await chooseRegion(page, 'Нижний Новгород')
   await expect(page.getByText('Пока нет подходящих заказов')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Сбросить фильтры' })).toBeVisible()
 })

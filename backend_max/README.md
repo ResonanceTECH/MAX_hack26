@@ -1,7 +1,33 @@
 # B2B Match — бэкенд мини-приложения в MAX
 
+> Часть решения **MAX_hack26**.  
+> Корень (Docker, порты, стек): [`../README.md`](../README.md) ·  
+> Frontend: [`../frontend/README.md`](../frontend/README.md) ·  
+> Бот: [`../api/README.md`](../api/README.md) ·  
+> OpenAPI-снимок: [`../docs/README.md`](../docs/README.md).
+
 Бэкенд мини-приложения **B2B Match** для мессенджера MAX (трек «Эффективный бизнес»,
-хакатон MAX_hack26). FastAPI + PostgreSQL, полностью контейнеризован.
+хакатон MAX_hack26). FastAPI + PostgreSQL, полностью контейнеризован. Все бизнес-ручки
+под префиксом **`/api`** (см. `app/main.py`).
+
+## Содержание
+
+1. [Назначение решения](#1-назначение-решения)
+2. [Основной пользовательский сценарий](#2-основной-пользовательский-сценарий-mvp)
+3. [Состав и архитектура](#3-состав-и-архитектура)
+4. [Одна команда запуска (Docker)](#4-запуск-одной-командой)
+5. [Параметры и переменные окружения](#5-параметры-и-переменные-окружения)
+6. [Порты](#6-порты)
+7. [Зависимости](#7-зависимости)
+8. [Внешние сервисы и интеграции](#8-внешние-сервисы-и-интеграции)
+9. [Работа с данными](#9-работа-с-данными)
+10. [Тестовые данные](#10-тестовые-данные-seed)
+11. [Пошаговый сценарий проверки](#11-пошаговый-сценарий-проверки)
+12. [Известные ограничения](#12-известные-ограничения)
+13. [Остановка и повторный запуск](#13-остановка-и-повторный-запуск)
+14. [Тесты](#14-тесты)
+
+---
 
 ## 1. Назначение решения
 
@@ -16,57 +42,63 @@ B2B Match — двусторонний маркетплейс подбора B2B
 публиковать запрос, а завтра откликаться на чужой.
 
 Папка `backend_max/` содержит только **бэкенд**. Фронтенд мини-приложения
-(React + MAX Bridge + MAX UI) разрабатывается отдельно, статику он кладёт
-в `frontend/` (раздаётся Caddy) и обращается к этому API. Бот MAX — точка входа
-в мини-приложение и канал уведомлений; уведомления отправляет сам бэкенд
-через Bot API MAX (`POST https://platform-api2.max.ru/messages`).
+(React + MAX Bridge) — [`../frontend/`](../frontend/README.md), статику отдаёт Caddy
+и ходит на same-origin `/api`. Бот MAX — [`../api/README.md`](../api/README.md) + `bot.py`:
+точка входа в мини-приложение; **уведомления** отправляет сам бэкенд через Bot API MAX
+(`POST https://platform-api2.max.ru/messages`).
 
 ## 2. Основной пользовательский сценарий (MVP)
 
 1. Пользователь открывает B2B Match в MAX (кнопка меню бота) → фронтенд получает
-   `initData` от MAX Bridge и авторизуется: `POST /auth/max`.
-2. Создаёт профиль компании: `PUT /companies/me` (отрасли, услуги, компетенции,
+   `initData` от MAX Bridge и авторизуется: `POST /api/auth/max`.
+2. Создаёт профиль компании: `PUT /api/companies/me` (отрасли, услуги, компетенции,
    регионы, ценовой диапазон, сроки, кейсы, сертификаты).
-3. Создаёт потребность свободным текстом: `POST /opportunities` (Smart Request Builder
+3. Создаёт потребность свободным текстом: `POST /api/opportunities` (Smart Request Builder
    сам выделяет категорию, бюджет, срок, регион, требования; предпросмотр —
-   `POST /ai/parse-opportunity`).
+   `POST /api/ai/parse-opportunity`).
 4. При публикации система **сразу** вычисляет матчи (в ответе `matches` с баллами
    и критериями), а подходящим исполнителям запрос появляется в персональной ленте
-   `GET /me/recommendations` + приходит MAX-уведомление (inbox — `GET /notifications`).
-5. Исполнитель отправляет отклик: `POST /opportunities/{id}/proposals`.
+   `GET /api/me/recommendations` + приходит MAX-уведомление (inbox — `GET /api/notifications`).
+5. Исполнитель отправляет отклик: `POST /api/opportunities/{id}/proposals`.
    Заказчик получает MAX-уведомление «поступило предложение».
-6. Заказчик сравнивает предложения: `GET /opportunities/{id}/comparison`
-   (Comparison Board), добавляет в shortlist: `POST /opportunities/{id}/shortlist`
-   (или `POST /proposals/{id}/shortlist`).
-7. Открывает Deal Room: `GET /opportunities/{id}/dealroom` — единый контекст
+6. Заказчик сравнивает предложения: `GET /api/opportunities/{id}/comparison`
+   (Comparison Board), добавляет в shortlist: `POST /api/opportunities/{id}/shortlist`
+   (или `POST /api/proposals/{id}/shortlist`).
+7. Открывает Deal Room: `GET /api/opportunities/{id}/dealroom` — единый контекст
    (запрос + предложения + shortlist + следующее действие), фиксирует переход
-   в переговоры: `POST /deals` и выбирает исполнителя (`POST /proposals/{id}/status`,
+   в переговоры: `POST /api/deals` и выбирает исполнителя (`POST /api/proposals/{id}/status`,
    статус `chosen`). Исполнитель получает уведомление.
 
 ## 2.1. Контракт API (соответствует ТЗ фронтенда)
 
+Все пути ниже относительно префикса **`/api`** (полный пример: `POST /api/auth/max`).  
+Живой Swagger: `http://localhost:8000/docs`. Снимок: [`../docs/openapi-current.json`](../docs/openapi-current.json).
+
 | Домен | Эндпоинт |
 |---|---|
-| Auth | `POST /auth/max` |
-| Current user | `GET /me` |
-| Company | `GET /companies/{id}`, `PATCH /companies/{id}`, `PUT /companies/me`, `GET /companies/me` |
-| Catalog | `GET /companies` |
-| Opportunities | `GET /opportunities`, `POST /opportunities`, `GET /opportunities/{id}`, `PATCH /opportunities/{id}`, `GET /opportunities/mine` |
-| Publish | `POST /opportunities/{id}/publish` (+ `close`, `reopen`) |
-| Matches | `GET /opportunities/{id}/matches` |
-| Personal feed | `GET /me/recommendations` |
-| Match feedback | `POST /matches/{id}/feedback` |
-| Proposal | `POST /opportunities/{id}/proposals`, `GET /proposals/{id}`, `GET /proposals/mine` |
-| Proposals | `GET /opportunities/{id}/proposals` |
-| Shortlist | `POST /opportunities/{id}/shortlist` (по `company_id` или `proposal_id`), `POST /proposals/{id}/shortlist` |
-| Comparison | `GET /opportunities/{id}/comparison` |
-| Deal | `POST /deals`, `GET /deals`, `GET /deals/{id}` |
-| Notifications | `GET /notifications`, `POST /notifications/{id}/read`, `POST /notifications/read-all` |
-| AI parsing | `POST /ai/parse-opportunity` |
-| Upload | `POST /files` (≤10 МБ, опц. привязка к `opportunity_id`/`deal_id` — файлы сделки), `GET /files/{id}` |
-| Share | `POST /share/company/{id}`, `POST /share/opportunity/{id}` (карточка через бота → mid для `shareMaxContent`), `GET /share/.../link` (диплинк `:share`) |
-| Dictionaries | `GET /dictionaries`, `/dictionaries/categories`, `/dictionaries/regions` |
-| Admin (внутреннее) | `/api/admin/*` — seed, reset, статистика, модерация, верификация, напоминания |
+| Auth | `POST /api/auth/max` |
+| Current user | `GET /api/me` |
+| Company | `GET /api/companies/{id}`, `PATCH /api/companies/{id}`, `PUT /api/companies/me`, `GET /api/companies/me` |
+| Catalog | `GET /api/companies` |
+| Workspace | `/api/companies/me/members\|cases\|services\|documents\|activity\|settings\|verification` |
+| Opportunities | `GET/POST /api/opportunities`, `GET /api/opportunities/{id}`, `PATCH …`, `GET /api/opportunities/mine` |
+| Publish | `POST /api/opportunities/{id}/publish` (+ `close`, `reopen`) |
+| Matches | `GET /api/opportunities/{id}/matches` |
+| Personal feed | `GET /api/me/recommendations` |
+| Match feedback | `POST /api/matches/{id}/feedback` |
+| Proposal | `POST /api/opportunities/{id}/proposals`, `GET /api/proposals/{id}`, `GET /api/proposals/mine` |
+| Proposals list | `GET /api/opportunities/{id}/proposals` |
+| Shortlist | `POST /api/opportunities/{id}/shortlist`, `POST /api/proposals/{id}/shortlist` |
+| Comparison / Deal Room | `GET /api/opportunities/{id}/comparison`, `…/dealroom` |
+| Deal | `POST/GET /api/deals`, `GET /api/deals/{id}` |
+| Notifications | `GET /api/notifications`, `POST …/read`, `POST …/read-all` |
+| Favorites | `GET /api/favorites`, `POST /api/favorites/toggle`, `GET /api/favorites/check` |
+| AI parsing | `POST /api/ai/parse-opportunity` |
+| Upload | `POST /api/files` (≤10 МБ), `GET /api/files/{id}` |
+| Share | `POST /api/share/company\|opportunity/{id}`, `GET …/link` |
+| Dictionaries | `GET /api/dictionaries`, `/categories`, `/regions` |
+| Moderation | `/api/moderation/*`, `/api/escalations/*`, `/api/reports/*` |
+| Admin | `/api/admin/*` — seed, reset, stats, verify, notify/deadlines, platform admin |
 
 ## 3. Состав и архитектура
 
@@ -129,30 +161,32 @@ MAX_hack26/                     # корень репозитория
 
 ## 4. Запуск (одной командой)
 
-```powershell
-# из корня репозитория MAX_hack26 (там лежат compose.yaml и .env)
-# один раз: если .env ещё нет — copy backend_max\.env.example .env и впишите BOT_TOKEN
-docker-compose up --build
+Одна команда поднимает **все локальные компоненты** решения (БД + Backend + Caddy/Frontend):
+
+```bash
+# из корня репозитория MAX_hack26 (compose.yaml и .env)
+cp backend_max/.env.example .env   # один раз; впишите BOT_TOKEN
+docker compose up -d --build
+docker compose ps
 ```
 
-Компоненты: `db` (PostgreSQL), `backend` (FastAPI), `caddy` (HTTPS-вход).
+Компоненты: `db` (PostgreSQL), `backend` (FastAPI), `caddy` (HTTPS-вход + SPA).  
+Полный чеклист заказчика: [`../README.md#одна-команда-запуска-docker`](../README.md#одна-команда-запуска-docker).
 
-- Бэкенд напрямую: `http://localhost:8000` (документация API — `/docs`, health-check — `/health`)
-- Через Caddy: `https://localhost` — фронтенд из `frontend/`, API проксируется на те же пути
-  (самоподписанный сертификат локально; в браузере — «Принять риск»)
-- Продакшен: `DOMAIN=ваш-домен.ru` + удалите `tls internal` в `Caddyfile` →
-  Caddy выпустит сертификат Let's Encrypt автоматически. URL мини-приложения
-  для платформы MAX: `https://<домен>/`
+- Бэкенд напрямую: `http://localhost:8000` (`/docs`, `/health`, `/api/health`)
+- Через Caddy: `https://localhost` — Frontend, `/api*` проксируется на backend
+  (локальный CA Caddy; в браузере — «Принять риск»)
+- Продакшен: `DOMAIN=ваш-домен.ru` в `.env` → Let's Encrypt (нужны открытые 80/443).
+  URL мини-приложения для MAX: `https://<домен>/`
 
-Сборка занимает меньше минуты (плюс первая загрузка образов).
+Запуск без полного Docker (только БД в compose, API на хосте):
 
-Запуск без Docker (для разработки, БД — PostgreSQL на `localhost:5432`):
-
-```powershell
-python -m venv .venv; .\.venv\Scripts\Activate.ps1
-pip install -r backend_max\requirements.txt -r backend_max\requirements-dev.txt
-docker-compose up -d db    # поднять только PostgreSQL
-$env:DATABASE_URL="postgresql+psycopg2://b2b:b2b_pass@localhost:5432/b2b_match"; $env:DEV_MODE="1"
+```bash
+python -m venv .venv && source .venv/bin/activate   # Windows: .\.venv\Scripts\Activate.ps1
+pip install -r backend_max/requirements.txt -r backend_max/requirements-dev.txt
+docker compose up -d db
+export DATABASE_URL="postgresql+psycopg2://b2b:b2b_pass@localhost:5432/b2b_match"
+export DEV_MODE=1
 python -m uvicorn backend_max.app.main:app --port 8000
 ```
 
@@ -225,40 +259,50 @@ pyjwt, requests, python-dotenv, eval-type-backport для Python 3.9). Тест�
 
 ## 11. Пошаговый сценарий проверки
 
-1. `docker compose up --build` → `GET /health` → `{"status":"ok"}`.
+### Примеры ожидаемого поведения (кратко)
+
+| Шаг | Запрос | Ожидание |
+|-----|--------|----------|
+| Health | `GET /health` | `200` `{"status":"ok"}` |
+| Dev-auth | `POST /api/auth/max` `{"dev_max_user_id":7777001}` | JWT |
+| Seed | `POST /api/admin/seed` | идемпотентно компании + запросы + матчи |
+| Recommendations | `GET /api/me/recommendations` под `7777002` | score ≥ `MIN_MATCH_SCORE`, критерии |
+| Parse | `POST /api/ai/parse-opportunity` | категория, бюджет, срок, регион |
+| Publish | `POST /api/opportunities` | `published` + `matches[]` |
+| Proposal → Deal | proposals → comparison → shortlist → deals | статусы и inbox |
+
+### По шагам
+
+1. `docker compose up -d --build` → `GET /health` → `{"status":"ok"}`.
 2. Вход админа и seed (dev-режим):
-   `POST /auth/max` с `{"dev_max_user_id": 7777001}` → токен;
-   `POST /api/admin/seed` → `companies: 8, requests: 3, matches: 9`.
+   `POST /api/auth/max` с `{"dev_max_user_id": 7777001}` → токен;
+   `POST /api/admin/seed`.
 3. Лента исполнителя: вход `dev_max_user_id: 7777002` (DigitalLab) →
-   `GET /me/recommendations` → первый элемент «Нужна разработка
-   интернет-магазина…» со score 95 и критериями `почему подходит`.
-4. Smart Request Builder: `POST /ai/parse-opportunity` с `description:
+   `GET /api/me/recommendations` → релевантный запрос со score и критериями «почему подходит».
+4. Smart Request Builder: `POST /api/ai/parse-opportunity` с `description:
    "Нужна разработка интернет-магазина. React, 1С, бюджет 400-600 тысяч, срок два месяца, Москва"` →
-   категория `IT-разработка`, бюджет `400000–600000`, срок `60`, регион `Москва`.
-5. `POST /opportunities` с тем же описанием → статус `published`, в ответе
-   `matches` с компаниями и критериями. Draft-сценарий: `publish: false` →
-   `PATCH /opportunities/{id}` → `POST /opportunities/{id}/publish`.
-6. Отклик: от лица другого исполнителя `POST /opportunities/{id}/proposals` →
-   заказчику приходит уведомление (`GET /notifications`).
-7. `GET /opportunities/{id}/comparison` → строки сравнения по цене/сроку/кейсам/матчу.
-8. `POST /opportunities/{id}/shortlist` (`{"proposal_id": ...}`), затем
-   `POST /deals` → переговоры, у исполнителя в `GET /deals` появляется сделка.
-   Выбор исполнителя: `POST /proposals/{id}/status` `{"status": "chosen"}` →
-   `GET /opportunities/{id}/dealroom` показывает `next_action` про переговоры;
-   у исполнителя `GET /proposals/mine` статус `chosen`.
-9. Feedback: `POST /matches/{match_id}/feedback` `{"positive": true}`.
-10. Файлы: `POST /files` (multipart) → `GET /files/{id}`.
+   категория IT, бюджетный диапазон, срок, регион `Москва`.
+5. `POST /api/opportunities` с тем же описанием → статус `published`, в ответе
+   `matches`. Draft: `publish: false` → `PATCH /api/opportunities/{id}` →
+   `POST /api/opportunities/{id}/publish`.
+6. Отклик: от другого исполнителя `POST /api/opportunities/{id}/proposals` →
+   у заказчика `GET /api/notifications`.
+7. `GET /api/opportunities/{id}/comparison` → строки по цене/сроку/кейсам/матчу.
+8. `POST /api/opportunities/{id}/shortlist` (`{"proposal_id": ...}`), затем
+   `POST /api/deals`. Статус исполнителя: `POST /api/proposals/{id}/status`
+   `{"status": "chosen"}` → `GET /api/opportunities/{id}/dealroom`.
+9. Feedback: `POST /api/matches/{match_id}/feedback` `{"positive": true}`.
+10. Файлы: `POST /api/files` (multipart) → `GET /api/files/{id}`.
 
-Ожидаемое поведение полностью повторяет автотесты: `pytest backend_max\tests`
-(25 тестов). Готовая коллекция Postman — `backend_max/postman/B2B_Match.postman_collection.json`.
+Автотесты: `pytest backend_max/tests`.  
+Postman: `backend_max/postman/`.  
+Скрипт живого стенда (сценарии + покрытие эндпоинтов):
 
-Дополнительно — скрипт проверки сценариев против живого сервера
-(98 проверок, 9 сценариев, детерминированный прогон с автосбросом БД
-и отчётом о покрытии всех 59 эндпоинтов):
-
-```powershell
-python backend_max\scripts\verify_scenarios.py
+```bash
+python backend_max/scripts/verify_scenarios.py
 ```
+
+UI-проверка того же seed: [`../frontend/README.md`](../frontend/README.md#13-пошаговый-сценарий-проверки).
 
 ## 12. Известные ограничения
 
@@ -277,18 +321,36 @@ python backend_max\scripts\verify_scenarios.py
 
 ## 13. Остановка и повторный запуск
 
-```powershell
-docker-compose down        # остановка (данные PostgreSQL сохраняются в volume pgdata)
-docker-compose up --build  # повторный запуск
-docker-compose down -v     # полная очистка (БД + файлы)
+```bash
+docker compose down              # стоп; volume pgdata сохраняется
+docker compose up -d --build     # повторный запуск
+docker compose logs --tail=200 backend
+docker compose down -v           # полная очистка БД + томов Caddy
 ```
+
+Файлы загрузок на хосте: каталог `./data` (не обязательно в volume compose — смотрите `FILES_DIR`).
 
 ## 14. Тесты
 
 Тесты работают с PostgreSQL (тестовая БД `b2b_match_test` создаётся автоматически),
 поэтому сначала поднимите БД:
 
-```powershell
-docker-compose up -d db
-pytest backend_max\tests   # 20 тестов: структуризатор, матчинг, полный сценарий MVP, контракт, admin/seed
+```bash
+docker compose up -d db
+pytest backend_max/tests
+# структуризатор, матчинг, MVP-flow, RBAC, фильтры, admin/seed, …
 ```
+
+Связанные проверки UI: [`../frontend/README.md#тесты`](../frontend/README.md#тесты).  
+Общий чеклист стенда: [`../README.md#тестирование`](../README.md#тестирование).
+
+---
+
+## Связанные README
+
+| Модуль | Ссылка |
+|--------|--------|
+| Корень решения | [../README.md](../README.md) |
+| Frontend | [../frontend/README.md](../frontend/README.md) |
+| Бот / MaxAPI | [../api/README.md](../api/README.md) |
+| OpenAPI | [../docs/README.md](../docs/README.md) |

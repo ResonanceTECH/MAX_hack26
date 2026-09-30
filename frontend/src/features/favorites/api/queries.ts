@@ -18,8 +18,34 @@ export function useToggleFavorite() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ type, targetId }: { type: FavoriteItem['type']; targetId: string }) =>
-      favoriteApi.toggle(type, targetId),
-    onSuccess: () => {
+      favoriteApi.toggle(type, String(targetId)),
+    onMutate: async ({ type, targetId }) => {
+      const key = String(targetId)
+      await qc.cancelQueries({ queryKey: favoriteKeys.list() })
+      const previous = qc.getQueryData<FavoriteItem[]>(favoriteKeys.list())
+      qc.setQueryData<FavoriteItem[]>(favoriteKeys.list(), (old = []) => {
+        const exists = old.some((f) => f.type === type && String(f.targetId) === key)
+        if (exists) {
+          return old.filter((f) => !(f.type === type && String(f.targetId) === key))
+        }
+        return [
+          {
+            id: `opt-${type}-${key}`,
+            type,
+            targetId: key,
+            createdAt: new Date().toISOString(),
+          },
+          ...old,
+        ]
+      })
+      return { previous }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) {
+        qc.setQueryData(favoriteKeys.list(), ctx.previous)
+      }
+    },
+    onSettled: () => {
       void qc.invalidateQueries({ queryKey: favoriteKeys.all })
     },
   })

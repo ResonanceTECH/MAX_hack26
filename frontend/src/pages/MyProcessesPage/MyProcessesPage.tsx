@@ -70,7 +70,7 @@ export function MyProcessesPage() {
       to: ROUTES.MY_PROPOSALS,
     },
     {
-      title: 'Shortlist',
+      title: 'Шортлист',
       count: shortlist.data?.length ?? 0,
       to: ROUTES.MY_SHORTLIST,
     },
@@ -83,7 +83,7 @@ export function MyProcessesPage() {
 
   return (
     <Box>
-      <PageHeader title="Мои процессы" subtitle="Запросы, отклики, shortlist и переговоры" />
+      <PageHeader title="Мои процессы" subtitle="Запросы, отклики, шортлист и переговоры" />
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {summary.map((card) => (
@@ -113,7 +113,7 @@ export function MyProcessesPage() {
       >
         <Tab label={`Запросы (${activeRequests.length})`} />
         <Tab label={`Отклики (${(proposals.data ?? []).length})`} />
-        <Tab label={`Shortlist (${shortlist.data?.length ?? 0})`} />
+        <Tab label={`Шортлист (${shortlist.data?.length ?? 0})`} />
         <Tab label={`Переговоры (${negotiationDeals.length})`} />
       </Tabs>
 

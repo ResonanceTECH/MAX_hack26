@@ -133,6 +133,60 @@ function guessTechnologies(text: string): string[] {
   return technologies
 }
 
+/** Normalize "100 000" / "100.000" / "100,000" → integer rubles. */
+export function normalizeBudgetAmountToken(raw: string): number | null {
+  let s = raw.replace(/[\s\u00A0\u202F]/g, '')
+  if (!s) return null
+
+  // Thousand separators: 1.000.000 or 100,000
+  if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+    s = s.replace(/\./g, '')
+  } else if (/^\d{1,3}(,\d{3})+$/.test(s)) {
+    s = s.replace(/,/g, '')
+  } else {
+    // Drop any leftover non-digits (avoid partial junk from "1С")
+    s = s.replace(/[^\d]/g, '')
+  }
+
+  if (!s) return null
+  const n = Number(s)
+  return Number.isFinite(n) ? n : null
+}
+
+function suffixMultiplier(suffix: string | undefined): number {
+  if (!suffix) return 1
+  const s = suffix.toLowerCase()
+  if (s.startsWith('тыс')) return 1000
+  if (s.startsWith('млн') || s.startsWith('миллион')) return 1_000_000
+  return 1
+}
+
+/**
+ * Extract budget from free text using budget context only —
+ * never the first digit in the whole string (avoids "1С" → 1000).
+ */
+export function parseBudgetFromText(text: string): number | null {
+  const patterns: RegExp[] = [
+    /бюджет[^0-9]{0,24}(?:до|от)?[^0-9]{0,8}(\d[\d\s\u00A0\u202F.,]*)\s*(тыс(?:яч(?:и)?)?|млн|миллион(?:а|ов)?|руб(?:лей|ля|\.)?|₽)?/i,
+    /(?:^|[^\d])(?:до|от)\s+(\d[\d\s\u00A0\u202F.,]*)\s*(тыс(?:яч(?:и)?)?|млн|миллион(?:а|ов)?)\b/i,
+    /(\d[\d\s\u00A0\u202F.,]*)\s*(тыс(?:яч(?:и)?)?|млн|миллион(?:а|ов)?)\b/i,
+    /(\d[\d\s\u00A0\u202F.,]*)\s*(?:руб(?:лей|ля|\.)?|₽)/i,
+  ]
+
+  for (const re of patterns) {
+    const match = text.match(re)
+    if (!match?.[1]) continue
+    const raw = normalizeBudgetAmountToken(match[1])
+    if (raw == null) continue
+    const mult = suffixMultiplier(match[2])
+    // Ignore tiny artifacts without explicit money/multiplier suffix
+    if (mult === 1 && raw < 10 && !/руб|₽/i.test(match[0])) continue
+    return raw * mult
+  }
+
+  return null
+}
+
 /** Локальный фолбэк, если LLM/API недоступны (тесты, офлайн). */
 export async function parseOpportunityTextLocal(text: string): Promise<ParsedOpportunityDraft> {
   await delay(200)
@@ -158,16 +212,7 @@ export async function parseOpportunityTextLocal(text: string): Promise<ParsedOpp
     backendCategory = 'Строительство и ремонт'
   }
 
-  let budgetMax: number | null = null
-  const budgetMatch = text.match(/(\d[\d\s]*)\s*(тыс|тысяч|млн)?/i)
-  if (budgetMatch) {
-    const raw = Number(budgetMatch[1].replace(/\s/g, ''))
-    if (budgetMatch[2]?.startsWith('тыс')) budgetMax = raw * 1000
-    else if (budgetMatch[2]?.startsWith('млн')) budgetMax = raw * 1_000_000
-    else if (raw < 10000) budgetMax = raw * 1000
-    else budgetMax = raw
-  }
-  if (lower.includes('500') && budgetMax == null) budgetMax = 500000
+  const budgetMax = parseBudgetFromText(text)
 
   const industries = guessIndustries(text, category, backendCategory)
   const tech =

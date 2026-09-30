@@ -38,9 +38,29 @@ function daysFromNow(days: number | null | undefined): string | null {
   return d.toISOString()
 }
 
+function uniqueStrings(values: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of values) {
+    const value = raw.trim()
+    if (!value) continue
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(value)
+  }
+  return out
+}
+
 export function mapRequestDtoToOpportunity(dto: RequestDto): Opportunity {
   const company = companySummaryFromIds(dto.company_id, dto.company_name)
-  const requirements = dto.requirements ?? []
+  // Backend: requirements = must-haves; required_certificates = extra (shown as «желательные»).
+  // Don't mirror requirements into skills+technologies — details page would look like
+  // обязательные === желательные (same chips twice).
+  const requirements = uniqueStrings(dto.requirements ?? [])
+  const certificates = uniqueStrings(dto.required_certificates ?? []).filter(
+    (item) => !requirements.some((req) => req.toLowerCase() === item.toLowerCase()),
+  )
   return {
     id: String(dto.id),
     title: dto.title,
@@ -49,11 +69,13 @@ export function mapRequestDtoToOpportunity(dto: RequestDto): Opportunity {
     company,
     category: dto.category,
     subcategory: dto.subcategory ?? '',
-    industries: dto.category ? [dto.category] : [],
-    skills: requirements,
+    // Backend Request has no industries — don't mirror category (looks like category === industry).
+    industries: [],
+    skills: [],
+    // Keep for cards/filters; details page hides tags already listed as required.
     technologies: requirements,
     requiredRequirements: requirements,
-    desiredRequirements: dto.required_certificates ?? [],
+    desiredRequirements: certificates,
     budgetMin: dto.budget_min,
     budgetMax: dto.budget_max,
     currency: 'RUB',

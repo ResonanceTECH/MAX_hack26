@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Box from '@mui/material/Box'
 import Alert from '@mui/material/Alert'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { COMPANY_CASE_STATUS } from '@/entities/company-case'
 import { useOpportunity } from '@/entities/opportunity/api/queries'
 import { useCreateProposal } from '@/entities/proposal/api/queries'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
+import { useCompanyCases } from '@/features/company-management/api/queries'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { ProposalApiError } from '@/shared/api/proposalApi'
 import { opportunityDetailsPath, ROUTES } from '@/shared/constants/routes'
@@ -17,6 +19,7 @@ import {
   AppButton,
   AppIcon,
   AppInput,
+  AppSelect,
   AppTextarea,
   ErrorState,
   LoadingState,
@@ -25,13 +28,25 @@ import {
 } from '@/shared/ui'
 import { CheckmarkCircle01Icon } from '@/shared/ui/icons'
 
+const NONE_CASE = ''
+
 const proposalFormSchema = z.object({
-  price: z.coerce.number().positive('Укажите сумму больше 0'),
-  durationDays: z.coerce.number().int().positive('Укажите срок в днях'),
+  // Backend ProposalIn.price is int — floats / 1e+20 from <input type="number"> → 422
+  price: z.coerce
+    .number({ invalid_type_error: 'Укажите сумму больше 0' })
+    .int('Укажите целое число в рублях')
+    .positive('Укажите сумму больше 0')
+    .max(1_000_000_000_000, 'Слишком большая сумма'),
+  durationDays: z.coerce
+    .number({ invalid_type_error: 'Укажите срок в днях' })
+    .int('Укажите целое число дней')
+    .positive('Укажите срок в днях')
+    .max(3_650, 'Срок слишком большой'),
   description: z.string().min(10, 'Минимум 10 символов'),
   included: z.string().min(1, 'Укажите хотя бы один пункт'),
   excluded: z.string().optional(),
-  cases: z.string().min(1, 'Укажите хотя бы один кейс'),
+  /** Selected CompanyCase id, or empty = do not send case_ref. */
+  caseId: z.string().optional(),
   comment: z.string().optional(),
 })
 
@@ -50,6 +65,7 @@ export function CreateProposalPage() {
   const opportunityId = opportunityIdParam || id
   const opportunityQuery = useOpportunity(opportunityId)
   const company = useSessionStore((s) => s.company)
+  const casesQuery = useCompanyCases(company?.id)
   const createProposal = useCreateProposal()
   const showSuccess = useSnackbarStore((s) => s.showSuccess)
   const showError = useSnackbarStore((s) => s.showError)
@@ -58,6 +74,7 @@ export function CreateProposalPage() {
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<ProposalFormValues>({
@@ -68,10 +85,20 @@ export function CreateProposalPage() {
       description: '',
       included: '',
       excluded: '',
-      cases: '',
+      caseId: NONE_CASE,
       comment: '',
     },
   })
+
+  const caseOptions = useMemo(() => {
+    const items = (casesQuery.data ?? []).filter(
+      (c) => c.status === COMPANY_CASE_STATUS.PUBLISHED || c.status === COMPANY_CASE_STATUS.DRAFT,
+    )
+    return [
+      { value: NONE_CASE, label: 'Без привязки к кейсу' },
+      ...items.map((c) => ({ value: c.id, label: c.title })),
+    ]
+  }, [casesQuery.data])
 
   if (opportunityQuery.isLoading) return <LoadingState variant="page" />
   if (opportunityQuery.isError || !opportunityQuery.data) {
@@ -104,6 +131,7 @@ export function CreateProposalPage() {
 
   const onSubmit = handleSubmit(async (values) => {
     setGuardError(null)
+    const selected = (casesQuery.data ?? []).find((c) => c.id === values.caseId)
     try {
       await createProposal.mutateAsync({
         opportunityId,
@@ -113,7 +141,9 @@ export function CreateProposalPage() {
         description: values.description,
         included: splitCommaList(values.included),
         excluded: splitCommaList(values.excluded),
-        cases: splitCommaList(values.cases),
+        // Titles only for solution_text — never raw free-text as case_ref
+        cases: selected ? [selected.title] : [],
+        caseId: values.caseId?.trim() ? values.caseId : null,
         comment: values.comment?.trim() || undefined,
       })
       showSuccess('Предложение отправлено')
@@ -182,17 +212,19 @@ export function CreateProposalPage() {
           label="Стоимость, ₽"
           type="number"
           inputMode="numeric"
+          inputProps={{ min: 1, step: 1, max: 1_000_000_000_000 }}
           error={Boolean(errors.price)}
           helperText={errors.price?.message}
-          {...register('price')}
+          {...register('price', { valueAsNumber: true })}
         />
         <AppInput
           label="Срок, дней"
           type="number"
           inputMode="numeric"
+          inputProps={{ min: 1, step: 1, max: 3650 }}
           error={Boolean(errors.durationDays)}
           helperText={errors.durationDays?.message}
-          {...register('durationDays')}
+          {...register('durationDays', { valueAsNumber: true })}
         />
         <AppTextarea
           label="Описание предложения"
@@ -213,13 +245,34 @@ export function CreateProposalPage() {
           helperText="Через запятую"
           {...register('excluded')}
         />
-        <AppTextarea
-          label="Релевантные кейсы"
-          placeholder="CRM для клиники, портал пациента"
-          error={Boolean(errors.cases)}
-          helperText={errors.cases?.message ?? 'Через запятую'}
-          {...register('cases')}
+        <Controller
+          name="caseId"
+          control={control}
+          render={({ field }) => (
+            <AppSelect
+              label="Релевантный кейс"
+              options={caseOptions}
+              value={field.value ?? NONE_CASE}
+              onChange={field.onChange}
+              helperText={
+                caseOptions.length <= 1
+                  ? 'Нет кейсов в профиле — можно отправить без привязки или добавить в «Кейсы»'
+                  : 'Только кейс из профиля компании (поле case_ref на бэке). Необязательно.'
+              }
+            />
+          )}
         />
+        {caseOptions.length <= 1 ? (
+          <AppButton
+            component={RouterLink}
+            to={ROUTES.PROFILE_COMPANY_CASES}
+            variant="text"
+            size="small"
+            sx={{ alignSelf: 'flex-start', mt: -1 }}
+          >
+            Перейти к кейсам компании
+          </AppButton>
+        ) : null}
         <AppTextarea label="Комментарий для заказчика (необязательно)" {...register('comment')} />
         <AppButton type="submit" variant="contained" loading={isSubmitting || createProposal.isPending}>
           Отправить предложение

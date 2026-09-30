@@ -10,6 +10,8 @@ export interface OpenChatParams {
   url?: string
 }
 
+export type ShareResult = 'share' | 'clipboard' | 'noop' | 'error'
+
 export type OpenChatResult = { mode: 'max' } | { mode: 'share' } | { mode: 'clipboard' } | { mode: 'noop' }
 
 /**
@@ -20,7 +22,7 @@ export interface MaxBridgeAdapter {
   isAvailable(): boolean
   getPlatform(): string | null
   getInitData(): string | null
-  shareContent(data: ShareData): Promise<void>
+  shareContent(data: ShareData): Promise<ShareResult>
   openChat(params?: OpenChatParams): Promise<OpenChatResult>
   close(): void
 }
@@ -45,8 +47,15 @@ function getMaxHost(): MaxHost | null {
   return w.MaxWebApp ?? w.WebApp ?? w.Telegram?.WebApp ?? w.MAX ?? null
 }
 
-async function browserShareOrCopy(data: ShareData): Promise<'share' | 'clipboard' | 'noop'> {
+function buildShareClipboardText(data: ShareData, url: string): string {
+  const parts = [data.title, data.text, url].filter(Boolean)
+  return [...new Set(parts)].join('\n')
+}
+
+async function browserShareOrCopy(data: ShareData): Promise<ShareResult> {
   const url = data.url ?? (typeof window !== 'undefined' ? window.location.href : undefined)
+  if (!url) return 'noop'
+
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
     try {
       await navigator.share({
@@ -55,14 +64,22 @@ async function browserShareOrCopy(data: ShareData): Promise<'share' | 'clipboard
         url,
       })
       return 'share'
-    } catch {
-      // user cancelled or unsupported — fall through
+    } catch (err) {
+      // User cancelled share sheet — don't treat as hard failure
+      if (err instanceof DOMException && err.name === 'AbortError') return 'noop'
+      // fall through to clipboard
     }
   }
-  if (url && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(url)
-    return 'clipboard'
+
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(buildShareClipboardText(data, url))
+      return 'clipboard'
+    } catch {
+      return 'error'
+    }
   }
+
   return 'noop'
 }
 
@@ -80,8 +97,8 @@ export class BrowserMaxBridgeAdapter implements MaxBridgeAdapter {
     return null
   }
 
-  async shareContent(data: ShareData): Promise<void> {
-    await browserShareOrCopy(data)
+  async shareContent(data: ShareData): Promise<ShareResult> {
+    return browserShareOrCopy(data)
   }
 
   async openChat(params?: OpenChatParams): Promise<OpenChatResult> {
@@ -90,6 +107,7 @@ export class BrowserMaxBridgeAdapter implements MaxBridgeAdapter {
       text: params?.title,
       url: params?.url ?? (typeof window !== 'undefined' ? window.location.href : undefined),
     })
+    if (mode === 'error') return { mode: 'noop' }
     return { mode }
   }
 
@@ -121,17 +139,17 @@ export class RealMaxBridgeAdapter implements MaxBridgeAdapter {
     return this.host.initData ?? null
   }
 
-  async shareContent(data: ShareData): Promise<void> {
+  async shareContent(data: ShareData): Promise<ShareResult> {
     const url = data.url ?? (typeof window !== 'undefined' ? window.location.href : '')
     if (typeof this.host.shareURL === 'function' && url) {
       this.host.shareURL(url, data.text ?? data.title)
-      return
+      return 'share'
     }
     if (typeof this.host.openLink === 'function' && url) {
       this.host.openLink(url)
-      return
+      return 'share'
     }
-    await browserShareOrCopy(data)
+    return browserShareOrCopy(data)
   }
 
   async openChat(params?: OpenChatParams): Promise<OpenChatResult> {
@@ -153,6 +171,7 @@ export class RealMaxBridgeAdapter implements MaxBridgeAdapter {
       text: params?.title,
       url,
     })
+    if (mode === 'error') return { mode: 'noop' }
     return { mode }
   }
 

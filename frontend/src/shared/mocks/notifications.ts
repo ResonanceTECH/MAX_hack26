@@ -24,8 +24,8 @@ export const mockNotifications: AppNotification[] = [
   {
     id: 'notif-3',
     type: NOTIFICATION_TYPES.SHORTLIST,
-    title: 'Добавили в shortlist',
-    message: 'Вас добавили в shortlist по запросу интеграции МИС',
+    title: 'Добавили в шортлист',
+    message: 'Вас добавили в шортлист по запросу интеграции МИС',
     createdAt: '2026-09-20T12:00:00.000Z',
     read: true,
     link: '/my/proposals',
@@ -79,8 +79,8 @@ export const mockNotifications: AppNotification[] = [
   {
     id: 'notif-9',
     type: NOTIFICATION_TYPES.SHORTLIST,
-    title: 'Shortlist обновлён',
-    message: 'В shortlist по CRM добавлена DataCraft',
+    title: 'Шортлист обновлён',
+    message: 'В шортлист по CRM добавлена DataCraft',
     createdAt: '2026-09-17T16:00:00.000Z',
     read: true,
     link: '/my/shortlist',

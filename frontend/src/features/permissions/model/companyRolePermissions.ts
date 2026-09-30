@@ -53,6 +53,7 @@ export const companyRolePermissions: Record<CompanyMemberRole, Permission[]> = {
     Permission.VIEW_NOTIFICATIONS,
     Permission.VIEW_COMPANY_PROFILE,
     Permission.VIEW_COMPANY,
+    Permission.EDIT_COMPANY,
     Permission.MANAGE_COMPANY_SERVICES,
     Permission.MANAGE_COMPANY_CASES,
     Permission.VIEW_COMPANY_SERVICES,
@@ -93,7 +94,7 @@ export const COMPANY_PERMISSION_MATRIX_ROWS: { permission: Permission; label: st
   { permission: Permission.MANAGE_COMPANY_PERMISSIONS, label: 'Настройка прав доступа' },
   { permission: Permission.CREATE_OPPORTUNITY, label: 'Публикация запросов' },
   { permission: Permission.CREATE_PROPOSAL, label: 'Отклики' },
-  { permission: Permission.MANAGE_SHORTLIST, label: 'Shortlist' },
+  { permission: Permission.MANAGE_SHORTLIST, label: 'Шортлист' },
   { permission: Permission.START_NEGOTIATION, label: 'Старт переговоров' },
 ]
 

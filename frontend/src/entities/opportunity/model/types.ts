@@ -35,7 +35,9 @@ export interface Opportunity {
   industries: string[]
   skills: string[]
   technologies: string[]
+  /** Must-haves for match (API: `requirements`). */
   requiredRequirements: string[]
+  /** Nice-to-have / certs distinct from required (API: `required_certificates` minus overlap). */
   desiredRequirements: string[]
   budgetMin: number | null
   budgetMax: number | null

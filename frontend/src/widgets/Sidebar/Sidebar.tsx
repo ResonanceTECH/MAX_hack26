@@ -9,6 +9,7 @@ import ListItemText from '@mui/material/ListItemText'
 import Typography from '@mui/material/Typography'
 import { useAdminUnreadCount } from '@/features/admin/api/queries'
 import { useSessionStore } from '@/features/auth/model/sessionStore'
+import { SidebarAccountFooter } from '@/features/auth/ui/SidebarAccountFooter'
 import { SYSTEM_ROLES } from '@/entities/user'
 import { Permission } from '@/features/permissions/model/permissions'
 import { useCompanyPermission } from '@/features/permissions/hooks/useCompanyPermission'
@@ -173,7 +174,9 @@ export function Sidebar() {
             </ListItemButton>
           </List>
         </>
-      ) : null}
+      ) : (
+        <SidebarAccountFooter />
+      )}
     </Box>
   )
 }

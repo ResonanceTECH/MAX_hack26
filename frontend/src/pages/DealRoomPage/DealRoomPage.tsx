@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link as RouterLink, useParams } from 'react-router-dom'
 import Box from '@mui/material/Box'
+import LinearProgress from '@mui/material/LinearProgress'
 import List from '@mui/material/List'
 import ListItem from '@mui/material/ListItem'
 import ListItemText from '@mui/material/ListItemText'
@@ -9,17 +10,20 @@ import Tab from '@mui/material/Tab'
 import Tabs from '@mui/material/Tabs'
 import Typography from '@mui/material/Typography'
 import type { DealEvent, DealFile } from '@/entities/deal'
-import { useDeal } from '@/entities/deal/api/queries'
+import { useDeal, useFixDealTerms, useUploadDealFile } from '@/entities/deal/api/queries'
 import { useOpportunity } from '@/entities/opportunity/api/queries'
 import { useProposal } from '@/entities/proposal/api/queries'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
 import { apiClient } from '@/shared/api/apiClient'
+import { filesApi } from '@/shared/api/filesApi'
 import { proposalDetailsPath } from '@/shared/constants/routes'
 import { formatDate, formatRelativeDate } from '@/shared/lib/format'
 import { getMaxBridge } from '@/shared/lib/max'
 import {
   AppButton,
   AppIcon,
+  AppInput,
+  AppTextarea,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -78,8 +82,32 @@ export function DealRoomPage() {
   const dealQuery = useDeal(id)
   const opportunityQuery = useOpportunity(dealQuery.data?.opportunityId ?? '')
   const proposalQuery = useProposal(dealQuery.data?.proposalId ?? '')
+  const uploadFile = useUploadDealFile(id)
+  const fixTerms = useFixDealTerms(id)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [termsSummary, setTermsSummary] = useState('')
+  const [agreedPrice, setAgreedPrice] = useState('')
+  const [agreedDays, setAgreedDays] = useState('')
   const showInfo = useSnackbarStore((s) => s.showInfo)
+  const showSuccess = useSnackbarStore((s) => s.showSuccess)
   const showError = useSnackbarStore((s) => s.showError)
+
+  useEffect(() => {
+    const d = dealQuery.data
+    if (!d) return
+    setTermsSummary(d.termsSummary ?? '')
+    setAgreedPrice(
+      d.agreedPrice != null ? String(d.agreedPrice) : d.price != null ? String(d.price) : '',
+    )
+    setAgreedDays(
+      d.agreedTermDays != null
+        ? String(d.agreedTermDays)
+        : d.durationDays != null
+          ? String(d.durationDays)
+          : '',
+    )
+  }, [dealQuery.data?.id, dealQuery.data?.updatedAt])
 
   if (dealQuery.isLoading) return <LoadingState variant="page" />
   if (dealQuery.isError || !dealQuery.data) {
@@ -90,6 +118,61 @@ export function DealRoomPage() {
   const buyerName = opportunityQuery.data?.company.shortName ?? 'Заказчик'
   const headerTitle = `${deal.companyName} × ${buyerName}`
   const files = deal.files ?? []
+  const uploading = uploadFile.isPending
+  const termsFixed = Boolean(deal.termsSummary)
+
+  const submitTerms = () => {
+    const priceNum = agreedPrice.trim() ? Number(agreedPrice) : null
+    const daysNum = agreedDays.trim() ? Number(agreedDays) : null
+    if (priceNum != null && (!Number.isFinite(priceNum) || priceNum <= 0)) {
+      showError('Укажите корректную стоимость')
+      return
+    }
+    if (daysNum != null && (!Number.isInteger(daysNum) || daysNum <= 0)) {
+      showError('Укажите срок целым числом дней')
+      return
+    }
+    fixTerms.mutate(
+      {
+        termsSummary,
+        agreedPrice: priceNum,
+        agreedTermDays: daysNum,
+      },
+      {
+        onSuccess: () => showSuccess('Условия зафиксированы'),
+        onError: (err) =>
+          showError(err instanceof Error ? err.message : 'Не удалось зафиксировать условия'),
+      },
+    )
+  }
+
+  const openFilePicker = () => {
+    fileInputRef.current?.click()
+  }
+
+  const onFileSelected = (fileList: FileList | null) => {
+    const file = fileList?.[0]
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    if (!file) return
+    if (file.size > filesApi.maxBytes) {
+      showError('Файл больше 10 МБ')
+      return
+    }
+    setUploadProgress(0)
+    uploadFile.mutate(
+      { file, onProgress: setUploadProgress },
+      {
+        onSuccess: (meta) => {
+          showSuccess(`Файл «${meta.name}» загружен`)
+          setUploadProgress(null)
+        },
+        onError: (err) => {
+          showError(err instanceof Error ? err.message : 'Не удалось загрузить файл')
+          setUploadProgress(null)
+        },
+      },
+    )
+  }
 
   return (
     <Box>
@@ -127,7 +210,7 @@ export function DealRoomPage() {
                 label="Срок"
                 value={deal.durationDays != null ? `${deal.durationDays} дн.` : 'не указан'}
               />
-              <Row label="Контакт" value={deal.contactName} />
+              <Row label="Контакт" value={deal.contactName || '—'} />
               <Row label="Следующий шаг" value={deal.nextAction} />
               <Row label="Последнее действие" value={deal.lastAction} />
               <Stack direction="row" spacing={1} alignItems="center">
@@ -138,8 +221,68 @@ export function DealRoomPage() {
               </Stack>
             </Stack>
           </Section>
+
+          <Section title="Фиксация условий">
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Здесь стороны записывают согласованные условия (цена, срок, этапы). История только
+              показывает факт — редактирование на этой вкладке «Обзор».
+            </Typography>
+            {termsFixed && deal.termsSummary ? (
+              <Box
+                sx={{
+                  mb: 2,
+                  p: 1.5,
+                  borderRadius: 2,
+                  bgcolor: 'action.hover',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                  Уже зафиксировано
+                </Typography>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {deal.termsSummary}
+                </Typography>
+              </Box>
+            ) : null}
+            <Stack spacing={2}>
+              <AppTextarea
+                label="Согласованные условия"
+                placeholder="Например: оплата 50/50, старт через неделю, NDA до пятницы…"
+                value={termsSummary}
+                onChange={(e) => setTermsSummary(e.target.value)}
+                minRows={3}
+              />
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <AppInput
+                  label="Согласованная стоимость, ₽"
+                  type="number"
+                  inputMode="numeric"
+                  value={agreedPrice}
+                  onChange={(e) => setAgreedPrice(e.target.value)}
+                />
+                <AppInput
+                  label="Срок, дней"
+                  type="number"
+                  inputMode="numeric"
+                  value={agreedDays}
+                  onChange={(e) => setAgreedDays(e.target.value)}
+                />
+              </Stack>
+              <AppButton
+                variant="contained"
+                onClick={submitTerms}
+                loading={fixTerms.isPending}
+                disabled={fixTerms.isPending || termsSummary.trim().length < 3}
+              >
+                {termsFixed ? 'Обновить условия' : 'Зафиксировать условия'}
+              </AppButton>
+            </Stack>
+          </Section>
+
           <AppButton
-            variant="contained"
+            variant="outlined"
             onClick={() => {
               void (async () => {
                 try {
@@ -203,42 +346,74 @@ export function DealRoomPage() {
       ) : null}
 
       {tab === 2 ? (
-        files.length === 0 ? (
-          <EmptyState
-            title="Файлов пока нет"
-            description="Договоры, NDA и приложения появятся здесь, когда стороны загрузят их в сделку."
+        <Stack spacing={2}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            hidden
+            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.zip,.txt"
+            onChange={(e) => onFileSelected(e.target.files)}
           />
-        ) : (
-          <List disablePadding>
-            {files.map((file) => (
-              <ListItem
-                key={file.id}
-                divider
-                secondaryAction={
-                  <AppButton
-                    size="small"
-                    variant="outlined"
-                    onClick={() => {
-                      void downloadDealFile(file).catch((err: unknown) => {
-                        showError(err instanceof Error ? err.message : 'Не удалось скачать файл')
-                      })
-                    }}
-                  >
-                    Скачать
-                  </AppButton>
-                }
-                sx={{ px: 0 }}
-              >
-                <AppIcon icon={File02Icon} size={22} color="text.secondary" aria-hidden />
-                <ListItemText
-                  sx={{ ml: 1.5 }}
-                  primary={file.name}
-                  secondary={`${formatFileSize(file.size)} · ${formatDate(file.createdAt)}`}
-                />
-              </ListItem>
-            ))}
-          </List>
-        )
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
+            <AppButton
+              variant="contained"
+              onClick={openFilePicker}
+              loading={uploading}
+              disabled={uploading}
+            >
+              Загрузить файл
+            </AppButton>
+            <Typography variant="body2" color="text.secondary">
+              Договоры, NDA, приложения — до 10 МБ
+            </Typography>
+          </Stack>
+          {uploadProgress != null ? (
+            <Box>
+              <LinearProgress variant="determinate" value={uploadProgress} sx={{ mb: 0.5 }} />
+              <Typography variant="caption" color="text.secondary">
+                Загрузка… {uploadProgress}%
+              </Typography>
+            </Box>
+          ) : null}
+          {files.length === 0 ? (
+            <EmptyState
+              title="Файлов пока нет"
+              description="Загрузите договор, NDA или приложение — файл будет доступен обеим сторонам сделки."
+              actionLabel={uploading ? undefined : 'Выбрать файл'}
+              onAction={uploading ? undefined : openFilePicker}
+            />
+          ) : (
+            <List disablePadding>
+              {files.map((file) => (
+                <ListItem
+                  key={file.id}
+                  divider
+                  secondaryAction={
+                    <AppButton
+                      size="small"
+                      variant="outlined"
+                      onClick={() => {
+                        void downloadDealFile(file).catch((err: unknown) => {
+                          showError(err instanceof Error ? err.message : 'Не удалось скачать файл')
+                        })
+                      }}
+                    >
+                      Скачать
+                    </AppButton>
+                  }
+                  sx={{ px: 0 }}
+                >
+                  <AppIcon icon={File02Icon} size={22} color="text.secondary" aria-hidden />
+                  <ListItemText
+                    sx={{ ml: 1.5 }}
+                    primary={file.name}
+                    secondary={`${formatFileSize(file.size)} · ${formatDate(file.createdAt)}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </Stack>
       ) : null}
 
       {tab === 3 ? (

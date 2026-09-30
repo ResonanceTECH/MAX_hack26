@@ -17,7 +17,7 @@ describe('companyRolePermissions / hasPermission', () => {
     expect(hasPermission(role, Permission.MANAGE_COMPANY_SERVICES, member)).toBe(true)
     expect(hasPermission(role, Permission.VIEW_COMPANY_DOCUMENTS, member)).toBe(true)
     expect(hasPermission(role, Permission.MANAGE_COMPANY_DOCUMENTS, member)).toBe(false)
-    expect(hasPermission(role, Permission.EDIT_COMPANY, member)).toBe(false)
+    expect(hasPermission(role, Permission.EDIT_COMPANY, member)).toBe(true)
     expect(hasPermission(role, Permission.MANAGE_COMPANY_MEMBERS, member)).toBe(false)
     expect(hasPermission(role, Permission.MANAGE_COMPANY_SETTINGS, member)).toBe(false)
   })

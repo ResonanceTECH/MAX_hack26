@@ -51,7 +51,7 @@ export function ProposalsPage() {
                 canManageShortlist
                   ? async (pid) => {
                       await shortlistMutation.mutateAsync(pid)
-                      showSuccess('Добавлено в shortlist')
+                      showSuccess('Добавлено в шортлист')
                     }
                   : undefined
               }

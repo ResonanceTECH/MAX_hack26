@@ -18,6 +18,9 @@ export const mockDeals: Deal[] = [
     lastAction: 'Обсуждение условий',
     updatedAt: '2026-09-25T14:00:00.000Z',
     files: [],
+    termsSummary: null,
+    agreedPrice: null,
+    agreedTermDays: null,
     events: [
       {
         id: 'e1',
@@ -29,8 +32,8 @@ export const mockDeals: Deal[] = [
       {
         id: 'e2',
         date: '2026-09-24T12:00:00.000Z',
-        title: 'Компания добавлена в shortlist',
-        description: 'Заказчик включил Digital Lab в shortlist финалистов',
+        title: 'Компания добавлена в шортлист',
+        description: 'Заказчик включил Digital Lab в шортлист финалистов',
         type: 'shortlist',
       },
       {
@@ -58,6 +61,9 @@ export const mockDeals: Deal[] = [
     lastAction: 'Отправлен бриф',
     updatedAt: '2026-09-22T09:00:00.000Z',
     files: [],
+    termsSummary: null,
+    agreedPrice: null,
+    agreedTermDays: null,
     events: [
       {
         id: 'e4',
@@ -91,6 +97,9 @@ export const mockDeals: Deal[] = [
     lastAction: 'Согласована стоимость пилота',
     updatedAt: '2026-09-21T16:00:00.000Z',
     files: [],
+    termsSummary: null,
+    agreedPrice: null,
+    agreedTermDays: null,
     events: [
       {
         id: 'e6',
@@ -124,6 +133,9 @@ export const mockDeals: Deal[] = [
     lastAction: 'Запрос уточнения по страховке',
     updatedAt: '2026-09-20T11:00:00.000Z',
     files: [],
+    termsSummary: null,
+    agreedPrice: null,
+    agreedTermDays: null,
     events: [
       {
         id: 'e8',
@@ -150,6 +162,9 @@ export const mockDeals: Deal[] = [
     lastAction: 'Сделка закрыта',
     updatedAt: '2026-09-10T18:00:00.000Z',
     files: [],
+    termsSummary: null,
+    agreedPrice: null,
+    agreedTermDays: null,
     events: [
       {
         id: 'e9',

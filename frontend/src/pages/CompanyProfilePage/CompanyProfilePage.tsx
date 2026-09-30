@@ -13,13 +13,13 @@ import { formatCurrency } from '@/shared/lib/format'
 import { AppButton, EmptyState, LoadingState, PageHeader, Tag, VerifiedBadge } from '@/shared/ui'
 
 const MANAGEMENT_LINKS = [
-  { to: ROUTES.COMPANY_ADMIN, label: 'Панель управления' },
-  { to: ROUTES.COMPANY_EDIT, label: 'Редактировать' },
-  { to: ROUTES.COMPANY_TEAM, label: 'Команда' },
-  { to: ROUTES.COMPANY_SERVICES, label: 'Услуги' },
-  { to: ROUTES.COMPANY_CASES, label: 'Кейсы' },
-  { to: ROUTES.COMPANY_DOCUMENTS, label: 'Документы' },
-  { to: ROUTES.COMPANY_VERIFICATION, label: 'Верификация' },
+  { to: ROUTES.COMPANY_ADMIN, label: 'Панель управления', need: Permission.VIEW_COMPANY_ACTIVITY },
+  { to: ROUTES.COMPANY_EDIT, label: 'Редактировать профиль', need: Permission.EDIT_COMPANY },
+  { to: ROUTES.COMPANY_TEAM, label: 'Команда', need: Permission.MANAGE_COMPANY_MEMBERS },
+  { to: ROUTES.COMPANY_SERVICES, label: 'Услуги', need: Permission.VIEW_COMPANY_SERVICES },
+  { to: ROUTES.COMPANY_CASES, label: 'Кейсы', need: Permission.VIEW_COMPANY_CASES },
+  { to: ROUTES.COMPANY_DOCUMENTS, label: 'Документы', need: Permission.VIEW_COMPANY_DOCUMENTS },
+  { to: ROUTES.COMPANY_VERIFICATION, label: 'Верификация', need: Permission.VIEW_COMPANY_VERIFICATION },
 ] as const
 
 export function CompanyProfilePage() {
@@ -27,8 +27,9 @@ export function CompanyProfilePage() {
   const company = useSessionStore((s) => s.company)
   const isLoading = useSessionStore((s) => s.isLoading)
   const { has } = useCompanyPermissions()
+  const canEdit = has(Permission.EDIT_COMPANY)
   const canManageCompany =
-    has(Permission.EDIT_COMPANY) || has(Permission.MANAGE_COMPANY_MEMBERS)
+    canEdit || has(Permission.MANAGE_COMPANY_MEMBERS) || has(Permission.VIEW_COMPANY_SERVICES)
 
   if (isLoading) return <LoadingState variant="page" />
 
@@ -46,9 +47,21 @@ export function CompanyProfilePage() {
     )
   }
 
+  const visibleLinks = MANAGEMENT_LINKS.filter((link) => has(link.need))
+
   return (
     <Box>
-      <PageHeader title="Профиль компании" subtitle="Рабочий профиль в B2B Match" />
+      <PageHeader
+        title="Профиль компании"
+        subtitle="Рабочий профиль в B2B Match — данные можно менять при наличии права редактирования"
+        actions={
+          canEdit ? (
+            <AppButton component={RouterLink} to={ROUTES.COMPANY_EDIT} variant="contained">
+              Редактировать
+            </AppButton>
+          ) : null
+        }
+      />
       <NeedsChangesList />
       <Stack spacing={2}>
         <Stack direction="row" spacing={2} alignItems="center">
@@ -78,32 +91,97 @@ export function CompanyProfilePage() {
         {company.priceFrom != null ? (
           <Typography variant="body2" fontWeight={600}>
             от {formatCurrency(company.priceFrom)}
+            {company.priceTo != null ? ` — ${formatCurrency(company.priceTo)}` : ''}
           </Typography>
         ) : null}
 
-        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-          {company.services.map((s) => (
-            <Tag key={s} label={s} />
-          ))}
-        </Stack>
-        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-          {company.technologies.map((t) => (
-            <Tag key={t} label={t} color="secondary" />
-          ))}
-        </Stack>
+        {company.industries.length > 0 ? (
+          <Box>
+            <Typography variant="h4" sx={{ mb: 0.75 }}>
+              Отрасли
+            </Typography>
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+              {company.industries.map((item) => (
+                <Tag key={item} label={item} />
+              ))}
+            </Stack>
+          </Box>
+        ) : null}
 
-        {canManageCompany ? (
+        {company.services.length > 0 ? (
+          <Box>
+            <Typography variant="h4" sx={{ mb: 0.75 }}>
+              Услуги
+            </Typography>
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+              {company.services.map((s) => (
+                <Tag key={s} label={s} />
+              ))}
+            </Stack>
+          </Box>
+        ) : null}
+
+        {company.capabilities.length > 0 ? (
+          <Box>
+            <Typography variant="h4" sx={{ mb: 0.75 }}>
+              Компетенции
+            </Typography>
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+              {company.capabilities.map((c) => (
+                <Tag key={c} label={c} />
+              ))}
+            </Stack>
+          </Box>
+        ) : null}
+
+        {company.technologies.length > 0 ? (
+          <Box>
+            <Typography variant="h4" sx={{ mb: 0.75 }}>
+              Технологии
+            </Typography>
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+              {company.technologies.map((t) => (
+                <Tag key={t} label={t} color="secondary" />
+              ))}
+            </Stack>
+          </Box>
+        ) : null}
+
+        <Typography variant="body2" color="text.secondary">
+          Кейсов в профиле: {company.casesCount}
+          {has(Permission.VIEW_COMPANY_CASES) ? (
+            <>
+              {' · '}
+              <Typography
+                component={RouterLink}
+                to={ROUTES.COMPANY_CASES}
+                variant="body2"
+                color="secondary"
+              >
+                Смотреть кейсы
+              </Typography>
+            </>
+          ) : null}
+        </Typography>
+
+        {!canEdit ? (
+          <Typography variant="body2" color="text.secondary">
+            Редактирование профиля доступно владельцу и администратору компании.
+          </Typography>
+        ) : null}
+
+        {canManageCompany && visibleLinks.length > 0 ? (
           <Box>
             <Typography variant="h3" sx={{ mb: 1 }}>
               Управление
             </Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              {MANAGEMENT_LINKS.map((link) => (
+              {visibleLinks.map((link) => (
                 <AppButton
                   key={link.to}
                   component={RouterLink}
                   to={link.to}
-                  variant="outlined"
+                  variant={link.need === Permission.EDIT_COMPANY ? 'contained' : 'outlined'}
                   size="small"
                 >
                   {link.label}

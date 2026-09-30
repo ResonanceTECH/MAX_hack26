@@ -91,8 +91,20 @@ export const companyManagementApi = {
         if (patch.industries != null) body.industries = patch.industries
         if (patch.services != null) body.services = patch.services
         if (patch.capabilities != null) body.competencies = patch.capabilities
+        // Backend Company has no technologies column — fold into competencies so edits persist
+        if (patch.technologies != null) {
+          const existing = Array.isArray(body.competencies)
+            ? (body.competencies as string[])
+            : patch.capabilities ?? []
+          const merged = [...existing]
+          for (const t of patch.technologies) {
+            if (!merged.some((x) => x.toLowerCase() === t.toLowerCase())) merged.push(t)
+          }
+          body.competencies = merged
+        }
         if (patch.priceFrom !== undefined) body.budget_min = patch.priceFrom
         if (patch.priceTo !== undefined) body.budget_max = patch.priceTo
+        // Prefer PUT /companies/me when id is "me"-scoped session company
         const { data } = await apiClient.patch<CompanyDto>(`/companies/${companyId}`, body)
         return mapCompanyDtoToModel(data)
       } catch (error) {

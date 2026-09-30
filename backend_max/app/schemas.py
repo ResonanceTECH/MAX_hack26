@@ -256,6 +256,14 @@ class DealCreateIn(BaseModel):
     proposal_id: int
 
 
+class DealTermsIn(BaseModel):
+    """Фиксация согласованных условий в Deal Room."""
+
+    terms_summary: str = Field(min_length=3, max_length=4000)
+    agreed_price: int | None = Field(default=None, ge=1)
+    agreed_term_days: int | None = Field(default=None, ge=1, le=3650)
+
+
 class DealOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -271,6 +279,9 @@ class DealOut(BaseModel):
     proposal: ProposalOut | None = None
     files: list["FileOut"] = Field(default_factory=list)
     next_action: str = ""
+    terms_summary: str | None = None
+    agreed_price: int | None = None
+    agreed_term_days: int | None = None
 
 
 class FileOut(BaseModel):

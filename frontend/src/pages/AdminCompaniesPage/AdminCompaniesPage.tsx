@@ -21,13 +21,13 @@ import {
   VerificationStatusChip,
 } from '@/features/admin'
 import { BaseUiMenu } from '@/features/company-management/ui/BaseUiMenu'
-import { REGIONS } from '@/shared/constants/labels'
 import { adminCompanyPath, ROUTES } from '@/shared/constants/routes'
 import {
   AppButton,
   AppSelect,
   CompanyAvatar,
   EmptyState,
+  RegionAutocomplete,
   ErrorState,
   FilterDrawer,
   LoadingState,
@@ -93,11 +93,13 @@ export function AdminCompaniesPage() {
           })),
         ]}
       />
-      <AppSelect
+      <RegionAutocomplete
         label="Регион"
         value={region}
+        allowEmpty
+        emptyLabel="Все"
+        helperText={null}
         onChange={setRegion}
-        options={[{ value: '', label: 'Все' }, ...REGIONS.map((r) => ({ value: r, label: r }))]}
       />
       <AppSelect
         label="Сортировка"

@@ -21,14 +21,28 @@ import {
   type ParsedOpportunityDraft,
 } from '@/features/opportunity-create/lib/parseOpportunityText'
 import { useSnackbarStore } from '@/features/ui/model/snackbarStore'
-import { OPPORTUNITY_CATEGORIES, REGIONS } from '@/shared/constants/labels'
+import { OPPORTUNITY_CATEGORIES, INDUSTRIES } from '@/shared/constants/labels'
 import { OPPORTUNITY_TYPE_LABELS } from '@/shared/constants/labels'
 import { companyDetailsPath, opportunityDetailsPath, ROUTES } from '@/shared/constants/routes'
 import { formatBudgetRange } from '@/shared/lib/format'
-import { AppButton, AppInput, AppSelect, AppTextarea, PageHeader } from '@/shared/ui'
+import {
+  AppButton,
+  AppInput,
+  AppSelect,
+  AppTextarea,
+  CommaListInput,
+  PageHeader,
+  RegionAutocomplete,
+} from '@/shared/ui'
 import { MatchCard } from '@/widgets/MatchCard/MatchCard'
 
 type Step = 'describe' | 'structured' | 'form' | 'preview' | 'success' | 'draft-saved'
+
+function setBudgetFieldValue(value: unknown): number | null {
+  if (value === '' || value == null) return null
+  const n = typeof value === 'number' ? value : Number(String(value).replace(/\s/g, ''))
+  return Number.isFinite(n) ? n : null
+}
 
 function toPayload(values: OpportunityFormValues) {
   return {
@@ -226,52 +240,47 @@ export function CreateOpportunityPage() {
               helperText={form.formState.errors.category?.message}
               onChange={(v) => form.setValue('category', v, { shouldValidate: true })}
             />
-            <AppInput
+            <CommaListInput
               label="Отрасли (через запятую)"
               error={Boolean(form.formState.errors.industries)}
-              helperText={form.formState.errors.industries?.message}
-              value={form.watch('industries').join(', ')}
-              onChange={(e) =>
-                form.setValue(
-                  'industries',
-                  e.target.value
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                  { shouldValidate: true },
-                )
+              helperText={
+                form.formState.errors.industries?.message ??
+                `Вертикаль рынка, не категория услуги. Например: ${INDUSTRIES.slice(0, 4).join(', ')}`
               }
+              value={form.watch('industries')}
+              onChange={(next) => form.setValue('industries', next, { shouldValidate: true })}
             />
-            <AppInput
+            <CommaListInput
               label="Технологии (через запятую)"
-              value={form.watch('technologies').join(', ')}
-              onChange={(e) =>
-                form.setValue(
-                  'technologies',
-                  e.target.value
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                )
-              }
+              value={form.watch('technologies')}
+              onChange={(next) => form.setValue('technologies', next)}
             />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <AppInput
                 label="Бюджет от"
                 type="number"
-                {...form.register('budgetMin', { valueAsNumber: true })}
+                inputMode="numeric"
+                {...form.register('budgetMin', { setValueAs: setBudgetFieldValue })}
               />
               <AppInput
                 label="Бюджет до"
                 type="number"
-                {...form.register('budgetMax', { valueAsNumber: true })}
+                inputMode="numeric"
+                {...form.register('budgetMax', { setValueAs: setBudgetFieldValue })}
               />
             </Stack>
-            <AppSelect
-              label="Регион"
-              value={form.watch('region')}
-              options={REGIONS.map((r) => ({ value: r, label: r }))}
-              onChange={(v) => form.setValue('region', v, { shouldValidate: true })}
+            <Controller
+              name="region"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <RegionAutocomplete
+                  label="Регион"
+                  value={field.value}
+                  onChange={(v) => field.onChange(v)}
+                  error={Boolean(fieldState.error)}
+                  helperText={fieldState.error?.message}
+                />
+              )}
             />
             <AppInput
               label="Дедлайн приёма предложений"

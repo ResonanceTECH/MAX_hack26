@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { chooseSelect, gap } from './helpers'
+import { chooseSelect, chooseRegion, gap } from './helpers'
 
 test('[COMP-01] catalog loads', async ({ page }) => {
   await page.goto('/companies')
@@ -41,7 +41,7 @@ test('[COMP-05] technology filter', async ({ page }) => {
 test('[COMP-06] region filter', async ({ page }) => {
   await page.goto('/companies')
   await expect(page.getByRole('heading', { name: 'Digital Lab' })).toBeVisible()
-  await chooseSelect(page, 'Регион', 'Санкт-Петербург')
+  await chooseRegion(page, 'Санкт-Петербург')
   await expect(page.getByRole('heading', { name: 'TechFlow' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Digital Lab' })).toHaveCount(0)
 })
@@ -65,7 +65,7 @@ test('[COMP-08] rating filter', async ({ page }) => {
 
 test('[COMP-09] combined filters', async ({ page }) => {
   await page.goto('/companies')
-  await chooseSelect(page, 'Регион', 'Москва')
+  await chooseRegion(page, 'Москва')
   await page.getByRole('checkbox', { name: 'Только verified' }).check()
   await expect(page.getByRole('heading', { name: 'Digital Lab' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'МедСнаб' })).toHaveCount(0)
